@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { ChatMessage } from '../../types'
 import { ChevronDownIcon } from './icons'
 import { Logo } from './Logo'
@@ -64,7 +64,7 @@ export function MessageList({
     setShowJump(!atBottom)
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (messages.length > count.current) {
       pinned.current = true
       setShowJump(false)

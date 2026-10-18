@@ -12,17 +12,18 @@ export function Markdown({ content, streaming = false }: Props) {
     [content, streaming],
   )
   const blocks = useMemo(() => parseBlocks(closed), [closed])
+  const pendingView = useMemo(() => {
+    if (!pending) return null
+    if (/^\s*```/.test(pending)) return pending
+    return renderInline(parseInline(pending))
+  }, [pending])
 
   return (
     <div className="markdown">
       {blocks.map((block, index) => (
         <BlockView key={index} block={block} />
       ))}
-      {pending ? (
-        <span className="markdown-pending">
-          {/^\s*```/.test(pending) ? pending : renderInline(parseInline(pending))}
-        </span>
-      ) : null}
+      {pendingView ? <span className="markdown-pending">{pendingView}</span> : null}
     </div>
   )
 }

@@ -7,7 +7,7 @@ import { Sidebar } from './Sidebar'
 import './chat.css'
 
 export function Chat() {
-  const { messages, input, setInput, loading, error, send, reset, title, regenerate } =
+  const { user, messages, input, setInput, loading, ready, error, send, reset, title, regenerate } =
     useChat()
   const [sidebarOpen, setSidebarOpen] = useState(
     () => window.matchMedia('(min-width: 861px)').matches,
@@ -20,6 +20,7 @@ export function Chat() {
         onNewChat={reset}
         onCollapse={() => setSidebarOpen(false)}
         title={title}
+        userName={user?.user_name}
       />
       <main className="chat">
         <ChatHeader
@@ -39,7 +40,7 @@ export function Chat() {
           {error ? <p className="error">{error}</p> : null}
           <Composer
             value={input}
-            loading={loading}
+            loading={loading || !ready}
             onChange={setInput}
             onSend={() => void send()}
           />

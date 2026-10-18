@@ -1,7 +1,20 @@
-import type { ChatEvent } from './types'
+import type { ChatEvent, UserInfo } from './types'
+
+export async function fetchUserInfo(): Promise<UserInfo> {
+  const response = await fetch('/user/info')
+  if (!response.ok) {
+    throw new Error(`获取用户信息失败 ${response.status}`)
+  }
+  const data = (await response.json()) as UserInfo
+  if (!data.user_id || !data.sessionsid || !data.user_name) {
+    throw new Error('用户信息不完整')
+  }
+  return data
+}
 
 export async function sendChatStream(
   message: string,
+  user: Pick<UserInfo, 'user_id' | 'sessionsid'>,
   onEvent: (event: ChatEvent) => void,
 ): Promise<void> {
   const response = await fetch('/v1/chat', {
@@ -10,7 +23,11 @@ export async function sendChatStream(
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
     },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({
+      message,
+      user_id: user.user_id,
+      sessionsid: user.sessionsid,
+    }),
   })
 
   if (!response.ok || !response.body) {

@@ -5,9 +5,10 @@ type Props = {
   onNewChat: () => void
   onCollapse: () => void
   title?: string
+  userName?: string
 }
 
-export function Sidebar({ onNewChat, onCollapse, title = '' }: Props) {
+export function Sidebar({ onNewChat, onCollapse, title = '', userName = '本地助手' }: Props) {
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -36,7 +37,7 @@ export function Sidebar({ onNewChat, onCollapse, title = '' }: Props) {
           <span>暂无历史会话</span>
         )}
       </div>
-      <div className="account">本地助手</div>
+      <div className="account">{userName}</div>
     </aside>
   )
 }

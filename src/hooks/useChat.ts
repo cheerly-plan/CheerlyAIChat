@@ -1,50 +1,124 @@
-import { useState } from 'react'
-import { sendChatStream } from '../api'
-import type { ChatMessage } from '../types'
+import { useEffect, useRef, useState } from 'react'
+import { fetchUserInfo, sendChatStream } from '../api'
+import type { ChatMessage, UserInfo } from '../types'
 
 export function useChat() {
+  const [user, setUser] = useState<UserInfo | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const pendingText = useRef('')
+  const streamId = useRef<string | null>(null)
+  const raf = useRef(0)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchUserInfo()
+      .then((info) => {
+        if (!cancelled) setUser(info)
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : '获取用户信息失败')
+        }
+      })
+    return () => {
+      cancelled = true
+      if (raf.current) cancelAnimationFrame(raf.current)
+    }
+  }, [])
+
+  function patchMessage(id: string, patch: (item: ChatMessage) => ChatMessage) {
+    setMessages((prev) => {
+      const index = prev.findIndex((item) => item.id === id)
+      if (index === -1) return prev
+      const item = prev[index]
+      if (!item) return prev
+      const next = prev.slice()
+      next[index] = patch(item)
+      return next
+    })
+  }
+
+  function flushText() {
+    if (raf.current) {
+      cancelAnimationFrame(raf.current)
+      raf.current = 0
+    }
+    const id = streamId.current
+    const chunk = pendingText.current
+    if (!id || !chunk) return
+    pendingText.current = ''
+    patchMessage(id, (item) => ({ ...item, content: item.content + chunk }))
+  }
+
+  function queueText(chunk: string) {
+    pendingText.current += chunk
+    if (raf.current) return
+    raf.current = requestAnimationFrame(() => {
+      raf.current = 0
+      flushText()
+    })
+  }
+
+  function stopStream() {
+    pendingText.current = ''
+    streamId.current = null
+    if (raf.current) {
+      cancelAnimationFrame(raf.current)
+      raf.current = 0
+    }
+  }
 
   async function streamReply(userContent: string, assistantId: string) {
+    if (!user) {
+      setError('用户信息未就绪')
+      return
+    }
+    streamId.current = assistantId
+    pendingText.current = ''
+    if (raf.current) {
+      cancelAnimationFrame(raf.current)
+      raf.current = 0
+    }
     setError('')
     setLoading(true)
     try {
-      await sendChatStream(userContent, (event) => {
+      await sendChatStream(userContent, user, (event) => {
+        if (streamId.current !== assistantId) return
         if (event.type === 'text') {
-          setMessages((prev) =>
-            prev.map((item) =>
-              item.id === assistantId
-                ? { ...item, content: item.content + event.content }
-                : item,
-            ),
-          )
+          queueText(event.content)
+          return
         }
+        flushText()
         if (event.type === 'tool_start') {
-          setMessages((prev) =>
-            prev.map((item) =>
-              item.id === assistantId
-                ? { ...item, tools: [...(item.tools ?? []), event.name] }
-                : item,
-            ),
-          )
+          patchMessage(assistantId, (item) => ({
+            ...item,
+            tools: [...(item.tools ?? []), event.name],
+          }))
         }
         if (event.type === 'error') {
           setError(event.message)
         }
       })
+      if (streamId.current === assistantId) flushText()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '发送失败')
+      if (streamId.current === assistantId) {
+        flushText()
+        setError(err instanceof Error ? err.message : '发送失败')
+      }
     } finally {
-      setLoading(false)
+      if (streamId.current === assistantId) {
+        streamId.current = null
+        setLoading(false)
+      }
     }
   }
 
   async function send(text?: string) {
     const content = (text ?? input).trim()
-    if (!content || loading) return
+    if (!content || loading || !user) return
 
     const assistantId = crypto.randomUUID()
     setMessages((prev) => [
@@ -57,31 +131,35 @@ export function useChat() {
   }
 
   async function regenerate(id: string) {
-    if (loading) return
+    if (loading || !user) return
     const index = messages.findIndex((item) => item.id === id)
-    const user = messages[index - 1]
-    if (!user || user.role !== 'user') return
+    const previous = messages[index - 1]
+    if (!previous || previous.role !== 'user') return
     const assistantId = crypto.randomUUID()
     setMessages([
       ...messages.slice(0, index),
       { id: assistantId, role: 'assistant', content: '', tools: [] },
     ])
-    await streamReply(user.content, assistantId)
+    await streamReply(previous.content, assistantId)
   }
 
   function reset() {
+    stopStream()
     setMessages([])
     setInput('')
     setError('')
+    setLoading(false)
   }
 
   const title = conversationTitle(messages)
 
   return {
+    user,
     messages,
     input,
     setInput,
     loading,
+    ready: Boolean(user),
     error,
     send,
     reset,
