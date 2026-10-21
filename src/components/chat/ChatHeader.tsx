@@ -3,13 +3,20 @@ import { NewChatIcon, PanelIcon, SearchIcon } from './icons'
 
 type Props = {
   title: string
+  titleLoading?: boolean
   collapsed: boolean
   onToggleSidebar: () => void
   onNewChat: () => void
 }
 
-export function ChatHeader({ title, collapsed, onToggleSidebar, onNewChat }: Props) {
-  if (!collapsed && !title) return null
+export function ChatHeader({
+  title,
+  titleLoading = false,
+  collapsed,
+  onToggleSidebar,
+  onNewChat,
+}: Props) {
+  if (!collapsed && !title && !titleLoading) return null
 
   return (
     <header className="chat-header">
@@ -29,7 +36,11 @@ export function ChatHeader({ title, collapsed, onToggleSidebar, onNewChat }: Pro
           </div>
         </>
       ) : null}
-      {title ? <span className="chat-header-title">{title}</span> : null}
+      {titleLoading && !title ? (
+        <span className="chat-header-title skeleton-line skeleton-title" aria-hidden="true" />
+      ) : title ? (
+        <span className="chat-header-title">{title}</span>
+      ) : null}
     </header>
   )
 }

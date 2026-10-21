@@ -1,17 +1,53 @@
 import { useState } from 'react'
+import { hasCachedActiveSession } from '../../api'
 import { useChat } from '../../hooks/useChat'
 import { ChatHeader } from './ChatHeader'
 import { Composer } from './Composer'
+import { Logo } from './Logo'
 import { MessageList } from './MessageList'
 import { Sidebar } from './Sidebar'
 import './chat.css'
 
+function timeGreeting() {
+  const hour = new Date().getHours()
+  if (hour < 5) return '晚上好'
+  if (hour < 11) return '早上好'
+  if (hour < 13) return '中午好'
+  if (hour < 18) return '下午好'
+  return '晚上好'
+}
+
 export function Chat() {
-  const { user, messages, input, setInput, loading, ready, error, send, reset, title, regenerate } =
-    useChat()
+  const {
+    user,
+    messages,
+    input,
+    setInput,
+    loading,
+    historyLoading,
+    hasMore,
+    ready,
+    error,
+    send,
+    loadOlder,
+    reset,
+    selectSession,
+    renameSessionTitle,
+    removeSession,
+    sessions,
+    sessionsReady,
+    sessionId,
+    title,
+    regenerate,
+  } = useChat()
   const [sidebarOpen, setSidebarOpen] = useState(
     () => window.matchMedia('(min-width: 861px)').matches,
   )
+  const isLanding =
+    !sessionId &&
+    messages.length === 0 &&
+    !historyLoading &&
+    (sessionsReady || !hasCachedActiveSession())
 
   return (
     <div className={`shell${sidebarOpen ? '' : ' sidebar-collapsed'}`}>
@@ -19,33 +55,63 @@ export function Chat() {
       <Sidebar
         onNewChat={reset}
         onCollapse={() => setSidebarOpen(false)}
-        title={title}
+        onSelectSession={(id) => void selectSession(id)}
+        onRenameSession={(id, next) => renameSessionTitle(id, next)}
+        onDeleteSession={(id) => removeSession(id)}
+        sessions={sessions}
+        sessionsReady={sessionsReady}
+        activeSessionId={sessionId}
         userName={user?.user_name}
       />
       <main className="chat">
         <ChatHeader
           title={title}
+          titleLoading={!sessionsReady && hasCachedActiveSession()}
           collapsed={!sidebarOpen}
           onToggleSidebar={() => setSidebarOpen((open) => !open)}
           onNewChat={reset}
         />
-        <MessageList
-          messages={messages}
-          loading={loading}
-          onSuggest={(text) => void send(text)}
-          onEditSubmit={(text) => void send(text)}
-          onRegenerate={(id) => void regenerate(id)}
-        />
-        <div className="dock">
-          {error ? <p className="error">{error}</p> : null}
-          <Composer
-            value={input}
-            loading={loading || !ready}
-            onChange={setInput}
-            onSend={() => void send()}
-          />
-          <p className="disclaimer">内容由 AI 生成，请仔细甄别</p>
-        </div>
+        {isLanding ? (
+          <div className="landing">
+            {error ? <p className="error">{error}</p> : null}
+            <div className="landing-hero">
+              <h1 className="landing-hello">
+                <Logo size={36} />
+                <span>{timeGreeting()}，让我们开始聊天吧</span>
+              </h1>
+              <Composer
+                value={input}
+                loading={loading || !ready}
+                onChange={setInput}
+                onSend={() => void send()}
+              />
+            </div>
+          </div>
+        ) : (
+          <>
+            <MessageList
+              key={sessionId ?? 'new'}
+              sessionId={sessionId}
+              messages={messages}
+              loading={loading}
+              historyLoading={historyLoading}
+              hasMore={hasMore}
+              onEditSubmit={(text) => void send(text)}
+              onRegenerate={(id) => void regenerate(id)}
+              onLoadOlder={() => void loadOlder()}
+            />
+            <div className="dock">
+              {error ? <p className="error">{error}</p> : null}
+              <Composer
+                value={input}
+                loading={loading || !ready}
+                onChange={setInput}
+                onSend={() => void send()}
+              />
+            </div>
+          </>
+        )}
+        <p className="disclaimer">内容由 AI 生成，请仔细甄别</p>
       </main>
     </div>
   )

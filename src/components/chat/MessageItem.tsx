@@ -7,6 +7,7 @@ type Props = {
   message: ChatMessage
   loading?: boolean
   busy?: boolean
+  canRegenerate?: boolean
   onEditSubmit?: (text: string) => void
   onRegenerate?: (id: string) => void
 }
@@ -15,6 +16,7 @@ export function MessageItem({
   message,
   loading = false,
   busy = false,
+  canRegenerate = false,
   onEditSubmit,
   onRegenerate,
 }: Props) {
@@ -34,7 +36,7 @@ export function MessageItem({
   const waiting = loading && !message.content && !message.tools?.length
   const thinking = loading && Boolean(message.tools?.length) && !message.content
   return (
-    <div className="row assistant">
+    <div className="row assistant" id={`msg-${message.id}`}>
       <div className="assistant-body">
         {thinking ? <p className="tool">正在调用 {message.tools?.join('、')}</p> : null}
         {waiting ? <span className="typing" /> : null}
@@ -44,15 +46,17 @@ export function MessageItem({
         {done ? (
           <MessageActions>
             <CopyButton text={message.content} />
-            <button
-              type="button"
-              aria-label="重新生成"
-              title="重新生成"
-              disabled={busy}
-              onClick={() => onRegenerate?.(message.id)}
-            >
-              <RefreshIcon />
-            </button>
+            {canRegenerate ? (
+              <button
+                type="button"
+                aria-label="重新生成"
+                title="重新生成"
+                disabled={busy}
+                onClick={() => onRegenerate?.(message.id)}
+              >
+                <RefreshIcon />
+              </button>
+            ) : null}
           </MessageActions>
         ) : null}
       </div>
@@ -95,7 +99,7 @@ function UserMessage({
 
   if (editing) {
     return (
-      <div className="row user">
+      <div className="row user" id={`msg-${message.id}`}>
         <form
           className="inline-composer"
           onSubmit={(event) => {
@@ -150,7 +154,7 @@ function UserMessage({
   }
 
   return (
-    <div className="row user">
+    <div className="row user" id={`msg-${message.id}`}>
       <div className="user-block">
         <div className="bubble">{message.content}</div>
         {done ? (
