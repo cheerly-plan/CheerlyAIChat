@@ -91,7 +91,8 @@ export function LoginView({ onAuthed }: Props) {
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            placeholder="至少 6 位"
+            placeholder={mode === 'login' ? '输入密码' : '至少 8 位'}
+            minLength={mode === 'login' ? undefined : 8}
             maxLength={64}
             required
           />

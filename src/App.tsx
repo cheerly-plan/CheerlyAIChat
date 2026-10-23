@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   clearAuthToken,
   fetchUserInfo,
+  logout,
   readAuthToken,
 } from './api'
 import type { AuthUser, UserInfo } from './types'
@@ -56,6 +57,8 @@ function App() {
   }, [])
 
   const handleLogout = useCallback(() => {
+    // 吊销服务端令牌（网络失败不阻塞本地退出），再清本地凭证
+    void logout()
     clearAuthToken()
     setUser(null)
     setChatEpoch((epoch) => epoch + 1)
@@ -63,7 +66,7 @@ function App() {
   }, [])
 
   if (status === 'checking') {
-    return <div className="auth-checking">正在加载…</div>
+    return <div className="auth-checking"></div>
   }
   if (status === 'anonymous') {
     return <LoginView onAuthed={handleAuthed} />

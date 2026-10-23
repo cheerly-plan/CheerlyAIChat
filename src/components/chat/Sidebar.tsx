@@ -19,6 +19,8 @@ type Props = {
   sessionsError?: string
   onRetrySessions?: () => void
   activeSessionId?: string | null
+  /** 对话进行中（等待/流式回复），会话列表对应标题右侧显示 loading 指示 */
+  chatLoading?: boolean
   userName?: string
   onLogout?: () => void
 }
@@ -34,7 +36,8 @@ export function Sidebar({
   sessionsError = '',
   onRetrySessions,
   activeSessionId = null,
-  userName = '本地助手',
+  chatLoading = false,
+  userName = '',
   onLogout,
 }: Props) {
   const groups = groupSessions(sessions)
@@ -97,6 +100,7 @@ export function Sidebar({
                   key={item.session_id}
                   item={item}
                   active={item.session_id === activeSessionId}
+                  loading={chatLoading && item.session_id === activeSessionId}
                   menuOpen={menuId === item.session_id}
                   onSelect={() => onSelectSession(item.session_id)}
                   onOpenMenu={() => setMenuId(item.session_id)}
@@ -151,6 +155,8 @@ export function Sidebar({
 type ItemProps = {
   item: SessionInfo
   active: boolean
+  /** 该会话的对话正在进行中，标题右侧显示 loading 指示 */
+  loading?: boolean
   menuOpen: boolean
   onSelect: () => void
   onOpenMenu: () => void
@@ -162,6 +168,7 @@ type ItemProps = {
 function HistoryItem({
   item,
   active,
+  loading = false,
   menuOpen,
   onSelect,
   onOpenMenu,
@@ -225,6 +232,9 @@ function HistoryItem({
       <button type="button" className="history-item-title" onClick={onSelect}>
         {title}
       </button>
+      {loading ? (
+        <span className="history-item-loading" role="status" aria-label="正在回复" />
+      ) : null}
       <div className="history-actions">
         <button
           ref={moreRef}

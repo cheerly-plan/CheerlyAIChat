@@ -71,6 +71,7 @@ export function Chat({ onLogout, initialUser = null }: Props) {
         sessionsError={sessionsError}
         onRetrySessions={() => void reloadSessions()}
         activeSessionId={sessionId}
+        chatLoading={loading}
         userName={user?.user_name}
         onLogout={onLogout}
       />

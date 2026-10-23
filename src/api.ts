@@ -34,6 +34,17 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
+// 业务请求统一入口：令牌失效（401）时清除本地令牌并刷新，
+// App 门禁检测不到令牌会自然回到登录页
+async function authedFetch(url: string, init?: RequestInit): Promise<Response> {
+  const response = await fetch(url, init)
+  if (response.status === 401 && readAuthToken()) {
+    clearAuthToken()
+    window.location.reload()
+  }
+  return response
+}
+
 const ACTIVE_SESSION_KEY = 'cheerly.active_session'
 
 export function readActiveSessionId(userId: string): string | null {
@@ -121,7 +132,7 @@ async function errorMessage(response: Response, fallback: string): Promise<strin
 }
 
 export async function fetchUserInfo(): Promise<UserInfo> {
-  const response = await fetch('/user/info', { headers: authHeaders() })
+  const response = await authedFetch('/user/info', { headers: authHeaders() })
   if (!response.ok) {
     throw new Error(`获取用户信息失败 ${response.status}`)
   }
@@ -135,7 +146,7 @@ export async function fetchUserInfo(): Promise<UserInfo> {
 export async function createSession(
   idempotencyKey: string,
 ): Promise<SessionInfo> {
-  const response = await fetch('/v1/session/create', {
+  const response = await authedFetch('/v1/session/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ idempotency_key: idempotencyKey }),
@@ -157,7 +168,7 @@ export async function renameSession(
   sessionId: string,
   title: string,
 ): Promise<SessionInfo> {
-  const response = await fetch('/v1/session/rename', {
+  const response = await authedFetch('/v1/session/rename', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ session_id: sessionId, title }),
@@ -170,7 +181,7 @@ export async function renameSession(
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
-  const response = await fetch('/v1/session/delete', {
+  const response = await authedFetch('/v1/session/delete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ session_id: sessionId }),
@@ -184,7 +195,7 @@ export async function fetchSessionTitle(
   sessionId: string,
 ): Promise<SessionTitle> {
   const params = new URLSearchParams({ session_id: sessionId })
-  const response = await fetch(`/v1/session/title?${params}`, { headers: authHeaders() })
+  const response = await authedFetch(`/v1/session/title?${params}`, { headers: authHeaders() })
   if (!response.ok) {
     throw new Error(`获取会话标题失败 ${response.status}`)
   }
@@ -193,7 +204,7 @@ export async function fetchSessionTitle(
 }
 
 export async function fetchSessions(): Promise<SessionInfo[]> {
-  const response = await fetch('/v1/session/list', { headers: authHeaders() })
+  const response = await authedFetch('/v1/session/list', { headers: authHeaders() })
   if (!response.ok) {
     throw new Error(`获取会话列表失败 ${response.status}`)
   }
@@ -215,7 +226,7 @@ export async function fetchChatMemory(
   if (options.beforeSeq != null) {
     params.set('before_seq', String(options.beforeSeq))
   }
-  const response = await fetch(`/v1/chat/memory?${params}`, { headers: authHeaders() })
+  const response = await authedFetch(`/v1/chat/memory?${params}`, { headers: authHeaders() })
   if (!response.ok) {
     throw new Error(`获取会话记忆失败 ${response.status}`)
   }
@@ -266,13 +277,21 @@ export async function sendChatStream(
   message: string,
   chatSessionId: string,
   onEvent: (event: ChatEvent) => void,
+  options: { regenerate?: boolean } = {},
 ): Promise<void> {
-  const params = new URLSearchParams({
-    sessionId: chatSessionId,
-    content: message,
-  })
-  const response = await fetch(`/v1/chat/stream?${params}`, {
-    headers: { Accept: 'text/event-stream', ...authHeaders() },
+  // POST + JSON body：用户消息不再进 URL，避免落入代理/访问日志/浏览器历史
+  const response = await authedFetch('/v1/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      ...authHeaders(),
+    },
+    body: JSON.stringify({
+      message,
+      chat_session_id: chatSessionId,
+      regenerate: options.regenerate ?? false,
+    }),
   })
 
   if (!response.ok || !response.body) {
@@ -292,7 +311,12 @@ export async function sendChatStream(
     for (const part of parts) {
       for (const line of part.split('\n')) {
         if (!line.startsWith('data: ')) continue
-        onEvent(JSON.parse(line.slice(6)) as ChatEvent)
+        // 坏数据只跳过该条，不让整段流挂掉
+        try {
+          onEvent(JSON.parse(line.slice(6)) as ChatEvent)
+        } catch {
+          /* 忽略无法解析的事件 */
+        }
       }
     }
   }

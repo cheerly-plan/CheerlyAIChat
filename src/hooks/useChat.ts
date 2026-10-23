@@ -241,6 +241,7 @@ export function useChat(initialUser?: UserInfo | null) {
     userContent: string,
     assistantId: string,
     activeSessionId: string,
+    options: { regenerate?: boolean } = {},
   ) {
     if (!user) {
       setError('用户信息未就绪')
@@ -279,10 +280,13 @@ export function useChat(initialUser?: UserInfo | null) {
             setError(event.message)
           }
         },
+        options,
       )
       if (streamId.current === assistantId) flushText()
       // SSE 流结束后标题由后台生成，轮询接口拿最终结果
-      if (streamId.current === assistantId) void pollSessionTitle(activeSessionId)
+      if (streamId.current === assistantId && !options.regenerate) {
+        void pollSessionTitle(activeSessionId)
+      }
     } catch (err) {
       if (streamId.current === assistantId) {
         flushText()
@@ -376,7 +380,10 @@ export function useChat(initialUser?: UserInfo | null) {
       ...messages.slice(0, index),
       { id: assistantId, role: 'assistant', content: '', tools: [] },
     ])
-    await streamReply(previous.content, assistantId, sessionId)
+    // regenerate=true：后端不重复保存用户消息，并剔除旧的助手回答
+    await streamReply(previous.content, assistantId, sessionId, {
+      regenerate: true,
+    })
   }
 
   async function selectSession(id: string) {
