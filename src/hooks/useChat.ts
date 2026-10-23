@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  DEFAULT_SESSION_TITLE,
   createSession,
   deleteSession,
   fetchChatMemory,
+  fetchSessionTitle,
   fetchSessions,
   fetchUserInfo,
   readActiveSessionId,
@@ -13,10 +15,16 @@ import {
 } from '../api'
 import type { ChatMessage, SessionInfo, UserInfo } from '../types'
 
-export function useChat() {
+// 后端在对话结束后异步生成会话标题并写库，
+// 前端轮询 GET /v1/session/title 直到拿到非默认标题或超时。
+const TITLE_POLL_INTERVAL_MS = 2000
+const TITLE_POLL_MAX_ATTEMPTS = 12
+
+export function useChat(initialUser?: UserInfo | null) {
   const [user, setUser] = useState<UserInfo | null>(null)
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [sessionsReady, setSessionsReady] = useState(false)
+  const [sessionsError, setSessionsError] = useState('')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -31,27 +39,38 @@ export function useChat() {
   const loadingOlder = useRef(false)
   const draftKey = useRef(crypto.randomUUID())
   const sessionIdRef = useRef<string | null>(null)
+  const sessionsRef = useRef<SessionInfo[]>([])
 
   useEffect(() => {
     sessionIdRef.current = sessionId
   }, [sessionId])
 
   useEffect(() => {
+    sessionsRef.current = sessions
+  }, [sessions])
+
+  useEffect(() => {
     let cancelled = false
-    fetchUserInfo()
+    // App 登录门禁已校验令牌并拿到用户信息时直接复用，避免重复请求 /user/info
+    const ready = initialUser ? Promise.resolve(initialUser) : fetchUserInfo()
+    ready
       .then(async (info) => {
         let list: SessionInfo[] = []
         let listError = ''
         try {
-          list = await fetchSessions(info.user_id)
+          list = await fetchSessions()
         } catch (err) {
           listError = err instanceof Error ? err.message : '获取会话列表失败'
         }
         if (cancelled) return
         setUser(info)
-        setSessions(list)
+        if (listError) {
+          // 加载失败 ≠ 没有会话，交给侧栏展示错误并支持重试
+          setSessionsError(listError)
+        } else {
+          setSessions(mergePendingSessions(sessionsRef.current, list))
+        }
         setSessionsReady(true)
-        if (listError) setError(listError)
         const cached = readActiveSessionId(info.user_id)
         if (!cached || !list.some((item) => item.session_id === cached)) {
           if (cached) writeActiveSessionId(info.user_id, null)
@@ -61,10 +80,7 @@ export function useChat() {
         setSessionId(cached)
         setHistoryLoading(true)
         try {
-          const page = await fetchChatMemory({
-            user_id: info.user_id,
-            chat_session_id: cached,
-          })
+          const page = await fetchChatMemory(cached)
           if (cancelled || sessionIdRef.current !== cached) return
           setMessages(toChatMessages(page.messages))
           setHasMore(Boolean(page.has_more))
@@ -82,6 +98,7 @@ export function useChat() {
       .catch((err) => {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : '获取用户信息失败')
+          setSessionsError('会话列表加载失败')
           setSessionsReady(true)
         }
       })
@@ -89,7 +106,30 @@ export function useChat() {
       cancelled = true
       if (raf.current) cancelAnimationFrame(raf.current)
     }
+    // 仅在挂载时初始化；用户切换/登出由 App 用 key 重建整个 Chat，无需依赖 initialUser
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // 合并服务器列表与本地临时会话：列表请求期间用户新建的会话不被覆盖丢失
+  function mergePendingSessions(
+    pending: SessionInfo[],
+    list: SessionInfo[],
+  ): SessionInfo[] {
+    const known = new Set(list.map((item) => item.session_id))
+    const local = pending.filter((item) => !known.has(item.session_id))
+    return local.length ? [...local, ...list] : list
+  }
+
+  async function reloadSessions() {
+    if (!sessionsReady) return
+    setSessionsError('')
+    try {
+      const list = await fetchSessions()
+      setSessions(mergePendingSessions(sessionsRef.current, list))
+    } catch (err) {
+      setSessionsError(err instanceof Error ? err.message : '获取会话列表失败')
+    }
+  }
 
   function patchMessage(id: string, patch: (item: ChatMessage) => ChatMessage) {
     setMessages((prev) => {
@@ -118,15 +158,43 @@ export function useChat() {
   function patchSessionTitle(id: string, title: string) {
     setSessions((prev) => {
       const index = prev.findIndex((item) => item.session_id === id)
-      if (index === -1) {
-        return [{ session_id: id, title }, ...prev]
-      }
+      if (index === -1) return prev
       const current = prev[index]
       if (!current || current.title === title) return prev
       const next = prev.slice()
       next[index] = { ...current, title }
       return next
     })
+  }
+
+  function sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
+  // 只在会话仍为默认标题时应用生成结果，避免覆盖用户手动改的名字；
+  // 会话被删除后停止轮询。
+  function applyGeneratedTitle(id: string, title: string) {
+    const target = sessionsRef.current.find((item) => item.session_id === id)
+    if (!target || target.title !== DEFAULT_SESSION_TITLE) return
+    patchSessionTitle(id, title)
+  }
+
+  async function pollSessionTitle(sessionId: string) {
+    if (!user) return
+    for (let attempt = 0; attempt < TITLE_POLL_MAX_ATTEMPTS; attempt += 1) {
+      await sleep(TITLE_POLL_INTERVAL_MS)
+      const target = sessionsRef.current.find((item) => item.session_id === sessionId)
+      if (!target || target.title !== DEFAULT_SESSION_TITLE) return
+      try {
+        const { title } = await fetchSessionTitle(sessionId)
+        if (title !== DEFAULT_SESSION_TITLE) {
+          applyGeneratedTitle(sessionId, title)
+          return
+        }
+      } catch {
+        // 单次查询失败忽略，继续下一轮
+      }
+    }
   }
 
   function flushText() {
@@ -189,7 +257,7 @@ export function useChat() {
     try {
       await sendChatStream(
         userContent,
-        { user_id: user.user_id, chat_session_id: activeSessionId },
+        activeSessionId,
         (event) => {
           if (streamId.current !== assistantId) return
           if (event.type === 'title_updated') {
@@ -213,6 +281,8 @@ export function useChat() {
         },
       )
       if (streamId.current === assistantId) flushText()
+      // SSE 流结束后标题由后台生成，轮询接口拿最终结果
+      if (streamId.current === assistantId) void pollSessionTitle(activeSessionId)
     } catch (err) {
       if (streamId.current === assistantId) {
         flushText()
@@ -232,7 +302,7 @@ export function useChat() {
     setHistoryLoading(true)
     try {
       const page = await fetchChatMemory(
-        { user_id: user.user_id, chat_session_id: sessionId },
+        sessionId,
         { beforeSeq: nextBeforeSeq.current },
       )
       const older = toChatMessages(page.messages)
@@ -255,7 +325,7 @@ export function useChat() {
       return null
     }
     if (sessionIdRef.current) return sessionIdRef.current
-    const created = await createSession(user.user_id, draftKey.current)
+    const created = await createSession(draftKey.current)
     sessionIdRef.current = created.session_id
     setSessionId(created.session_id)
     writeActiveSessionId(user.user_id, created.session_id)
@@ -270,7 +340,7 @@ export function useChat() {
     setInput('')
     setLoading(true)
     setError('')
-    let activeId: string | null = null
+    let activeId: string | null
     try {
       activeId = await ensureSession()
     } catch (err) {
@@ -324,10 +394,7 @@ export function useChat() {
     loadingOlder.current = false
     setHistoryLoading(true)
     try {
-      const page = await fetchChatMemory({
-        user_id: user.user_id,
-        chat_session_id: id,
-      })
+      const page = await fetchChatMemory(id)
       if (sessionIdRef.current !== id) return
       setMessages(toChatMessages(page.messages))
       setHasMore(Boolean(page.has_more))
@@ -347,7 +414,7 @@ export function useChat() {
     const next = title.trim()
     if (!next) return
     try {
-      const updated = await renameSession(user.user_id, id, next)
+      const updated = await renameSession(id, next)
       patchSessionTitle(id, updated.title)
     } catch (err) {
       setError(err instanceof Error ? err.message : '重命名会话失败')
@@ -357,7 +424,7 @@ export function useChat() {
   async function removeSession(id: string) {
     if (!user) return
     try {
-      await deleteSession(user.user_id, id)
+      await deleteSession(id)
       setSessions((prev) => prev.filter((item) => item.session_id !== id))
       if (sessionIdRef.current === id) reset()
     } catch (err) {
@@ -381,6 +448,8 @@ export function useChat() {
     user,
     sessions,
     sessionsReady,
+    sessionsError,
+    reloadSessions,
     sessionId,
     messages,
     input,

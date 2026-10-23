@@ -19,6 +19,22 @@ export type ChatEvent =
   | { type: 'error'; message: string }
   | { type: 'title_updated'; session_id: string; title: string }
 
+export type AuthUser = {
+  user_id: string
+  user_name: string
+}
+
+export type AuthResponse = {
+  token: string
+  expires_at: string
+  user: AuthUser
+}
+
+export type SessionTitle = {
+  session_id: string
+  title: string
+}
+
 export type MemoryMessage = {
   role: string
   content?: string

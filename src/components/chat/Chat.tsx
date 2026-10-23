@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { hasCachedActiveSession } from '../../api'
 import { useChat } from '../../hooks/useChat'
+import type { UserInfo } from '../../types'
 import { ChatHeader } from './ChatHeader'
 import { Composer } from './Composer'
 import { Logo } from './Logo'
@@ -17,7 +18,12 @@ function timeGreeting() {
   return '晚上好'
 }
 
-export function Chat() {
+type Props = {
+  onLogout: () => void
+  initialUser?: UserInfo | null
+}
+
+export function Chat({ onLogout, initialUser = null }: Props) {
   const {
     user,
     messages,
@@ -36,10 +42,12 @@ export function Chat() {
     removeSession,
     sessions,
     sessionsReady,
+    sessionsError,
+    reloadSessions,
     sessionId,
     title,
     regenerate,
-  } = useChat()
+  } = useChat(initialUser)
   const [sidebarOpen, setSidebarOpen] = useState(
     () => window.matchMedia('(min-width: 861px)').matches,
   )
@@ -60,8 +68,11 @@ export function Chat() {
         onDeleteSession={(id) => removeSession(id)}
         sessions={sessions}
         sessionsReady={sessionsReady}
+        sessionsError={sessionsError}
+        onRetrySessions={() => void reloadSessions()}
         activeSessionId={sessionId}
         userName={user?.user_name}
+        onLogout={onLogout}
       />
       <main className="chat">
         <ChatHeader

@@ -100,6 +100,30 @@
   padding: 10px 8px;
 }
 
+.history-error {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 8px;
+  color: #d64545;
+}
+
+.history-retry {
+  align-self: flex-start;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 12px;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.history-retry:hover {
+  background: #f3f4f6;
+}
+
 .history-skeleton {
   padding-top: 2px;
 }
@@ -432,6 +456,33 @@
   padding: 10px 8px;
   font-size: 13px;
   color: #4b5563;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.account-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-logout {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.account-logout:hover {
+  color: #d5392f;
+  background: rgba(213, 57, 47, 0.08);
 }
 
 .chat {

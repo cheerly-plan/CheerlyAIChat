@@ -16,8 +16,11 @@ type Props = {
   onDeleteSession: (id: string) => Promise<void> | void
   sessions: SessionInfo[]
   sessionsReady?: boolean
+  sessionsError?: string
+  onRetrySessions?: () => void
   activeSessionId?: string | null
   userName?: string
+  onLogout?: () => void
 }
 
 export function Sidebar({
@@ -28,8 +31,11 @@ export function Sidebar({
   onDeleteSession,
   sessions,
   sessionsReady = false,
+  sessionsError = '',
+  onRetrySessions,
   activeSessionId = null,
   userName = '本地助手',
+  onLogout,
 }: Props) {
   const groups = groupSessions(sessions)
   const [menuId, setMenuId] = useState<string | null>(null)
@@ -70,8 +76,18 @@ export function Sidebar({
         开启新对话
       </button>
       <div className="history">
+        {/* 显式四态，互斥渲染：加载骨架 / 加载失败 / 空态 / 会话分组 */}
         {!sessionsReady ? (
           <HistorySkeleton />
+        ) : sessionsError ? (
+          <div className="history-error">
+            <span>{sessionsError}</span>
+            {onRetrySessions ? (
+              <button type="button" className="history-retry" onClick={onRetrySessions}>
+                重试
+              </button>
+            ) : null}
+          </div>
         ) : groups.length ? (
           groups.map((group) => (
             <section key={group.label} className="history-group">
@@ -101,7 +117,19 @@ export function Sidebar({
           <span className="history-empty">暂无历史会话</span>
         )}
       </div>
-      <div className="account">{userName}</div>
+      <div className="account">
+        <span className="account-name">{userName}</span>
+        {onLogout ? (
+          <button
+            type="button"
+            className="account-logout"
+            onClick={onLogout}
+            aria-label="退出登录"
+          >
+            退出登录
+          </button>
+        ) : null}
+      </div>
     </aside>
     {renameItem ? (
       <RenameDialog

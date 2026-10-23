@@ -1,7 +1,38 @@
-import type { ChatEvent, ChatMemory, ChatMessage, MemoryMessage, SessionInfo, UserInfo } from './types'
+import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, MemoryMessage, SessionInfo, SessionTitle, UserInfo } from './types'
 
 export const CHAT_MEMORY_PAGE_SIZE = 20
 export const DEFAULT_SESSION_TITLE = '新会话'
+
+const AUTH_TOKEN_KEY = 'cheerly.auth_token'
+
+export function readAuthToken(): string | null {
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function writeAuthToken(token: string) {
+  try {
+    localStorage.setItem(AUTH_TOKEN_KEY, token)
+  } catch {
+    /* 隐私模式等无法写入时忽略 */
+  }
+}
+
+export function clearAuthToken() {
+  try {
+    localStorage.removeItem(AUTH_TOKEN_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
+function authHeaders(): Record<string, string> {
+  const token = readAuthToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 const ACTIVE_SESSION_KEY = 'cheerly.active_session'
 
@@ -35,8 +66,62 @@ export function hasCachedActiveSession() {
   return false
 }
 
+export async function login(
+  username: string,
+  password: string,
+): Promise<AuthResponse> {
+  const response = await fetch('/v1/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+  if (!response.ok) {
+    const detail = await errorMessage(response, '登录失败')
+    throw new Error(detail)
+  }
+  return (await response.json()) as AuthResponse
+}
+
+export async function register(
+  username: string,
+  password: string,
+  displayName: string,
+): Promise<AuthResponse> {
+  const response = await fetch('/v1/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username,
+      password,
+      display_name: displayName.trim(),
+    }),
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '注册失败'))
+  }
+  return (await response.json()) as AuthResponse
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await fetch('/v1/auth/logout', { method: 'POST', headers: authHeaders() })
+  } catch {
+    /* 本地退出不受网络影响 */
+  }
+}
+
+async function errorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const data = (await response.json()) as { detail?: string }
+    if (data.detail) return data.detail
+  } catch {
+    /* 非 JSON 响应时用兜底文案 */
+  }
+  return `${fallback} ${response.status}`
+}
+
 export async function fetchUserInfo(): Promise<UserInfo> {
-  const response = await fetch('/user/info')
+  const response = await fetch('/user/info', { headers: authHeaders() })
   if (!response.ok) {
     throw new Error(`获取用户信息失败 ${response.status}`)
   }
@@ -48,16 +133,12 @@ export async function fetchUserInfo(): Promise<UserInfo> {
 }
 
 export async function createSession(
-  userId: string,
   idempotencyKey: string,
 ): Promise<SessionInfo> {
   const response = await fetch('/v1/session/create', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      user_id: userId,
-      idempotency_key: idempotencyKey,
-    }),
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ idempotency_key: idempotencyKey }),
   })
   if (!response.ok) {
     throw new Error(`创建会话失败 ${response.status}`)
@@ -73,18 +154,13 @@ export async function createSession(
 }
 
 export async function renameSession(
-  userId: string,
   sessionId: string,
   title: string,
 ): Promise<SessionInfo> {
   const response = await fetch('/v1/session/rename', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      user_id: userId,
-      session_id: sessionId,
-      title,
-    }),
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ session_id: sessionId, title }),
   })
   if (!response.ok) {
     throw new Error(`重命名会话失败 ${response.status}`)
@@ -93,23 +169,31 @@ export async function renameSession(
   return { ...data, title: data.title || DEFAULT_SESSION_TITLE }
 }
 
-export async function deleteSession(userId: string, sessionId: string): Promise<void> {
+export async function deleteSession(sessionId: string): Promise<void> {
   const response = await fetch('/v1/session/delete', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      user_id: userId,
-      session_id: sessionId,
-    }),
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ session_id: sessionId }),
   })
   if (!response.ok) {
     throw new Error(`删除会话失败 ${response.status}`)
   }
 }
 
-export async function fetchSessions(userId: string): Promise<SessionInfo[]> {
-  const params = new URLSearchParams({ user_id: userId })
-  const response = await fetch(`/v1/session/list?${params}`)
+export async function fetchSessionTitle(
+  sessionId: string,
+): Promise<SessionTitle> {
+  const params = new URLSearchParams({ session_id: sessionId })
+  const response = await fetch(`/v1/session/title?${params}`, { headers: authHeaders() })
+  if (!response.ok) {
+    throw new Error(`获取会话标题失败 ${response.status}`)
+  }
+  const data = (await response.json()) as SessionTitle
+  return { session_id: data.session_id, title: data.title || DEFAULT_SESSION_TITLE }
+}
+
+export async function fetchSessions(): Promise<SessionInfo[]> {
+  const response = await fetch('/v1/session/list', { headers: authHeaders() })
   if (!response.ok) {
     throw new Error(`获取会话列表失败 ${response.status}`)
   }
@@ -121,18 +205,17 @@ export async function fetchSessions(userId: string): Promise<SessionInfo[]> {
 }
 
 export async function fetchChatMemory(
-  user: Pick<UserInfo, 'user_id' | 'chat_session_id'>,
+  chatSessionId: string,
   options: { limit?: number; beforeSeq?: number | null } = {},
 ): Promise<ChatMemory> {
   const params = new URLSearchParams({
-    user_id: user.user_id,
-    chat_session_id: user.chat_session_id,
+    chat_session_id: chatSessionId,
     limit: String(options.limit ?? CHAT_MEMORY_PAGE_SIZE),
   })
   if (options.beforeSeq != null) {
     params.set('before_seq', String(options.beforeSeq))
   }
-  const response = await fetch(`/v1/chat/memory?${params}`)
+  const response = await fetch(`/v1/chat/memory?${params}`, { headers: authHeaders() })
   if (!response.ok) {
     throw new Error(`获取会话记忆失败 ${response.status}`)
   }
@@ -181,16 +264,15 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
 
 export async function sendChatStream(
   message: string,
-  user: Pick<UserInfo, 'user_id' | 'chat_session_id'>,
+  chatSessionId: string,
   onEvent: (event: ChatEvent) => void,
 ): Promise<void> {
   const params = new URLSearchParams({
-    sessionId: user.chat_session_id,
+    sessionId: chatSessionId,
     content: message,
-    user_id: user.user_id,
   })
   const response = await fetch(`/v1/chat/stream?${params}`, {
-    headers: { Accept: 'text/event-stream' },
+    headers: { Accept: 'text/event-stream', ...authHeaders() },
   })
 
   if (!response.ok || !response.body) {
