@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ChatMessage } from '../../types'
-import { CopyIcon, EditIcon, RefreshIcon } from './icons'
+import { CheckIcon, CopyIcon, EditIcon, RefreshIcon } from './icons'
 import { Markdown } from './Markdown'
 
 type Props = {
@@ -182,23 +182,28 @@ function MessageActions({ children }: { children: ReactNode }) {
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
+  const timerRef = useRef(0)
+
+  useEffect(() => () => window.clearTimeout(timerRef.current), [])
 
   return (
     <button
       type="button"
+      className={copied ? 'copied' : undefined}
       aria-label={copied ? '已复制' : '复制'}
       title={copied ? '已复制' : '复制'}
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(text)
           setCopied(true)
-          window.setTimeout(() => setCopied(false), 1200)
+          window.clearTimeout(timerRef.current)
+          timerRef.current = window.setTimeout(() => setCopied(false), 1200)
         } catch {
           setCopied(false)
         }
       }}
     >
-      <CopyIcon />
+      {copied ? <CheckIcon /> : <CopyIcon />}
     </button>
   )
 }

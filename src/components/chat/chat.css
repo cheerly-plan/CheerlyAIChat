@@ -17,7 +17,7 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 12px;
+  padding: 12px 0 12px 12px;
   background: #f7f8fa;
   border-right: 1px solid #eef0f3;
   overflow: hidden;
@@ -42,6 +42,12 @@
 
 .sidebar-mask {
   display: none;
+}
+
+.brand,
+.new-chat,
+.account {
+  margin-right: 12px;
 }
 
 .brand {
@@ -82,7 +88,7 @@
 .history {
   flex: 1;
   min-height: 0;
-  padding: 8px 4px 8px;
+  padding: 0 16px 8px 4px;
   color: #9aa0a6;
   font-size: 13px;
   overflow: auto;
@@ -140,10 +146,11 @@
 .history-label {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 2;
   margin: 0;
   padding: 10px 8px 8px;
   background: #f7f8fa;
+  box-shadow: 0 -1px 0 #f7f8fa;
   color: #9aa0a6;
   font: inherit;
   font-size: 12px;
@@ -898,7 +905,7 @@
 
   .row:hover .msg-actions,
   .msg-actions:focus-within,
-  .msg-actions:has(button[aria-label='已复制']) {
+  .msg-actions:has(button.copied) {
     opacity: 1;
     pointer-events: auto;
   }
@@ -920,6 +927,12 @@
 .msg-actions button:hover {
   color: #4b5563;
   background: #f3f4f6;
+}
+
+.msg-actions button.copied,
+.msg-actions button.copied:hover {
+  color: #22c55e;
+  background: transparent;
 }
 
 .msg-actions button:disabled,
@@ -1206,7 +1219,7 @@
 
   .sidebar-collapsed .sidebar {
     width: 260px;
-    padding: 12px;
+    padding: 12px 0 12px 12px;
     opacity: 1;
     border-right-color: #eef0f3;
     transform: translateX(-100%);

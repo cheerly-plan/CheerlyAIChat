@@ -194,7 +194,7 @@ function HistoryItem({
       ref={boxRef}
       className={`history-item${active ? ' active' : ''}${menuOpen ? ' menu-open' : ''}`}
     >
-      <button type="button" className="history-item-title" title={title} onClick={onSelect}>
+      <button type="button" className="history-item-title" onClick={onSelect}>
         {title}
       </button>
       <div className="history-actions">
