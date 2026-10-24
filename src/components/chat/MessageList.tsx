@@ -1,8 +1,9 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ChatMessage } from '../../types'
+import { buildSessionTurns } from '../../lib/sessionTurns'
 import { ChevronDownIcon } from './icons'
 import { MessageItem } from './MessageItem'
-import { SessionOutline, buildSessionTurns } from './SessionOutline'
+import { SessionOutline } from './SessionOutline'
 
 const PIN_GAP = 32
 
@@ -11,9 +12,10 @@ type Props = {
   loading: boolean
   historyLoading?: boolean
   hasMore?: boolean
-  sessionId?: string | null
   onEditSubmit: (text: string) => void
   onRegenerate: (id: string) => void
+  onResume?: () => void
+  canResume?: boolean
   onLoadOlder?: () => void
 }
 
@@ -22,9 +24,10 @@ export function MessageList({
   loading,
   historyLoading = false,
   hasMore = false,
-  sessionId = null,
   onEditSubmit,
   onRegenerate,
+  onResume,
+  canResume = false,
   onLoadOlder,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null)
@@ -93,14 +96,6 @@ export function MessageList({
     setShowJump(!atBottom)
     maybeLoadOlder(el)
   }
-
-  useLayoutEffect(() => {
-    pinned.current = true
-    setShowJump(false)
-    firstId.current = undefined
-    count.current = 0
-    prevHeight.current = 0
-  }, [sessionId])
 
   useLayoutEffect(() => {
     const el = ref.current
@@ -172,8 +167,12 @@ export function MessageList({
             loading={loading && message.id === last?.id}
             busy={loading}
             canRegenerate={message.id === last?.id && last?.role === 'assistant'}
+            canResume={
+              canResume && message.id === last?.id && last?.role === 'assistant'
+            }
             onEditSubmit={onEditSubmit}
             onRegenerate={onRegenerate}
+            onResume={onResume}
           />
         ))}
       </div>

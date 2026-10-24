@@ -273,32 +273,12 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
   return result
 }
 
-export async function sendChatStream(
-  message: string,
-  chatSessionId: string,
+// SSE 流的公共读取逻辑：按空行分帧、解析 data: 行，坏数据只跳过该条
+async function readSSE(
+  body: ReadableStream<Uint8Array>,
   onEvent: (event: ChatEvent) => void,
-  options: { regenerate?: boolean } = {},
 ): Promise<void> {
-  // POST + JSON body：用户消息不再进 URL，避免落入代理/访问日志/浏览器历史
-  const response = await authedFetch('/v1/chat', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-      ...authHeaders(),
-    },
-    body: JSON.stringify({
-      message,
-      chat_session_id: chatSessionId,
-      regenerate: options.regenerate ?? false,
-    }),
-  })
-
-  if (!response.ok || !response.body) {
-    throw new Error(`请求失败 ${response.status}`)
-  }
-
-  const reader = response.body.getReader()
+  const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
 
@@ -320,4 +300,69 @@ export async function sendChatStream(
       }
     }
   }
+}
+
+export async function sendChatStream(
+  message: string,
+  chatSessionId: string,
+  onEvent: (event: ChatEvent) => void,
+  options: { regenerate?: boolean; signal?: AbortSignal } = {},
+): Promise<void> {
+  // POST + JSON body：用户消息不再进 URL，避免落入代理/访问日志/浏览器历史
+  const response = await authedFetch('/v1/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      ...authHeaders(),
+    },
+    body: JSON.stringify({
+      message,
+      chat_session_id: chatSessionId,
+      regenerate: options.regenerate ?? false,
+    }),
+    signal: options.signal,
+  })
+
+  if (!response.ok || !response.body) {
+    throw new Error(await errorMessage(response, '请求失败'))
+  }
+
+  await readSSE(response.body, onEvent)
+}
+
+// 断点续跑：从后端 checkpoint 恢复上次中断的回复（整段重跑，前端用首包覆盖半截内容）
+export async function resumeChatStream(
+  runId: string,
+  chatSessionId: string,
+  onEvent: (event: ChatEvent) => void,
+  options: { signal?: AbortSignal } = {},
+): Promise<void> {
+  const response = await authedFetch('/v1/chat/resume', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      ...authHeaders(),
+    },
+    body: JSON.stringify({ run_id: runId, chat_session_id: chatSessionId }),
+    signal: options.signal,
+  })
+  if (!response.ok || !response.body) {
+    throw new Error(await errorMessage(response, '恢复失败'))
+  }
+  await readSSE(response.body, onEvent)
+}
+
+// 会话加载后查询有没有可恢复的未完成回复（刷新页面后找回 run_id）
+export async function fetchPendingRun(
+  chatSessionId: string,
+): Promise<string | null> {
+  const params = new URLSearchParams({ chat_session_id: chatSessionId })
+  const response = await authedFetch(`/v1/chat/pending_run?${params}`, {
+    headers: authHeaders(),
+  })
+  if (!response.ok) return null
+  const data = (await response.json()) as { run_id?: string | null }
+  return data.run_id ?? null
 }

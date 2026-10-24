@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
-import { parseBlocks, parseInline, splitClosed, type Block, type Inline } from './parseMarkdown'
+import { parseBlocks, parseInline, splitClosed, type Block, type Inline } from '../../lib/markdown'
 
 type Props = {
   content: string

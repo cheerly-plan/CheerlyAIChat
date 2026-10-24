@@ -1,14 +1,16 @@
 import { useEffect, useRef } from 'react'
-import { GlobeIcon, PaperclipIcon, SendIcon } from './icons'
+import { GlobeIcon, PaperclipIcon, SendIcon, StopIcon } from './icons'
 
 type Props = {
   value: string
   loading: boolean
   onChange: (value: string) => void
   onSend: () => void
+  /** 流式回复期间传入：发送按钮变为停止按钮 */
+  onStop?: () => void
 }
 
-export function Composer({ value, loading, onChange, onSend }: Props) {
+export function Composer({ value, loading, onChange, onSend, onStop }: Props) {
   const areaRef = useRef<HTMLTextAreaElement>(null)
 
   function resize() {
@@ -58,9 +60,21 @@ export function Composer({ value, loading, onChange, onSend }: Props) {
           <button type="button" className="composer-attach" aria-label="上传附件" disabled={loading}>
             <PaperclipIcon />
           </button>
-          <button type="submit" disabled={loading || !value.trim()} aria-label="发送">
-            <SendIcon />
-          </button>
+          {loading && onStop ? (
+            <button
+              type="button"
+              className="composer-stop"
+              aria-label="停止生成"
+              title="停止生成"
+              onClick={onStop}
+            >
+              <StopIcon />
+            </button>
+          ) : (
+            <button type="submit" disabled={loading || !value.trim()} aria-label="发送">
+              <SendIcon />
+            </button>
+          )}
         </div>
       </div>
     </form>

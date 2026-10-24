@@ -1012,6 +1012,24 @@
   background: transparent;
 }
 
+.msg-actions:has(.msg-resume) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.msg-actions button.msg-resume {
+  width: auto;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.msg-actions button.msg-resume:hover {
+  color: #111827;
+  background: #f3f4f6;
+}
+
 .assistant-body {
   min-width: 0;
   flex: 1;
@@ -1148,6 +1166,23 @@
   font-size: 13px;
 }
 
+/* 末条不是助手消息时的兜底「继续生成」（刷新后半截未落库） */
+.chat-resume-btn {
+  display: block;
+  margin: 0 auto 8px;
+  padding: 4px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+  color: #4b5563;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chat-resume-btn:hover {
+  background: #f9fafb;
+}
+
 .composer {
   max-width: 800px;
   margin: 0 auto;
@@ -1246,6 +1281,36 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+/* 停止生成按钮：替代加载中的发送按钮 */
+.composer-stop {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: #111827;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  animation: composer-stop-in 0.15s ease;
+}
+
+.composer-stop:hover {
+  background: #374151;
+}
+
+@keyframes composer-stop-in {
+  from {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .composer button[type='submit']:disabled {

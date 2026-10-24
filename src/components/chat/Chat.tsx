@@ -47,6 +47,9 @@ export function Chat({ onLogout, initialUser = null }: Props) {
     sessionId,
     title,
     regenerate,
+    canResume,
+    resumeRun,
+    stop,
   } = useChat(initialUser)
   const [sidebarOpen, setSidebarOpen] = useState(
     () => window.matchMedia('(min-width: 861px)').matches,
@@ -96,6 +99,7 @@ export function Chat({ onLogout, initialUser = null }: Props) {
                 loading={loading || !ready}
                 onChange={setInput}
                 onSend={() => void send()}
+                onStop={() => stop()}
               />
             </div>
           </div>
@@ -103,22 +107,35 @@ export function Chat({ onLogout, initialUser = null }: Props) {
           <>
             <MessageList
               key={sessionId ?? 'new'}
-              sessionId={sessionId}
               messages={messages}
               loading={loading}
               historyLoading={historyLoading}
               hasMore={hasMore}
+              canResume={canResume}
               onEditSubmit={(text) => void send(text)}
               onRegenerate={(id) => void regenerate(id)}
+              onResume={() => void resumeRun()}
               onLoadOlder={() => void loadOlder()}
             />
             <div className="dock">
+              {canResume &&
+              !loading &&
+              messages[messages.length - 1]?.role !== 'assistant' ? (
+                <button
+                  type="button"
+                  className="chat-resume-btn"
+                  onClick={() => void resumeRun()}
+                >
+                  继续生成
+                </button>
+              ) : null}
               {error ? <p className="error">{error}</p> : null}
               <Composer
                 value={input}
                 loading={loading || !ready}
                 onChange={setInput}
                 onSend={() => void send()}
+                onStop={() => stop()}
               />
             </div>
           </>

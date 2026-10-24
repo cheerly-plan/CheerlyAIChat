@@ -8,8 +8,10 @@ type Props = {
   loading?: boolean
   busy?: boolean
   canRegenerate?: boolean
+  canResume?: boolean
   onEditSubmit?: (text: string) => void
   onRegenerate?: (id: string) => void
+  onResume?: () => void
 }
 
 export function MessageItem({
@@ -17,10 +19,13 @@ export function MessageItem({
   loading = false,
   busy = false,
   canRegenerate = false,
+  canResume = false,
   onEditSubmit,
   onRegenerate,
+  onResume,
 }: Props) {
   const done = !loading && Boolean(message.content)
+  const interrupted = canResume && !loading
 
   if (message.role === 'user') {
     return (
@@ -43,9 +48,9 @@ export function MessageItem({
         {message.content ? (
           <Markdown content={message.content} streaming={loading} />
         ) : null}
-        {done ? (
+        {done || interrupted ? (
           <MessageActions>
-            <CopyButton text={message.content} />
+            {done ? <CopyButton text={message.content} /> : null}
             {canRegenerate ? (
               <button
                 type="button"
@@ -55,6 +60,16 @@ export function MessageItem({
                 onClick={() => onRegenerate?.(message.id)}
               >
                 <RefreshIcon />
+              </button>
+            ) : null}
+            {interrupted ? (
+              <button
+                type="button"
+                className="msg-resume"
+                disabled={busy}
+                onClick={() => onResume?.()}
+              >
+                继续生成
               </button>
             ) : null}
           </MessageActions>
@@ -88,14 +103,13 @@ function UserMessage({
 
   useEffect(() => {
     if (!editing) return
-    setDraft(message.content)
     const el = areaRef.current
     if (!el) return
     el.focus()
     el.selectionStart = el.value.length
     el.selectionEnd = el.value.length
     resize()
-  }, [editing, message.content])
+  }, [editing])
 
   if (editing) {
     return (
@@ -165,7 +179,10 @@ function UserMessage({
               aria-label="重新编辑"
               title="重新编辑"
               disabled={busy}
-              onClick={() => setEditing(true)}
+              onClick={() => {
+                setDraft(message.content)
+                setEditing(true)
+              }}
             >
               <EditIcon />
             </button>

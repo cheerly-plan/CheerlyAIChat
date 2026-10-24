@@ -4,21 +4,26 @@ import {
   createSession,
   deleteSession,
   fetchChatMemory,
+  fetchPendingRun,
   fetchSessionTitle,
   fetchSessions,
   fetchUserInfo,
   readActiveSessionId,
   renameSession,
+  resumeChatStream,
   sendChatStream,
   toChatMessages,
   writeActiveSessionId,
 } from '../api'
-import type { ChatMessage, SessionInfo, UserInfo } from '../types'
+import type { ChatEvent, ChatMessage, SessionInfo, UserInfo } from '../types'
 
 // 后端在对话结束后异步生成会话标题并写库，
 // 前端轮询 GET /v1/session/title 直到拿到非默认标题或超时。
 const TITLE_POLL_INTERVAL_MS = 2000
 const TITLE_POLL_MAX_ATTEMPTS = 12
+// 服务端重启场景：流断开瞬间后端可能还没 ready（启动收敛 running→interrupted
+// 尚未执行），首次 pending_run 查不到时延迟重试一次
+const RESUME_DISCOVERY_RETRY_MS = 4000
 
 export function useChat(initialUser?: UserInfo | null) {
   const [user, setUser] = useState<UserInfo | null>(null)
@@ -32,6 +37,8 @@ export function useChat(initialUser?: UserInfo | null) {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState('')
+  // 断点续跑：后端 checkpoint 里存在 failed/interrupted 的 run 时可"继续生成"
+  const [canResume, setCanResume] = useState(false)
   const pendingText = useRef('')
   const streamId = useRef<string | null>(null)
   const raf = useRef(0)
@@ -40,6 +47,8 @@ export function useChat(initialUser?: UserInfo | null) {
   const draftKey = useRef(crypto.randomUUID())
   const sessionIdRef = useRef<string | null>(null)
   const sessionsRef = useRef<SessionInfo[]>([])
+  const resumeRunId = useRef<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     sessionIdRef.current = sessionId
@@ -93,6 +102,9 @@ export function useChat(initialUser?: UserInfo | null) {
           if (!cancelled && sessionIdRef.current === cached) {
             setHistoryLoading(false)
           }
+        }
+        if (!cancelled && sessionIdRef.current === cached) {
+          void discoverPendingRun(cached)
         }
       })
       .catch((err) => {
@@ -219,6 +231,9 @@ export function useChat(initialUser?: UserInfo | null) {
   }
 
   function stopStream() {
+    // 取消在途的 SSE 请求（后端会把该 run 标为 interrupted）
+    abortRef.current?.abort()
+    abortRef.current = null
     pendingText.current = ''
     streamId.current = null
     if (raf.current) {
@@ -235,13 +250,88 @@ export function useChat(initialUser?: UserInfo | null) {
     setHasMore(false)
     nextBeforeSeq.current = null
     loadingOlder.current = false
+    clearResumeState()
+  }
+
+  function clearResumeState() {
+    resumeRunId.current = null
+    setCanResume(false)
+  }
+
+  // 暂停生成：中止 SSE 请求，后端收到断开后把 checkpoint 标为 interrupted，
+  // "继续生成"按钮随即亮起
+  function stop() {
+    abortRef.current?.abort()
+  }
+
+  // 会话记忆加载完成后查询后端有没有可恢复的未完成回复（刷新页面后找回现场）
+  async function discoverPendingRun(id: string) {
+    try {
+      const runId = await fetchPendingRun(id)
+      if (runId && sessionIdRef.current === id) {
+        resumeRunId.current = runId
+        setCanResume(true)
+      }
+      return runId
+    } catch {
+      /* 发现失败不影响正常使用 */
+      return null
+    }
+  }
+
+  // 流异常终止（暂停/断网/服务端重启）后的收尾。极速暂停时 run_started 可能
+  // 还没到达前端，resumeRunId 为空——此时向后端查询；确认没有任何可恢复内容
+  // 时才移除末尾空气泡，避免残影
+  async function settleInterruptedStream(
+    activeSessionId: string,
+    assistantId: string,
+  ) {
+    if (!resumeRunId.current) {
+      // 后端 close 生成器是异步的，极速暂停时 checkpoint 可能还没标成 interrupted
+      for (let i = 0; i < 5 && !resumeRunId.current; i += 1) {
+        if (i) await sleep(200)
+        await discoverPendingRun(activeSessionId)
+      }
+      // 服务端重启场景：断流瞬间后端可能还没 ready（启动收敛 running→
+      // interrupted 尚未执行），短轮询拿不到时等几秒再补查一次
+      if (!resumeRunId.current && sessionIdRef.current === activeSessionId) {
+        await sleep(RESUME_DISCOVERY_RETRY_MS)
+        if (sessionIdRef.current === activeSessionId) {
+          await discoverPendingRun(activeSessionId)
+        }
+      }
+    }
+    if (resumeRunId.current) {
+      setCanResume(true)
+      return
+    }
+    setMessages((prev) =>
+      prev.filter((item) => {
+        if (item.id !== assistantId || item.role !== 'assistant') return true
+        return Boolean(item.content || (item.tools && item.tools.length))
+      }),
+    )
+  }
+
+  // 重新生成失败（error 事件）：后端未动库、旧回答原样保留，
+  // 但前端已把旧气泡换成了新的，从服务端拉回权威历史恢复现场
+  async function restoreHistoryAfterFailedRegenerate(id: string) {
+    try {
+      const page = await fetchChatMemory(id)
+      if (sessionIdRef.current !== id) return
+      setMessages(toChatMessages(page.messages))
+      setHasMore(Boolean(page.has_more))
+      nextBeforeSeq.current = page.next_before_seq ?? null
+    } catch {
+      /* 恢复失败保留当前界面，错误提示已单独展示 */
+    }
   }
 
   async function streamReply(
     userContent: string,
     assistantId: string,
     activeSessionId: string,
-    options: { regenerate?: boolean } = {},
+    options: { regenerate?: boolean; resumeRunId?: string } = {},
   ) {
     if (!user) {
       setError('用户信息未就绪')
@@ -255,44 +345,90 @@ export function useChat(initialUser?: UserInfo | null) {
     }
     setError('')
     setLoading(true)
+    const controller = new AbortController()
+    abortRef.current = controller
+    // 流内出现 error 事件（LLM 失败等）：后端已把 checkpoint 标为 failed，
+    // 属于异常收尾而非正常结束
+    let sawError = false
+    // 恢复时后端会重跑整段（不是只发剩余 token），第一条 text 覆盖半截内容
+    let resumeReplacePending = Boolean(options.resumeRunId)
     try {
-      await sendChatStream(
-        userContent,
-        activeSessionId,
-        (event) => {
-          if (streamId.current !== assistantId) return
-          if (event.type === 'title_updated') {
-            patchSessionTitle(event.session_id, event.title)
-            return
-          }
-          if (event.type === 'text') {
-            queueText(event.content)
-            return
-          }
-          flushText()
-          if (event.type === 'tool_start') {
+      const handler = (event: ChatEvent) => {
+        if (streamId.current !== assistantId) return
+        if (event.type === 'run_started') {
+          // 记下本次 run 的 id：流异常断开后"继续生成"靠它发起恢复
+          resumeRunId.current = event.run_id
+          return
+        }
+        if (event.type === 'title_updated') {
+          patchSessionTitle(event.session_id, event.title)
+          return
+        }
+        if (event.type === 'text') {
+          if (resumeReplacePending) {
+            resumeReplacePending = false
+            pendingText.current = ''
             patchMessage(assistantId, (item) => ({
               ...item,
-              tools: [...(item.tools ?? []), event.name],
+              content: event.content,
             }))
+            return
           }
-          if (event.type === 'error') {
-            setError(event.message)
-          }
-        },
-        options,
-      )
+          queueText(event.content)
+          return
+        }
+        flushText()
+        if (event.type === 'tool_start') {
+          patchMessage(assistantId, (item) => ({
+            ...item,
+            tools: [...(item.tools ?? []), event.name],
+          }))
+        }
+        if (event.type === 'error') {
+          sawError = true
+          setError(event.message)
+          // LLM 失败在后端标为 failed，同样可恢复
+          if (resumeRunId.current) setCanResume(true)
+        }
+      }
+      if (options.resumeRunId) {
+        await resumeChatStream(options.resumeRunId, activeSessionId, handler, {
+          signal: controller.signal,
+        })
+      } else {
+        await sendChatStream(userContent, activeSessionId, handler, {
+          ...options,
+          signal: controller.signal,
+        })
+      }
       if (streamId.current === assistantId) flushText()
+      // 只有正常结束才清除可恢复标记；error 事件点亮的状态必须保留，
+      // 否则"继续生成"按钮会刚亮起就被这里抹掉
+      if (!sawError) clearResumeState()
       // SSE 流结束后标题由后台生成，轮询接口拿最终结果
-      if (streamId.current === assistantId && !options.regenerate) {
+      // （regenerate/resume 也可能补触发生成；pollSessionTitle 自带
+      //  "标题非默认即退出"守卫，不会覆盖用户改过的名字）
+      if (streamId.current === assistantId) {
         void pollSessionTitle(activeSessionId)
+      }
+      // 重新生成失败：恢复被前端移除的旧回答（后端库里原样保留）
+      if (options.regenerate && sawError && sessionIdRef.current === activeSessionId) {
+        await restoreHistoryAfterFailedRegenerate(activeSessionId)
       }
     } catch (err) {
       if (streamId.current === assistantId) {
         flushText()
-        setError(err instanceof Error ? err.message : '发送失败')
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          // 主动暂停：已生成的部分保留，checkpoint 在后端标为 interrupted
+          setError('')
+        } else {
+          setError(err instanceof Error ? err.message : '发送失败')
+        }
+        // 极速暂停/断网时 run_started 可能未到达前端，向后端补查一次
+        await settleInterruptedStream(activeSessionId, assistantId)
       }
     } finally {
+      if (abortRef.current === controller) abortRef.current = null
       if (streamId.current === assistantId) {
         streamId.current = null
         setLoading(false)
@@ -358,6 +494,8 @@ export function useChat(initialUser?: UserInfo | null) {
       setInput(content)
       return
     }
+    // 发新消息覆盖未完成回复，不再展示「继续生成」
+    clearResumeState()
 
     const assistantId = crypto.randomUUID()
     setMessages((prev) => [
@@ -370,6 +508,7 @@ export function useChat(initialUser?: UserInfo | null) {
 
   async function regenerate(id: string) {
     if (loading || !user || !sessionId) return
+    clearResumeState()
     const last = messages[messages.length - 1]
     if (!last || last.id !== id || last.role !== 'assistant') return
     const index = messages.length - 1
@@ -386,6 +525,26 @@ export function useChat(initialUser?: UserInfo | null) {
     })
   }
 
+  // 断点续跑：后端从完整消息重跑，首条 text 覆盖半截内容；
+  // 没有半截回答时新建一条气泡
+  async function resumeRun() {
+    const runId = resumeRunId.current
+    if (!runId || loading || !user || !sessionId) return
+    clearResumeState()
+    const last = messages[messages.length - 1]
+    let assistantId: string
+    if (last && last.role === 'assistant') {
+      assistantId = last.id
+    } else {
+      assistantId = crypto.randomUUID()
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantId, role: 'assistant', content: '', tools: [] },
+      ])
+    }
+    await streamReply('', assistantId, sessionId, { resumeRunId: runId })
+  }
+
   async function selectSession(id: string) {
     if (!user || id === sessionId) return
     stopStream()
@@ -395,6 +554,7 @@ export function useChat(initialUser?: UserInfo | null) {
     writeActiveSessionId(user.user_id, id)
     setError('')
     setLoading(false)
+    clearResumeState()
     setMessages([])
     setHasMore(false)
     nextBeforeSeq.current = null
@@ -414,6 +574,7 @@ export function useChat(initialUser?: UserInfo | null) {
     } finally {
       if (sessionIdRef.current === id) setHistoryLoading(false)
     }
+    if (sessionIdRef.current === id) await discoverPendingRun(id)
   }
 
   async function renameSessionTitle(id: string, title: string) {
@@ -474,5 +635,8 @@ export function useChat(initialUser?: UserInfo | null) {
     removeSession,
     title,
     regenerate,
+    canResume,
+    resumeRun,
+    stop,
   }
 }

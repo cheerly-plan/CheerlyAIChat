@@ -12,6 +12,7 @@ export type SessionInfo = {
 }
 
 export type ChatEvent =
+  | { type: 'run_started'; run_id: string }
   | { type: 'text'; content: string }
   | { type: 'tool_start'; name: string }
   | { type: 'tool_end'; name: string }
