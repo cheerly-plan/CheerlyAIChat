@@ -142,31 +142,6 @@ export function RefreshIcon() {
   )
 }
 
-export function MoreIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-      <circle cx="6" cy="12" r="1.7" fill="currentColor" />
-      <circle cx="12" cy="12" r="1.7" fill="currentColor" />
-      <circle cx="18" cy="12" r="1.7" fill="currentColor" />
-    </svg>
-  )
-}
-
-export function TrashIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-      <path
-        d="M5 7h14M10 11v6M14 11v6M8 7V5.8A1.8 1.8 0 0 1 9.8 4h4.4A1.8 1.8 0 0 1 16 5.8V7m-9 0 1 12.2A1.8 1.8 0 0 0 9.8 21h4.4a1.8 1.8 0 0 0 1.8-1.8L17 7"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
 export function WarningIcon() {
   return (
     <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
@@ -185,22 +160,6 @@ export function CloseIcon() {
         fill="none"
         stroke="currentColor"
         strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
-export function GlobeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
-      <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="1.7" />
-      <ellipse cx="12" cy="12" rx="3.2" ry="8" fill="none" stroke="currentColor" strokeWidth="1.7" />
-      <path
-        d="M4 12h16M6.4 8h11.2M6.4 16h11.2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
         strokeLinecap="round"
       />
     </svg>
