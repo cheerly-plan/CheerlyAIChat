@@ -79,7 +79,17 @@ export function SessionOutline({ items, scrollRoot, onJump }: Props) {
           aria-label={item.title}
           onMouseEnter={(event) => markHover(item.id, event.currentTarget)}
           onFocus={(event) => markHover(item.id, event.currentTarget)}
-          onClick={() => onJump(item.id)}
+          onBlur={() => setHover(null)}
+          onClick={() => {
+            setHover(null)
+            onJump(item.id)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              setHover(null)
+              event.currentTarget.blur()
+            }
+          }}
         />
       ))}
       {preview && hover ? (

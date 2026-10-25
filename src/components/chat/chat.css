@@ -1146,6 +1146,35 @@
   font-size: 13px;
 }
 
+/* 「正在思考…」流光动画：灰→蓝渐变扫过文字（DeepSeek 思考中同款质感） */
+.tool.thinking {
+  background: linear-gradient(90deg, #9aa0a6 25%, #4d6bfe 50%, #9aa0a6 75%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: thinking-shimmer 1.8s linear infinite;
+}
+
+@keyframes thinking-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool.thinking {
+    animation: none;
+    background: none;
+    color: #8b8f9a;
+    -webkit-text-fill-color: #8b8f9a;
+  }
+}
+
 .typing {
   display: inline-block;
   width: 8px;
@@ -1238,6 +1267,60 @@
   font-size: 13px;
   line-height: 1;
   white-space: nowrap;
+}
+
+/* 「智能搜索」开关 —— 交互对齐 DeepSeek 智能搜索 chip：
+   未开启：灰色文字/图标 + 浅灰描边；悬停：浅灰预高亮；
+   开启：浅蓝底 + 蓝字蓝图标；图标动画由 GlobeToggleIcon 的 Lottie 帧驱动 */
+.chip-toggle {
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+  border-color: #dcdfe6;
+  color: #5b6472;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.chip-toggle svg {
+  transition: color 0.2s ease;
+}
+
+.chip-toggle:hover:not(:disabled):not(.active) {
+  background: #f0f2f5;
+  border-color: #c9ced8;
+  color: #414753;
+}
+
+.chip-toggle.active {
+  background: rgba(77, 107, 254, 0.1);
+  border-color: rgba(77, 107, 254, 0.28);
+  color: #4d6bfe;
+}
+
+/* Lottie 图标路径强制继承 chip 文字色（灰→蓝），与 DeepSeek 同款做法 */
+.globe-toggle-icon svg {
+  display: block;
+}
+
+.globe-toggle-icon svg path[fill] {
+  fill: currentColor;
+}
+
+.globe-toggle-icon svg path[stroke] {
+  stroke: currentColor;
+}
+
+.chip-toggle:focus-visible {
+  outline: 2px solid #4d6bfe;
+  outline-offset: 2px;
+}
+
+.chip-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .composer-actions {

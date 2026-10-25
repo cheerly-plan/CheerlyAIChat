@@ -331,7 +331,11 @@ export function useChat(initialUser?: UserInfo | null) {
     userContent: string,
     assistantId: string,
     activeSessionId: string,
-    options: { regenerate?: boolean; resumeRunId?: string } = {},
+    options: {
+      regenerate?: boolean
+      resumeRunId?: string
+      webSearch?: boolean
+    } = {},
   ) {
     if (!user) {
       setError('用户信息未就绪')
@@ -381,7 +385,19 @@ export function useChat(initialUser?: UserInfo | null) {
         if (event.type === 'tool_start') {
           patchMessage(assistantId, (item) => ({
             ...item,
-            tools: [...(item.tools ?? []), event.name],
+            // 优先用后端返回的展示名（如「智能搜索」），老后端缺 label 时回退工具名
+            tools: [...(item.tools ?? []), { label: event.label ?? event.name, running: true }],
+          }))
+        }
+        if (event.type === 'tool_end') {
+          // 把对应工具标记为已完成；之后到下一批 token 到达前是「模型思考」状态
+          patchMessage(assistantId, (item) => ({
+            ...item,
+            tools: (item.tools ?? []).map((tool, index) =>
+              index === (item.tools ?? []).length - 1 && tool.running
+                ? { ...tool, running: false }
+                : tool,
+            ),
           }))
         }
         if (event.type === 'error') {
@@ -400,8 +416,7 @@ export function useChat(initialUser?: UserInfo | null) {
           ...options,
           signal: controller.signal,
         })
-      }
-      if (streamId.current === assistantId) flushText()
+      }      if (streamId.current === assistantId) flushText()
       // 只有正常结束才清除可恢复标记；error 事件点亮的状态必须保留，
       // 否则"继续生成"按钮会刚亮起就被这里抹掉
       if (!sawError) clearResumeState()
@@ -473,7 +488,7 @@ export function useChat(initialUser?: UserInfo | null) {
     return created.session_id
   }
 
-  async function send(text?: string) {
+  async function send(text?: string, options: { webSearch?: boolean } = {}) {
     const content = (text ?? input).trim()
     if (!content || loading || !user) return
 
@@ -503,10 +518,12 @@ export function useChat(initialUser?: UserInfo | null) {
       { id: crypto.randomUUID(), role: 'user', content },
       { id: assistantId, role: 'assistant', content: '', tools: [] },
     ])
-    await streamReply(content, assistantId, activeId)
+    await streamReply(content, assistantId, activeId, {
+      webSearch: options.webSearch,
+    })
   }
 
-  async function regenerate(id: string) {
+  async function regenerate(id: string, options: { webSearch?: boolean } = {}) {
     if (loading || !user || !sessionId) return
     clearResumeState()
     const last = messages[messages.length - 1]
@@ -522,6 +539,7 @@ export function useChat(initialUser?: UserInfo | null) {
     // regenerate=true：后端不重复保存用户消息，并剔除旧的助手回答
     await streamReply(previous.content, assistantId, sessionId, {
       regenerate: true,
+      webSearch: options.webSearch,
     })
   }
 

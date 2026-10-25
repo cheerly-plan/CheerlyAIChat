@@ -18,6 +18,26 @@ function timeGreeting() {
   return '晚上好'
 }
 
+const WEB_SEARCH_PREF_KEY = 'ai_chat.webSearch'
+
+/** 读取「智能搜索」记忆偏好；从未设置过时默认开启 */
+function loadWebSearchPref(): boolean {
+  try {
+    const saved = localStorage.getItem(WEB_SEARCH_PREF_KEY)
+    return saved === null ? true : saved === 'true'
+  } catch {
+    return true
+  }
+}
+
+function saveWebSearchPref(on: boolean) {
+  try {
+    localStorage.setItem(WEB_SEARCH_PREF_KEY, String(on))
+  } catch {
+    /* 隐私模式等场景下写入失败则不记忆 */
+  }
+}
+
 type Props = {
   onLogout: () => void
   initialUser?: UserInfo | null
@@ -54,6 +74,16 @@ export function Chat({ onLogout, initialUser = null }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(
     () => window.matchMedia('(min-width: 861px)').matches,
   )
+  // 「智能搜索」开关：开启时本轮请求携带 web_search=true，
+  // 后端为模型提供 web_search 工具；重新生成沿用同一开关。
+  // 默认开启，并记住用户上次的选择（localStorage）
+  const [webSearch, setWebSearch] = useState(loadWebSearchPref)
+  const toggleWebSearch = () =>
+    setWebSearch((on) => {
+      const next = !on
+      saveWebSearchPref(next)
+      return next
+    })
   const isLanding =
     !sessionId &&
     messages.length === 0 &&
@@ -97,8 +127,10 @@ export function Chat({ onLogout, initialUser = null }: Props) {
               <Composer
                 value={input}
                 loading={loading || !ready}
+                webSearch={webSearch}
+                onToggleWebSearch={toggleWebSearch}
                 onChange={setInput}
-                onSend={() => void send()}
+                onSend={() => void send(undefined, { webSearch })}
                 onStop={() => stop()}
               />
             </div>
@@ -112,8 +144,8 @@ export function Chat({ onLogout, initialUser = null }: Props) {
               historyLoading={historyLoading}
               hasMore={hasMore}
               canResume={canResume}
-              onEditSubmit={(text) => void send(text)}
-              onRegenerate={(id) => void regenerate(id)}
+              onEditSubmit={(text) => void send(text, { webSearch })}
+              onRegenerate={(id) => void regenerate(id, { webSearch })}
               onResume={() => void resumeRun()}
               onLoadOlder={() => void loadOlder()}
             />
@@ -133,8 +165,10 @@ export function Chat({ onLogout, initialUser = null }: Props) {
               <Composer
                 value={input}
                 loading={loading || !ready}
+                webSearch={webSearch}
+                onToggleWebSearch={toggleWebSearch}
                 onChange={setInput}
-                onSend={() => void send()}
+                onSend={() => void send(undefined, { webSearch })}
                 onStop={() => stop()}
               />
             </div>

@@ -14,7 +14,7 @@ export type SessionInfo = {
 export type ChatEvent =
   | { type: 'run_started'; run_id: string }
   | { type: 'text'; content: string }
-  | { type: 'tool_start'; name: string }
+  | { type: 'tool_start'; name: string; label?: string }
   | { type: 'tool_end'; name: string }
   | { type: 'done' }
   | { type: 'error'; message: string }
@@ -52,9 +52,12 @@ export type ChatMemory = {
   next_before_seq?: number | null
 }
 
+/** 工具调用记录：label 为后端下发的展示名，running 标记工具是否仍在执行 */
+export type ToolRun = { label: string; running: boolean }
+
 export type ChatMessage = {
   id: string
   role: 'user' | 'assistant'
   content: string
-  tools?: string[]
+  tools?: ToolRun[]
 }

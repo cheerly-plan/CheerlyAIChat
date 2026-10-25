@@ -38,12 +38,22 @@ export function MessageItem({
     )
   }
 
-  const waiting = loading && !message.content && !message.tools?.length
-  const thinking = loading && Boolean(message.tools?.length) && !message.content
+  const toolRuns = message.tools ?? []
+  const waiting = loading && !message.content && !toolRuns.length
+  // 有工具记录但都在执行完、还没等到下一批 token：展示「正在思考」，
+  // 避免工具已跑完还一直挂着「正在调用 xx」
+  const thinking = loading && !message.content && toolRuns.length > 0
+  // 多轮循环里模型可能重复调用同一工具（如连续两次搜索），展示时去重
+  const runningLabels = [
+    ...new Set(toolRuns.filter((tool) => tool.running).map((tool) => tool.label)),
+  ].join('、')
+  const statusText = runningLabels ? `正在调用 ${runningLabels}` : '正在思考…'
   return (
     <div className="row assistant" id={`msg-${message.id}`}>
       <div className="assistant-body">
-        {thinking ? <p className="tool">正在调用 {message.tools?.join('、')}</p> : null}
+        {thinking ? (
+          <p className={runningLabels ? 'tool' : 'tool thinking'}>{statusText}</p>
+        ) : null}
         {waiting ? <span className="typing" /> : null}
         {message.content ? (
           <Markdown content={message.content} streaming={loading} />

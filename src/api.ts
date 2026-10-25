@@ -261,11 +261,16 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
       continue
     }
 
+    // 历史消息的工具都已执行完，展示名走后端 label 兜底映射
+    const historyTools = (pendingTools.length ? pendingTools : tools).map(
+      (name) => ({ label: name, running: false }),
+    )
+
     result.push({
       id: crypto.randomUUID(),
       role: 'assistant',
       content: msg.content ?? '',
-      tools: pendingTools.length ? pendingTools : tools.length ? tools : undefined,
+      tools: historyTools.length ? historyTools : undefined,
     })
     pendingTools = []
   }
@@ -306,7 +311,11 @@ export async function sendChatStream(
   message: string,
   chatSessionId: string,
   onEvent: (event: ChatEvent) => void,
-  options: { regenerate?: boolean; signal?: AbortSignal } = {},
+  options: {
+    regenerate?: boolean
+    webSearch?: boolean
+    signal?: AbortSignal
+  } = {},
 ): Promise<void> {
   // POST + JSON body：用户消息不再进 URL，避免落入代理/访问日志/浏览器历史
   const response = await authedFetch('/v1/chat', {
@@ -320,6 +329,7 @@ export async function sendChatStream(
       message,
       chat_session_id: chatSessionId,
       regenerate: options.regenerate ?? false,
+      web_search: options.webSearch ?? false,
     }),
     signal: options.signal,
   })

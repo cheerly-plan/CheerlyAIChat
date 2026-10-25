@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      lottie-web:
+        specifier: ^5.13.0
+        version: 5.13.0
       react:
         specifier: ^19.2.8
         version: 19.3.1
@@ -769,6 +772,9 @@ packages:
   locate-path@6.0.0:
     resolution: {integrity: sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw==, tarball: https://r2.cnpmjs.org/locate-path/-/locate-path-6.0.0.tgz}
     engines: {node: '>=10'}
+
+  lottie-web@5.13.0:
+    resolution: {integrity: sha512-+gfBXl6sxXMPe8tKQm7qzLnUy5DUPJPKIyRHwtpCpyUEYjHYRJC/5gjUvdkuO2c3JllrPtHXH5UJJK8LRYl5yQ==}
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==, tarball: https://r2.cnpmjs.org/lru-cache/-/lru-cache-5.1.1.tgz}
@@ -1648,6 +1654,8 @@ snapshots:
   locate-path@6.0.0:
     dependencies:
       p-locate: 5.0.0
+
+  lottie-web@5.13.0: {}
 
   lru-cache@5.1.1:
     dependencies:
