@@ -150,7 +150,10 @@ export function TagDialog({
               const value = event.target.value
               // 出现分隔符就把已输入的部分变成 chips（输入法组合中不动：
               // 此时 value 里的还是拼音，确认后才成词）
-              if (!event.nativeEvent.isComposing && SEPARATOR.test(value)) {
+              // React 把 ChangeEvent.nativeEvent 标成泛化的 Event，实际是带
+              // isComposing 的 InputEvent，这里窄化后取用
+              const composing = (event.nativeEvent as InputEvent).isComposing
+              if (!composing && SEPARATOR.test(value)) {
                 add(value)
                 setDraft('')
               } else {

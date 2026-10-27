@@ -337,6 +337,8 @@ export function useChat(initialUser?: UserInfo | null) {
       regenerate?: boolean
       resumeRunId?: string
       webSearch?: boolean
+      // 知识库开关：透传给后端决定是否挂载 kb_search / kg_search
+      kb?: boolean
     } = {},
   ) {
     if (!user) {
@@ -427,7 +429,8 @@ export function useChat(initialUser?: UserInfo | null) {
           ...options,
           signal: controller.signal,
         })
-      }      if (streamId.current === assistantId) flushText()
+      }
+      if (streamId.current === assistantId) flushText()
       // 只有正常结束才清除可恢复标记；error 事件点亮的状态必须保留，
       // 否则"继续生成"按钮会刚亮起就被这里抹掉
       if (!sawError) clearResumeState()
