@@ -59,33 +59,37 @@ export default function KbGraphPanel({
   const searchIdRef = useRef(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const load = useCallback(async () => {
-    const token = ++requestIdRef.current
-    setLoading(true)
-    setError('')
-    try {
-      const data = await fetchKgGraph(
-        fileId
-          ? { fileId }
-          : fileIds && fileIds.length > 0
-            ? { fileIds }
-            : undefined,
-      )
-      // 快速切文件时丢弃过期响应
-      if (token === requestIdRef.current) {
-        setGraph(data)
-        onStats?.(data.stats ?? null)
+  const load = useCallback(
+    /** quiet：后台刷新（轮询/构建收尾）不置 loading，避免画布上闪一层「正在读取」 */
+    async (options?: { quiet?: boolean }) => {
+      const token = ++requestIdRef.current
+      if (!options?.quiet) setLoading(true)
+      setError('')
+      try {
+        const data = await fetchKgGraph(
+          fileId
+            ? { fileId }
+            : fileIds && fileIds.length > 0
+              ? { fileIds }
+              : undefined,
+        )
+        // 快速切文件时丢弃过期响应
+        if (token === requestIdRef.current) {
+          setGraph(data)
+          onStats?.(data.stats ?? null)
+        }
+      } catch (e) {
+        if (token === requestIdRef.current) {
+          setGraph(null)
+          onStats?.(null)
+          setError(e instanceof Error ? e.message : '获取图谱失败')
+        }
+      } finally {
+        if (token === requestIdRef.current) setLoading(false)
       }
-    } catch (e) {
-      if (token === requestIdRef.current) {
-        setGraph(null)
-        onStats?.(null)
-        setError(e instanceof Error ? e.message : '获取图谱失败')
-      }
-    } finally {
-      if (token === requestIdRef.current) setLoading(false)
-    }
-  }, [fileId, fileIds, onStats])
+    },
+    [fileId, fileIds, onStats],
+  )
 
   useEffect(() => {
     // 清空检索态交给「切文件时组件重挂载」（父组件用 key），这里只负责拉图。
@@ -95,13 +99,26 @@ export default function KbGraphPanel({
     return () => cancelAnimationFrame(raf)
   }, [load])
 
-  // 图谱构建中：每 3 秒重拉一次，抽完自动出现。
-  // 单文件视图看自己的 graph_status；全库视图没有这个字段，用父组件给的 building
+  // 图谱构建中：单文件视图看自己的 graph_status，全库/合并视图看父组件给的 building
   const isBuilding = building || graph?.graph_status === 'building'
+  // 构建中只有单文件视图重拉：那份图最多几十个节点，用户也正盯着进度看。
+  // 全库/合并的整图有上百节点、单次几十到几百 KB，构建期间每 3 秒重拉既费带宽，
+  // 又会让力导向每 3 秒重排一次（节点乱跳）。它改由下面 wasBuildingRef
+  // 在构建结束那一帧补拉一次，中途保持旧图 + 一行提示
+  const pollWhileBuilding = isBuilding && Boolean(fileId)
   useEffect(() => {
-    if (!isBuilding) return
-    const timer = window.setInterval(() => void load(), 3000)
+    if (!pollWhileBuilding) return
+    const timer = window.setInterval(() => void load({ quiet: true }), 3000)
     return () => window.clearInterval(timer)
+  }, [pollWhileBuilding, load])
+
+  // 构建结束的那一帧补拉一次整图：轮询的最后一拍往往早于后端落库，
+  // 停表后画布会停在构建中途的旧图上（新实体没进来）。
+  // 全库/合并视图不轮询，靠的就是这条路径把构建完成的整图取回来
+  const wasBuildingRef = useRef(false)
+  useEffect(() => {
+    if (wasBuildingRef.current && !isBuilding) void load({ quiet: true })
+    wasBuildingRef.current = isBuilding
   }, [isBuilding, load])
 
   // 单文件视图：拉到图谱状态就推回父组件，左侧列表的勾选框才跟得上构建进度。
@@ -368,7 +385,11 @@ export default function KbGraphPanel({
 
       {searchError ? <p className="kb-error">{searchError}</p> : null}
       {isBuilding ? (
-        <p className="kb-kg-building">图谱构建中，当前显示已抽取的部分…</p>
+        <p className="kb-kg-building">
+          {pollWhileBuilding
+            ? '图谱构建中，当前显示已抽取的部分…'
+            : '有文件正在构建图谱，完成后这里自动刷新。'}
+        </p>
       ) : null}
       {file?.graph_status === 'stale' ? (
         // 切片人工修订后图谱就基于旧文本了：保留旧图供参考。

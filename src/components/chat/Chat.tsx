@@ -21,20 +21,21 @@ function timeGreeting() {
 }
 
 const WEB_SEARCH_PREF_KEY = 'ai_chat.webSearch'
+const KB_PREF_KEY = 'ai_chat.kb'
 
-/** 读取「智能搜索」记忆偏好；从未设置过时默认开启 */
-function loadWebSearchPref(): boolean {
+/** 读取布尔记忆偏好；从未设置过时用 fallback（智能搜索默认开、知识库默认关） */
+function loadBoolPref(key: string, fallback: boolean): boolean {
   try {
-    const saved = localStorage.getItem(WEB_SEARCH_PREF_KEY)
-    return saved === null ? true : saved === 'true'
+    const saved = localStorage.getItem(key)
+    return saved === null ? fallback : saved === 'true'
   } catch {
-    return true
+    return fallback
   }
 }
 
-function saveWebSearchPref(on: boolean) {
+function saveBoolPref(key: string, on: boolean) {
   try {
-    localStorage.setItem(WEB_SEARCH_PREF_KEY, String(on))
+    localStorage.setItem(key, String(on))
   } catch {
     /* 隐私模式等场景下写入失败则不记忆 */
   }
@@ -94,18 +95,23 @@ export function Chat({ onLogout, initialUser = null }: Props) {
   // 「智能搜索」开关：开启时本轮请求携带 web_search=true，
   // 后端为模型提供 web_search 工具；重新生成沿用同一开关。
   // 默认开启，并记住用户上次的选择（localStorage）
-  const [webSearch, setWebSearch] = useState(loadWebSearchPref)
+  const [webSearch, setWebSearch] = useState(() => loadBoolPref(WEB_SEARCH_PREF_KEY, true))
   const toggleWebSearch = () =>
     setWebSearch((on) => {
       const next = !on
-      saveWebSearchPref(next)
+      saveBoolPref(WEB_SEARCH_PREF_KEY, next)
       return next
     })
   // 「知识库」开关：与智能搜索同一套交互——开启时本轮挂载 kb_search
-  // 工具，通过对话即可查全库文档；默认关闭，每次进入都从关开始
-  // （检索要花钱且有延迟，不该默认替用户开）
-  const [kbOn, setKbOn] = useState(false)
-  const toggleKb = () => setKbOn((on) => !on)
+  // 工具，通过对话即可查全库文档。同样是记住上次选择，但默认关闭：
+  // 检索要花钱且有延迟，不该默认替用户开
+  const [kbOn, setKbOn] = useState(() => loadBoolPref(KB_PREF_KEY, false))
+  const toggleKb = () =>
+    setKbOn((on) => {
+      const next = !on
+      saveBoolPref(KB_PREF_KEY, next)
+      return next
+    })
 
   const isLanding =
     !sessionId &&

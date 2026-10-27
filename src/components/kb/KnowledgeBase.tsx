@@ -197,9 +197,12 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
 
   const refresh = useCallback(async () => {
     try {
-      setFiles(await fetchKbFiles())
+      const list = await fetchKbFiles()
+      setFiles(list)
+      return list
     } catch {
       /* 静默，等下次轮询再试 */
+      return null
     }
   }, [])
 
@@ -258,6 +261,14 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
     const timer = window.setInterval(() => void refresh(), 2500)
     return () => window.clearInterval(timer)
   }, [processing, refresh])
+
+  // 构建收尾再补一次列表刷新：轮询的最后一拍往往早于后端把状态写成
+  // ready，停止轮询后列表里的实体数会一直停在构建中途的 0
+  const wasGraphBuildingRef = useRef(false)
+  useEffect(() => {
+    if (wasGraphBuildingRef.current && !graphBuilding) void refresh()
+    wasGraphBuildingRef.current = graphBuilding
+  }, [graphBuilding, refresh])
 
   const selectedFile = files.find((f) => f.file_id === selectedId) ?? null
   // 只取字符串做依赖：轮询刷新 files 时引用会变，但 status 没变就不该重拉切片
@@ -490,8 +501,12 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
     setError('')
     setUploading(file.name)
     try {
-      await uploadKbFile(file)
+      const fileId = await uploadKbFile(file)
+      // 先刷新列表再选中：库里原本没文件时首屏无从自动选中，
+      // 不选中右侧就落到图谱兜底视图，看起来像「传完没反应」
       await refresh()
+      setTab('files')
+      selectFile(fileId)
     } catch (e) {
       setError(e instanceof Error ? e.message : '上传失败')
     } finally {
@@ -504,7 +519,12 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
     setError('')
     try {
       await deleteKbFile(item.file_id)
-      await refresh()
+      const list = await refresh()
+      // 删掉的正是当前在看的文件：接着看剩下的第一份。不补选的话
+      // selectedId 指向已删除的行，右侧会掉到图谱兜底视图
+      if (list && selectedIdRef.current === item.file_id) {
+        selectFile(list[0]?.file_id ?? null)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : '删除失败')
     }
@@ -1040,8 +1060,9 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
               fileIds={checkedIds.length > 1 ? checkedIds : undefined}
               canManage={canManage}
               // 单文件视图面板自己有 graph_status，不用父组件的合并信号；
-              // 只有合并视图（没有单文件状态字段）才需要父组件告知
-              building={checkedIds.length > 1 && graphBuilding}
+              // 合并视图和全库视图（0 勾选）都没有单文件状态，必须由父组件
+              // 告诉这里「有文件在建图」，否则构建完成后画布不会重拉
+              building={checkedIds.length !== 1 && graphBuilding}
               onStats={setGraphStats}
               onStatus={syncGraphStatus}
             />
