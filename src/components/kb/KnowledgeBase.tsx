@@ -285,6 +285,21 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
     )
   }, [files, query])
 
+  const graphDone = useMemo(
+    () =>
+      visibleFiles.filter(
+        (f) => f.graph_status === 'ready' || f.graph_status === 'stale',
+      ),
+    [visibleFiles],
+  )
+  const graphTodo = useMemo(
+    () =>
+      visibleFiles.filter(
+        (f) => f.graph_status !== 'ready' && f.graph_status !== 'stale',
+      ),
+    [visibleFiles],
+  )
+
   // 全库标签去重：给标签弹窗做候选，避免同一概念被写成几种词
   const allTags = useMemo(() => {
     const pool = new Set<string>()
@@ -589,6 +604,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
       <div className={`kb-body${panelOpen ? '' : ' panel-collapsed'}`}>
         <aside className="kb-panel">
           <div className="kb-panel-inner">
+            <div className="kb-panel-chrome">
             {/* 首行整体工具条：返回 · 功能tab · 收起 装进同一个胶囊 */}
             <div className="kb-panel-head">
               <button
@@ -647,25 +663,26 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
               />
             ) : null}
 
+            {tab === 'files' && canManage ? (
+              <div className="kb-upload-row">
+                <button
+                  type="button"
+                  className="kb-upload"
+                  onClick={() => inputRef.current?.click()}
+                  disabled={uploading !== null}
+                  title={uploading ? '正在上传' : undefined}
+                >
+                  <UploadIcon />
+                  <span>上传文件</span>
+                </button>
+              </div>
+            ) : null}
+            </div>
+
+            <div className="kb-panel-scroll">
+              <div className="kb-panel-scroll-inner">
             {tab === 'files' ? (
               <>
-                {/* 上传按钮取代原来的「文件列表」标题位；上传期间仅禁用按钮，无过程提示。
-                    普通用户没有上传入口，管理是管理员的事 */}
-                {canManage ? (
-                  <div className="kb-upload-row">
-                    <button
-                      type="button"
-                      className="kb-upload"
-                      onClick={() => inputRef.current?.click()}
-                      disabled={uploading !== null}
-                      title={uploading ? '正在上传' : undefined}
-                    >
-                      <UploadIcon />
-                      <span>上传文件</span>
-                    </button>
-                  </div>
-                ) : null}
-
                 {!filesLoaded ? (
                   // 首屏请求还没回来：什么都不渲染，避免空态文案闪一下又消失
                   null
@@ -782,97 +799,81 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                 ) : (
                   <>
                     <ul className="kb-glist">
-                      {/* 已完成（可勾选）在上，未完成在下，中间分割线 */}
-                      {visibleFiles
-                        .filter(
-                          (f) =>
-                            f.graph_status === 'ready' || f.graph_status === 'stale',
-                        )
-                        .map((item) => {
-                          const badge =
-                            item.graph_status === 'ready'
-                              ? null
-                              : graphBadge(item.graph_status, canManage)
-                          const isPicked =
-                            checked.has(item.file_id) || buildFileId === item.file_id
-                          return (
-                            <li
-                              key={item.file_id}
-                              className={`kb-gitem${isPicked ? ' is-picked' : ''}`}
-                            >
-                              <label className="kb-gcheck">
-                                <input
-                                  type="checkbox"
-                                  checked={checked.has(item.file_id)}
-                                  onChange={() => toggleChecked(item.file_id)}
-                                />
-                                <span className="kb-gtext">
-                                  <span className="kb-gname" title={item.filename}>
-                                    {item.filename}
-                                  </span>
-                                  <span className="kb-gcount">
-                                    {item.graph_entity_count ?? 0} 实体
-                                  </span>
-                                </span>
-                              </label>
-                              {badge ? (
+                      {/* 可构建（未生成/失败）在上，已完成可勾选在下 */}
+                      {graphTodo.map((item) => {
+                        const badge = graphBadge(item.graph_status, canManage)
+                        const isPicked = buildFileId === item.file_id
+                        return (
+                          <li
+                            key={item.file_id}
+                            className={`kb-gitem is-muted${isPicked ? ' is-picked' : ''}`}
+                            onClick={() => toggleBuildFile(item)}
+                          >
+                            <span className="kb-gcheck">
+                              <span className="kb-gtext">
                                 <span
-                                  className={`kb-gbadge ${badge.cls}`}
-                                  onClick={() => toggleBuildFile(item)}
-                                  title="查看这份文件的图谱"
+                                  className="kb-gname kb-gname-action"
+                                  title={`${item.filename}（点击构建图谱）`}
                                 >
-                                  {badge.label}
+                                  {item.filename}
                                 </span>
-                              ) : null}
-                            </li>
-                          )
-                        })}
-                      {visibleFiles.some(
-                        (f) =>
-                          f.graph_status !== 'ready' && f.graph_status !== 'stale',
-                      ) &&
-                      visibleFiles.some(
-                        (f) =>
-                          f.graph_status === 'ready' || f.graph_status === 'stale',
-                      ) ? (
+                              </span>
+                            </span>
+                            <span className={`kb-gbadge ${badge.cls}`}>
+                              {badge.label}
+                            </span>
+                          </li>
+                        )
+                      })}
+                      {graphTodo.length > 0 && graphDone.length > 0 ? (
                         <li className="kb-gdivider" aria-hidden="true" />
                       ) : null}
-                      {visibleFiles
-                        .filter(
-                          (f) =>
-                            f.graph_status !== 'ready' && f.graph_status !== 'stale',
-                        )
-                        .map((item) => {
-                          const badge = graphBadge(item.graph_status, canManage)
-                          const isPicked = buildFileId === item.file_id
-                          return (
-                            <li
-                              key={item.file_id}
-                              className={`kb-gitem is-muted${isPicked ? ' is-picked' : ''}`}
-                              // 没有复选框，整行可点 = 进构建视图（再点退出）
-                              onClick={() => toggleBuildFile(item)}
-                            >
-                              <span className="kb-gcheck">
-                                <span className="kb-gtext">
-                                  <span
-                                    className="kb-gname kb-gname-action"
-                                    title={`${item.filename}（点击构建图谱）`}
-                                  >
-                                    {item.filename}
-                                  </span>
+                      {graphDone.map((item) => {
+                        const badge =
+                          item.graph_status === 'ready'
+                            ? null
+                            : graphBadge(item.graph_status, canManage)
+                        const isPicked =
+                          checked.has(item.file_id) || buildFileId === item.file_id
+                        return (
+                          <li
+                            key={item.file_id}
+                            className={`kb-gitem${isPicked ? ' is-picked' : ''}`}
+                          >
+                            <label className="kb-gcheck">
+                              <input
+                                type="checkbox"
+                                checked={checked.has(item.file_id)}
+                                onChange={() => toggleChecked(item.file_id)}
+                              />
+                              <span className="kb-gtext">
+                                <span className="kb-gname" title={item.filename}>
+                                  {item.filename}
+                                </span>
+                                <span className="kb-gcount">
+                                  {item.graph_entity_count ?? 0} 实体
                                 </span>
                               </span>
-                              <span className={`kb-gbadge ${badge.cls}`}>
+                            </label>
+                            {badge ? (
+                              <span
+                                className={`kb-gbadge ${badge.cls}`}
+                                onClick={() => toggleBuildFile(item)}
+                                title="查看这份文件的图谱"
+                              >
                                 {badge.label}
                               </span>
-                            </li>
-                          )
-                        })}
+                            ) : null}
+                          </li>
+                        )
+                      })}
                     </ul>
                   </>
                 )}
               </>
             )}
+              </div>
+            </div>
           </div>
         </aside>
 
@@ -982,15 +983,17 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                         </div>
                         {editingSeq === chunk.seq ? (
                           <div className="kb-chunk-editor">
-                            <textarea
-                              value={editingText}
-                              onChange={(e) => setEditingText(e.target.value)}
-                              rows={Math.min(
-                                14,
-                                Math.max(4, Math.ceil(editingText.length / 44)),
-                              )}
-                              spellCheck={false}
-                            />
+                            <div className="kb-chunk-field">
+                              <textarea
+                                value={editingText}
+                                onChange={(e) => setEditingText(e.target.value)}
+                                rows={Math.min(
+                                  14,
+                                  Math.max(4, Math.ceil(editingText.length / 44)),
+                                )}
+                                spellCheck={false}
+                              />
+                            </div>
                             <div className="kb-chunk-actions">
                               <button
                                 type="button"

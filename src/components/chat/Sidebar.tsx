@@ -85,47 +85,49 @@ export function Sidebar({
         </button>
       ) : null}
       <div className="history">
-        {/* 显式四态，互斥渲染：加载骨架 / 加载失败 / 空态 / 会话分组 */}
-        {!sessionsReady ? (
-          <HistorySkeleton />
-        ) : sessionsError ? (
-          <div className="history-error">
-            <span>{sessionsError}</span>
-            {onRetrySessions ? (
-              <button type="button" className="history-retry" onClick={onRetrySessions}>
-                重试
-              </button>
-            ) : null}
-          </div>
-        ) : groups.length ? (
-          groups.map((group) => (
-            <section key={group.label} className="history-group">
-              <h2 className="history-label">{group.label}</h2>
-              {group.items.map((item) => (
-                <HistoryItem
-                  key={item.session_id}
-                  item={item}
-                  active={item.session_id === activeSessionId}
-                  loading={chatLoading && item.session_id === activeSessionId}
-                  menuOpen={menuId === item.session_id}
-                  onSelect={() => onSelectSession(item.session_id)}
-                  onOpenMenu={() => setMenuId(item.session_id)}
-                  onCloseMenu={() => setMenuId(null)}
-                  onStartRename={() => {
-                    setMenuId(null)
-                    setRenameItem(item)
-                  }}
-                  onDelete={() => {
-                    setMenuId(null)
-                    setDeleteItem(item)
-                  }}
-                />
-              ))}
-            </section>
-          ))
-        ) : (
-          <span className="history-empty">暂无历史会话</span>
-        )}
+        <div className="history-inner">
+          {/* 显式四态，互斥渲染：加载骨架 / 加载失败 / 空态 / 会话分组 */}
+          {!sessionsReady ? (
+            <HistorySkeleton />
+          ) : sessionsError ? (
+            <div className="history-error">
+              <span>{sessionsError}</span>
+              {onRetrySessions ? (
+                <button type="button" className="history-retry" onClick={onRetrySessions}>
+                  重试
+                </button>
+              ) : null}
+            </div>
+          ) : groups.length ? (
+            groups.map((group) => (
+              <section key={group.label} className="history-group">
+                <h2 className="history-label">{group.label}</h2>
+                {group.items.map((item) => (
+                  <HistoryItem
+                    key={item.session_id}
+                    item={item}
+                    active={item.session_id === activeSessionId}
+                    loading={chatLoading && item.session_id === activeSessionId}
+                    menuOpen={menuId === item.session_id}
+                    onSelect={() => onSelectSession(item.session_id)}
+                    onOpenMenu={() => setMenuId(item.session_id)}
+                    onCloseMenu={() => setMenuId(null)}
+                    onStartRename={() => {
+                      setMenuId(null)
+                      setRenameItem(item)
+                    }}
+                    onDelete={() => {
+                      setMenuId(null)
+                      setDeleteItem(item)
+                    }}
+                  />
+                ))}
+              </section>
+            ))
+          ) : (
+            <span className="history-empty">暂无历史会话</span>
+          )}
+        </div>
       </div>
       <div className="account">
         <span className="account-name">{userName}</span>

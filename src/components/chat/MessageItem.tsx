@@ -111,8 +111,13 @@ function UserMessage({
   function resize() {
     const el = areaRef.current
     if (!el) return
+    const wrap = el.parentElement
+    const pin = wrap
+      ? wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight <= 8
+      : true
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+    el.style.height = `${el.scrollHeight}px`
+    if (wrap && pin) wrap.scrollTop = wrap.scrollHeight
   }
 
   useEffect(() => {
@@ -138,27 +143,29 @@ function UserMessage({
             onEditSubmit?.(text)
           }}
         >
-          <textarea
-            ref={areaRef}
-            value={draft}
-            rows={1}
-            disabled={busy}
-            onChange={(event) => {
-              setDraft(event.target.value)
-              resize()
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.preventDefault()
-                setEditing(false)
-                setDraft(message.content)
-              }
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault()
-                event.currentTarget.form?.requestSubmit()
-              }
-            }}
-          />
+          <div className="inline-composer-input">
+            <textarea
+              ref={areaRef}
+              value={draft}
+              rows={1}
+              disabled={busy}
+              onChange={(event) => {
+                setDraft(event.target.value)
+                resize()
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  setEditing(false)
+                  setDraft(message.content)
+                }
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault()
+                  event.currentTarget.form?.requestSubmit()
+                }
+              }}
+            />
+          </div>
           <div className="inline-composer-bar">
             <button
               type="button"
@@ -247,15 +254,15 @@ function SourceList({ sources }: { sources: ChatSource[] }) {
       {active ? (
         <div className="msg-source-detail">
           <div className="msg-source-head">
-            <span className="msg-source-file" title={active.filename}>
+            {/* <span className="msg-source-file" title={active.filename}>
               {active.filename}
             </span>
-            <span className="msg-source-where">{active.where}</span>
+            <span className="msg-source-where">{active.where}</span> */}
             {active.kind === 'figure' ? (
               <span className="msg-source-note">图像识别，可能有误差</span>
             ) : null}
           </div>
-          <pre className="msg-source-text">{active.excerpt}</pre>
+          <pre className="msg-source-text"><span className="msg-source-text-inner">{active.excerpt}</span></pre>
         </div>
       ) : null}
     </div>

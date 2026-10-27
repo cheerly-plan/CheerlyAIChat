@@ -437,20 +437,22 @@ export default function KbGraphPanel({
               收起
             </button>
           </div>
-          <ul>
-            {evidence.map((item) => (
-              <li key={`${item.filename}-${item.chunk_seq}`}>
-                <div className="kb-kg-evidence-meta">
-                  <span className="kb-kg-evidence-entity">{item.entity}</span>
-                  <span>
-                    {item.filename}
-                    {item.page !== null ? ` · 第${item.page}页` : ` · 第${item.chunk_seq + 1}段`}
-                  </span>
-                </div>
-                <p>{item.text.length > 150 ? `${item.text.slice(0, 150)}…` : item.text}</p>
-              </li>
-            ))}
-          </ul>
+          <div className="kb-kg-evidence-scroll">
+            <ul>
+              {evidence.map((item) => (
+                <li key={`${item.filename}-${item.chunk_seq}`}>
+                  <div className="kb-kg-evidence-meta">
+                    <span className="kb-kg-evidence-entity">{item.entity}</span>
+                    <span>
+                      {item.filename}
+                      {item.page !== null ? ` · 第${item.page}页` : ` · 第${item.chunk_seq + 1}段`}
+                    </span>
+                  </div>
+                  <p>{item.text.length > 150 ? `${item.text.slice(0, 150)}…` : item.text}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       ) : null}
     </div>

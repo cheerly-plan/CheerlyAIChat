@@ -107,10 +107,27 @@
   height: 100%;
   display: flex;
   flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.kb-panel-chrome {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  padding: 14px 14px 16px;
+  padding: 14px 14px 0;
+}
+
+.kb-panel-scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.kb-panel-scroll-inner {
+  padding: 10px 14px 16px;
 }
 
 /* 首行：返回 · 功能tab · 处理中 · 收起 装进同一个胶囊容器 */
@@ -145,13 +162,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  margin-bottom: 10px;
 }
 
 /* 文件名/标签筛选框：普通用户也能用（读能力人人有） */
 .kb-search {
   width: 100%;
   box-sizing: border-box;
-  margin: 0 0 10px;
   padding: 7px 11px;
   border: 1px solid #d8dbe1;
   border-radius: 8px;
@@ -508,29 +525,30 @@
   white-space: nowrap;
 }
 
-/* chips 与输入框同框换行：点框内任意空白都聚焦到输入 */
+/* chips 与输入框同框换行：点框内任意空白都聚焦到输入。
+   滚动放外层、内边距放里层，滚动条贴住边框 */
 .tag-dialog-field {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
   max-height: 168px;
-  padding: 7px 9px;
   overflow-y: auto;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   background: #fff;
   cursor: text;
   transition: border-color 0.15s;
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
 }
 
 .tag-dialog-field:hover,
 .tag-dialog-field:focus-within {
   border-color: #3b7bff;
-  scrollbar-color: rgba(15, 23, 42, 0.24) transparent;
+}
+
+.tag-dialog-field-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 7px 9px;
 }
 
 .tag-dialog-chip {
@@ -1066,6 +1084,13 @@
   stroke: #93a6c4;
 }
 
+/* 选中邻接边盖过悬停灰：点选后关系要保持蓝色高亮 */
+.kg-link.is-hot.is-hover {
+  stroke: #4d6bfe;
+  stroke-width: 1.6;
+  opacity: 0.85;
+}
+
 .kg-node-g {
   cursor: pointer;
   transition: opacity 0.2s;
@@ -1075,14 +1100,32 @@
   opacity: 0.22;
 }
 
-.kg-node-g.is-active circle {
-  stroke-width: 2.8;
+/* 点选实体：光环 + 实心提亮 + 标签加粗，和检索命中（is-hit）区分开 */
+.kg-node-g.is-active circle:not(.kg-halo) {
+  fill-opacity: 0.72;
+  stroke-width: 3;
+}
+
+.kg-node-g.is-active .kg-halo {
+  opacity: 0.9;
+  stroke-width: 2.6;
+}
+
+.kg-node-g.is-active .kg-node-label {
+  fill: #0f172a;
+  font-weight: 600;
+  font-size: 11.5px;
 }
 
 /* 命中实体：把节点本身也提亮，只靠光环在密图里不够醒目 */
 .kg-node-g.is-hit circle:not(.kg-halo) {
   fill-opacity: 0.46;
   stroke-width: 2.6;
+}
+
+.kg-node-g.is-active.is-hit circle:not(.kg-halo) {
+  fill-opacity: 0.72;
+  stroke-width: 3;
 }
 
 .kg-node-label {
@@ -1251,7 +1294,7 @@
   bottom: 0;
   z-index: 6;
   width: min(300px, 86%);
-  padding: 14px 16px 18px;
+  padding: 0;
   border-left: 1px solid #eceef2;
   background: #fff;
   box-shadow: -10px 0 28px rgba(15, 23, 42, 0.1);
@@ -1277,6 +1320,10 @@
 }
 
 /* 概览统计挪到页面标题里（见 .kb-graph-stat），画布上不再浮标签 */
+
+.kg-detail-inner {
+  padding: 14px 16px 18px;
+}
 
 .kg-detail-head {
   display: flex;
@@ -1466,6 +1513,11 @@
   color: #222;
 }
 
+.kb-kg-evidence-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
 .kb-kg-evidence ul {
   list-style: none;
   display: flex;
@@ -1474,8 +1526,6 @@
   /* 6px 是给悬浮式滚动条留的落点：它压在卡片下沿之外，
      既不遮住卡片边框，又是面板最底下的一条 */
   padding: 0 0 6px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
 }
 
 .kb-kg-evidence li {
@@ -1525,49 +1575,49 @@
    与对话界面（chat.css）同一套参数。新增可滚动容器时，只把选择器加进这里的
    清单即可，别再单写一份。 */
 
-:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul) {
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field) {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
 
-:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul):hover,
-:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul):focus-within {
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field):hover,
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field):focus-within {
   scrollbar-color: rgba(15, 23, 42, 0.28) transparent;
 }
 
-:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul)::-webkit-scrollbar {
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul)::-webkit-scrollbar-track,
-:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul)::-webkit-scrollbar-corner {
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-track,
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-corner {
   background: transparent;
 }
 
-:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul)::-webkit-scrollbar-thumb {
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-thumb {
   background-color: transparent;
   background-clip: padding-box;
   border: 1px solid transparent;
   border-radius: 999px;
 }
 
-:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul):hover::-webkit-scrollbar-thumb,
-:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul):focus-within::-webkit-scrollbar-thumb {
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field):hover::-webkit-scrollbar-thumb,
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field):focus-within::-webkit-scrollbar-thumb {
   background-color: rgba(15, 23, 42, 0.2);
 }
 
-:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul)::-webkit-scrollbar-thumb:hover {
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-thumb:hover {
   background-color: rgba(15, 23, 42, 0.38);
 }
 
 /* 触屏没有 hover，直接常显一档浅色 */
 @media (hover: none) {
-  :is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul) {
+  :is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field) {
     scrollbar-color: rgba(15, 23, 42, 0.22) transparent;
   }
 
-  :is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul)::-webkit-scrollbar-thumb {
+  :is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-thumb {
     background-color: rgba(15, 23, 42, 0.2);
   }
 }
@@ -1586,7 +1636,14 @@
 
   .kb-panel-inner {
     width: 260px;
-    padding: 12px 12px 14px;
+  }
+
+  .kb-panel-chrome {
+    padding: 12px 12px 0;
+  }
+
+  .kb-panel-scroll-inner {
+    padding: 10px 12px 14px;
   }
 
   .kb-stat {
@@ -1621,7 +1678,10 @@
 @media (max-width: 900px) {
   .kg-detail {
     width: min(276px, 84%);
-    /* 抽屉改成贴视口定位后，.kb-page 的安全区 padding 管不到它，得自己避让刘海/底部横条 */
+  }
+
+  /* 抽屉改成贴视口定位后，.kb-page 的安全区 padding 管不到它，得自己避让刘海/底部横条 */
+  .kg-detail-inner {
     padding-top: calc(14px + env(safe-area-inset-top));
     padding-bottom: calc(18px + env(safe-area-inset-bottom));
   }
@@ -1876,23 +1936,35 @@
   gap: 8px;
 }
 
-.kb-chunk-editor textarea {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 8px 10px;
+.kb-chunk-field {
+  max-height: min(360px, 50vh);
+  overflow: auto;
   border: 1px solid #c9d4ff;
   border-radius: 8px;
   background: #fff;
+}
+
+.kb-chunk-field:focus-within {
+  box-shadow: 0 0 0 3px rgba(77, 107, 254, 0.1);
+}
+
+.kb-chunk-editor textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
   color: #222;
   font: inherit;
   font-size: 12.5px;
   line-height: 1.7;
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
 }
 
 .kb-chunk-editor textarea:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(77, 107, 254, 0.1);
 }
 
 .kb-chunk-actions {

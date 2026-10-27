@@ -359,6 +359,8 @@ export default function KnowledgeGraph({
    * 都重新布局一次。用 ref 转一手拿「当前这版」高亮，重建完自己补刷。
    */
   const highlightRef = useRef<() => void>(() => {})
+  /** 当前焦点实体（点选 / 外部指定 / 单条检索命中）。悬停离开时把关系名还原到它 */
+  const focusIdRef = useRef<string | null>(null)
 
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [view, setView] = useState({ k: 1, x: 0, y: 0 })
@@ -563,9 +565,10 @@ export default function KnowledgeGraph({
         node.name.length > 12 ? `${node.name.slice(0, 11)}…` : node.name
       g.appendChild(text)
 
-      // 悬停节点时只显示它的邻接关系名：全部常显在密图里会同节点标签叠成一团
+      // 悬停节点时只显示它的邻接关系名：全部常显在密图里会同节点标签叠成一团。
+      // 离开时若有选中实体，把关系名还原到选中节点，而不是全藏
       g.addEventListener('pointerenter', () => showLinkLabelsOf(node.id))
-      g.addEventListener('pointerleave', () => showLinkLabelsOf(null))
+      g.addEventListener('pointerleave', () => showLinkLabelsOf(focusIdRef.current))
       nodeLayer.appendChild(g)
       nodeElsRef.current.set(node.id, g)
     }
@@ -664,13 +667,15 @@ export default function KnowledgeGraph({
     return () => cancelAnimationFrame(raf)
   }, [activeNode])
 
-  // 高亮：全靠 class 切换，不重排布局（否则一检索图就重新抖一次）
+  // 高亮：全靠 class 切换，不重排布局（否则一检索图就重新抖一次）。
+  // 焦点优先用画布点选 / 外部指定的实体，其次才是「检索只命中一个」的兜底
   const applyHighlight = useCallback(() => {
     const nodeLayer = nodeRef.current
     const linkLayer = linkRef.current
     if (!nodeLayer || !linkLayer) return
     const hit = new Set(hitIds)
-    const focus = selectedId || (hit.size === 1 ? [...hit][0] : '')
+    const focus = activeNodeId || (hit.size === 1 ? [...hit][0] : '')
+    focusIdRef.current = focus || null
     const near = new Set<string>()
     if (focus) {
       near.add(focus)
@@ -683,12 +688,13 @@ export default function KnowledgeGraph({
     nodeLayer.querySelectorAll<SVGGElement>('.kg-node-g').forEach((el) => {
       const id = el.dataset.id ?? ''
       const isHit = hit.has(id)
+      const isActive = Boolean(activeNodeId) && id === activeNodeId
       el.classList.toggle('is-hit', isHit)
-      el.classList.toggle('is-active', id === selectedId)
+      el.classList.toggle('is-active', isActive)
       const dim = dimOthers && (hit.size > 0 || Boolean(focus)) && !isHit && !near.has(id)
       el.classList.toggle('is-dim', dim)
       const halo = el.querySelector('.kg-halo')
-      if (halo) halo.setAttribute('opacity', isHit ? '0.55' : '0')
+      if (halo) halo.setAttribute('opacity', isActive ? '0.85' : isHit ? '0.55' : '0')
     })
 
     linkLayer.querySelectorAll<SVGLineElement>('.kg-link').forEach((el) => {
@@ -696,9 +702,21 @@ export default function KnowledgeGraph({
       const t = el.getAttribute('data-target') ?? ''
       const related = focus ? s === focus || t === focus : hit.has(s) && hit.has(t)
       el.classList.toggle('is-dim', Boolean(focus) && dimOthers && !related)
-      el.classList.toggle('is-hot', hit.size > 0 && related)
+      el.classList.toggle('is-hot', Boolean(related))
     })
-  }, [hitIds, dimOthers, selectedId, edges])
+
+    // 选中后把邻接关系名常显：否则只在悬停时闪一下，点开详情面板后就没了
+    const sim = simRef.current
+    if (sim) {
+      for (const link of sim.links) {
+        if (!link.labelEl) continue
+        const a = sim.nodes[link.source]
+        const b = sim.nodes[link.target]
+        const on = Boolean(focus && (a.id === focus || b.id === focus))
+        link.labelEl.classList.toggle('is-on', on)
+      }
+    }
+  }, [hitIds, dimOthers, activeNodeId, edges])
 
   useEffect(() => {
     highlightRef.current = applyHighlight
@@ -949,7 +967,7 @@ export default function KnowledgeGraph({
         aria-hidden={!activeNode}
       >
         {activeNode ? (
-          <>
+          <div className="kg-detail-inner">
             <header className="kg-detail-head">
               <span
                 className="kg-detail-dot"
@@ -1025,7 +1043,7 @@ export default function KnowledgeGraph({
                 ))}
               </ul>
             )}
-          </>
+          </div>
         ) : null}
       </aside>
     </div>

@@ -129,11 +129,15 @@
 .history {
   flex: 1;
   min-height: 0;
-  padding: 0 16px 8px 4px;
+  padding: 0;
   color: #9aa0a6;
   font-size: 13px;
   overflow: auto;
   overscroll-behavior: contain;
+}
+
+.history-inner {
+  padding: 0 16px 8px 4px;
 }
 
 .history-empty {
@@ -613,16 +617,20 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 28px 24px 8px;
+  padding: 0;
   overflow-anchor: none;
   overscroll-behavior: contain;
+}
+
+.list-inner {
+  padding: 28px 24px 8px;
 }
 
 .list,
 .history,
 .markdown pre,
-.composer textarea,
-.inline-composer textarea,
+.composer-input,
+.inline-composer-input,
 .msg-source-text {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
@@ -633,10 +641,10 @@
 .history:hover,
 .history:focus-within,
 .markdown pre:hover,
-.composer textarea:hover,
-.composer textarea:focus,
-.inline-composer textarea:hover,
-.inline-composer textarea:focus,
+.composer-input:hover,
+.composer-input:focus-within,
+.inline-composer-input:hover,
+.inline-composer-input:focus-within,
 .msg-source-text:hover {
   scrollbar-color: rgba(15, 23, 42, 0.28) transparent;
 }
@@ -644,8 +652,8 @@
 .list::-webkit-scrollbar,
 .history::-webkit-scrollbar,
 .markdown pre::-webkit-scrollbar,
-.composer textarea::-webkit-scrollbar,
-.inline-composer textarea::-webkit-scrollbar,
+.composer-input::-webkit-scrollbar,
+.inline-composer-input::-webkit-scrollbar,
 .msg-source-text::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -654,8 +662,8 @@
 .list::-webkit-scrollbar-track,
 .history::-webkit-scrollbar-track,
 .markdown pre::-webkit-scrollbar-track,
-.composer textarea::-webkit-scrollbar-track,
-.inline-composer textarea::-webkit-scrollbar-track,
+.composer-input::-webkit-scrollbar-track,
+.inline-composer-input::-webkit-scrollbar-track,
 .msg-source-text::-webkit-scrollbar-track,
 .list::-webkit-scrollbar-corner,
 .history::-webkit-scrollbar-corner,
@@ -666,8 +674,8 @@
 .list::-webkit-scrollbar-thumb,
 .history::-webkit-scrollbar-thumb,
 .markdown pre::-webkit-scrollbar-thumb,
-.composer textarea::-webkit-scrollbar-thumb,
-.inline-composer textarea::-webkit-scrollbar-thumb,
+.composer-input::-webkit-scrollbar-thumb,
+.inline-composer-input::-webkit-scrollbar-thumb,
 .msg-source-text::-webkit-scrollbar-thumb {
   background-color: transparent;
   background-clip: padding-box;
@@ -680,10 +688,10 @@
 .history:hover::-webkit-scrollbar-thumb,
 .history:focus-within::-webkit-scrollbar-thumb,
 .markdown pre:hover::-webkit-scrollbar-thumb,
-.composer textarea:hover::-webkit-scrollbar-thumb,
-.composer textarea:focus::-webkit-scrollbar-thumb,
-.inline-composer textarea:hover::-webkit-scrollbar-thumb,
-.inline-composer textarea:focus::-webkit-scrollbar-thumb,
+.composer-input:hover::-webkit-scrollbar-thumb,
+.composer-input:focus-within::-webkit-scrollbar-thumb,
+.inline-composer-input:hover::-webkit-scrollbar-thumb,
+.inline-composer-input:focus-within::-webkit-scrollbar-thumb,
 .msg-source-text:hover::-webkit-scrollbar-thumb {
   background-color: rgba(15, 23, 42, 0.2);
 }
@@ -691,8 +699,8 @@
 .list::-webkit-scrollbar-thumb:hover,
 .history::-webkit-scrollbar-thumb:hover,
 .markdown pre::-webkit-scrollbar-thumb:hover,
-.composer textarea::-webkit-scrollbar-thumb:hover,
-.inline-composer textarea::-webkit-scrollbar-thumb:hover,
+.composer-input::-webkit-scrollbar-thumb:hover,
+.inline-composer-input::-webkit-scrollbar-thumb:hover,
 .msg-source-text::-webkit-scrollbar-thumb:hover {
   background-color: rgba(15, 23, 42, 0.38);
 }
@@ -701,8 +709,8 @@
   .list,
   .history,
   .markdown pre,
-  .composer textarea,
-  .inline-composer textarea,
+  .composer-input,
+  .inline-composer-input,
   .msg-source-text {
     scrollbar-color: rgba(15, 23, 42, 0.22) transparent;
   }
@@ -710,8 +718,8 @@
   .list::-webkit-scrollbar-thumb,
   .history::-webkit-scrollbar-thumb,
   .markdown pre::-webkit-scrollbar-thumb,
-  .composer textarea::-webkit-scrollbar-thumb,
-  .inline-composer textarea::-webkit-scrollbar-thumb,
+  .composer-input::-webkit-scrollbar-thumb,
+  .inline-composer-input::-webkit-scrollbar-thumb,
   .msg-source-text::-webkit-scrollbar-thumb {
     background-color: rgba(15, 23, 42, 0.2);
   }
@@ -765,7 +773,7 @@
   background: #f8fafc;
 }
 
-.chat:has(.chat-header-title) .list {
+.chat:has(.chat-header-title) .list-inner {
   padding-top: 12px;
 }
 
@@ -838,7 +846,7 @@
   align-items: flex-start;
 }
 
-.list-wrap.has-session-outline .list {
+.list-wrap.has-session-outline .list-inner {
   padding-left: 42px;
 }
 
@@ -956,14 +964,20 @@
   box-shadow: 0 6px 24px rgba(15, 23, 42, 0.05);
 }
 
+.inline-composer-input {
+  max-height: 160px;
+  overflow: auto;
+}
+
 .inline-composer textarea {
   display: block;
   width: 100%;
+  padding: 0;
   border: 0;
   outline: none;
   resize: none;
+  overflow: hidden;
   min-height: 28px;
-  max-height: 160px;
   font: inherit;
   font-size: 15px;
   line-height: 1.6;
@@ -1175,19 +1189,25 @@
 }
 
 .msg-source-detail {
-  padding: 10px 12px;
+  padding: 0;
   border: 1px solid #eef0f3;
   border-radius: 10px;
   background: #fafbfc;
+  overflow: hidden;
 }
 
 .msg-source-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
+  margin: 0;
+  padding: 8px 12px 0;
   font-size: 12px;
   color: #9aa0a6;
+}
+
+.msg-source-head:not(:has(*)) {
+  display: none;
 }
 
 .msg-source-file {
@@ -1204,8 +1224,8 @@
 }
 
 .msg-source-text {
-  margin: 0 -12px 0 0;
-  padding-right: 12px;
+  margin: 0;
+  padding: 0;
   max-height: 240px;
   overflow: auto;
   font-family: inherit;
@@ -1214,6 +1234,11 @@
   color: #374151;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.msg-source-text-inner {
+  display: block;
+  padding: 8px 12px 10px;
 }
 
 .markdown {
@@ -1283,14 +1308,15 @@
 
 .markdown pre {
   margin: 0.6em 0 1em;
-  padding: 12px 14px;
+  padding: 0;
   border-radius: 10px;
   background: #f6f8fa;
   overflow: auto;
 }
 
 .markdown pre code {
-  padding: 0;
+  display: block;
+  padding: 12px 14px;
   background: transparent;
   font-size: 13px;
 }
@@ -1396,21 +1422,28 @@
 .composer {
   max-width: 800px;
   margin: 0 auto;
-  padding: 16px 18px 12px;
+  padding-bottom: 12px;
   background: #fff;
   border: 1px solid #e8eaee;
   border-radius: 28px;
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
 }
 
+.composer-input {
+  max-height: 160px;
+  overflow: auto;
+  padding: 16px 18px 0;
+}
+
 .composer textarea {
   display: block;
   width: 100%;
+  padding: 0;
   border: 0;
   outline: none;
   resize: none;
+  overflow: hidden;
   min-height: 52px;
-  max-height: 160px;
   font: inherit;
   font-size: 16px;
   line-height: 1.6;
@@ -1428,6 +1461,7 @@
   justify-content: space-between;
   gap: 12px;
   margin-top: 12px;
+  padding: 0 18px;
 }
 
 .chips {

@@ -153,28 +153,30 @@ export function MessageList({
           requestAnimationFrame(syncFromUser)
         }}
       >
-        {hasMore ? (
-          <div className="load-older">
-            <button type="button" disabled={historyLoading} onClick={onLoadOlder}>
-              {historyLoading ? '加载中…' : '加载更早消息'}
-            </button>
-          </div>
-        ) : null}
-        {messages.map((message) => (
-          <MessageItem
-            key={message.id}
-            message={message}
-            loading={loading && message.id === last?.id}
-            busy={loading}
-            canRegenerate={message.id === last?.id && last?.role === 'assistant'}
-            canResume={
-              canResume && message.id === last?.id && last?.role === 'assistant'
-            }
-            onEditSubmit={onEditSubmit}
-            onRegenerate={onRegenerate}
-            onResume={onResume}
-          />
-        ))}
+        <div className="list-inner">
+          {hasMore ? (
+            <div className="load-older">
+              <button type="button" disabled={historyLoading} onClick={onLoadOlder}>
+                {historyLoading ? '加载中…' : '加载更早消息'}
+              </button>
+            </div>
+          ) : null}
+          {messages.map((message) => (
+            <MessageItem
+              key={message.id}
+              message={message}
+              loading={loading && message.id === last?.id}
+              busy={loading}
+              canRegenerate={message.id === last?.id && last?.role === 'assistant'}
+              canResume={
+                canResume && message.id === last?.id && last?.role === 'assistant'
+              }
+              onEditSubmit={onEditSubmit}
+              onRegenerate={onRegenerate}
+              onResume={onResume}
+            />
+          ))}
+        </div>
       </div>
       {showJump ? (
         <button type="button" className="jump-bottom" aria-label="滚动到底部" onClick={jumpToBottom}>

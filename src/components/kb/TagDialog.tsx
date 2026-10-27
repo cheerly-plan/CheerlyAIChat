@@ -123,60 +123,62 @@ export function TagDialog({
           className="tag-dialog-field"
           onClick={() => inputRef.current?.focus()}
         >
-          {tags.map((tag) => (
-            <span key={tag} className="tag-dialog-chip">
-              {tag}
-              <button
-                type="button"
-                aria-label={`移除标签 ${tag}`}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  remove(tag)
-                }}
-              >
-                <CloseIcon />
-              </button>
-            </span>
-          ))}
-          <input
-            ref={inputRef}
-            value={draft}
-            // 单标签上限 24 字，但允许粘贴一串（切成多个标签），所以放宽输入长度
-            maxLength={MAX_LEN * 4}
-            autoFocus
-            aria-label="输入标签"
-            placeholder={tags.length === 0 ? '输入标签后回车，如：考勤' : '继续添加…'}
-            onChange={(event) => {
-              const value = event.target.value
-              // 出现分隔符就把已输入的部分变成 chips（输入法组合中不动：
-              // 此时 value 里的还是拼音，确认后才成词）
-              // React 把 ChangeEvent.nativeEvent 标成泛化的 Event，实际是带
-              // isComposing 的 InputEvent，这里窄化后取用
-              const composing = (event.nativeEvent as InputEvent).isComposing
-              if (!composing && SEPARATOR.test(value)) {
-                add(value)
-                setDraft('')
-              } else {
-                setDraft(value)
-              }
-            }}
-            onKeyDown={(event) => {
-              if (event.nativeEvent.isComposing) return
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                if (draft.trim()) {
-                  add(draft)
+          <div className="tag-dialog-field-inner">
+            {tags.map((tag) => (
+              <span key={tag} className="tag-dialog-chip">
+                {tag}
+                <button
+                  type="button"
+                  aria-label={`移除标签 ${tag}`}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    remove(tag)
+                  }}
+                >
+                  <CloseIcon />
+                </button>
+              </span>
+            ))}
+            <input
+              ref={inputRef}
+              value={draft}
+              // 单标签上限 24 字，但允许粘贴一串（切成多个标签），所以放宽输入长度
+              maxLength={MAX_LEN * 4}
+              autoFocus
+              aria-label="输入标签"
+              placeholder={tags.length === 0 ? '输入标签后回车，如：考勤' : '继续添加…'}
+              onChange={(event) => {
+                const value = event.target.value
+                // 出现分隔符就把已输入的部分变成 chips（输入法组合中不动：
+                // 此时 value 里的还是拼音，确认后才成词）
+                // React 把 ChangeEvent.nativeEvent 标成泛化的 Event，实际是带
+                // isComposing 的 InputEvent，这里窄化后取用
+                const composing = (event.nativeEvent as InputEvent).isComposing
+                if (!composing && SEPARATOR.test(value)) {
+                  add(value)
                   setDraft('')
                 } else {
-                  submit()
+                  setDraft(value)
                 }
-              } else if (event.key === 'Backspace' && !draft && tags.length > 0) {
-                // 输入框空着按退格：撤掉最后一个标签，符合 chips 输入的习惯
-                event.preventDefault()
-                remove(tags[tags.length - 1])
-              }
-            }}
-          />
+              }}
+              onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing) return
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  if (draft.trim()) {
+                    add(draft)
+                    setDraft('')
+                  } else {
+                    submit()
+                  }
+                } else if (event.key === 'Backspace' && !draft && tags.length > 0) {
+                  // 输入框空着按退格：撤掉最后一个标签，符合 chips 输入的习惯
+                  event.preventDefault()
+                  remove(tags[tags.length - 1])
+                }
+              }}
+            />
+          </div>
         </div>
 
         <p className="tag-dialog-hint">

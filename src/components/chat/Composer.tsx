@@ -32,8 +32,13 @@ export function Composer({
   function resize() {
     const el = areaRef.current
     if (!el) return
+    const wrap = el.parentElement
+    const pin = wrap
+      ? wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight <= 8
+      : true
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+    el.style.height = `${el.scrollHeight}px`
+    if (wrap && pin) wrap.scrollTop = wrap.scrollHeight
   }
 
   useEffect(() => {
@@ -48,23 +53,25 @@ export function Composer({
         onSend()
       }}
     >
-      <textarea
-        ref={areaRef}
-        value={value}
-        placeholder="给 Cheerly 发送消息"
-        rows={2}
-        disabled={loading}
-        onChange={(event) => {
-          onChange(event.target.value)
-          resize()
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault()
-            onSend()
-          }
-        }}
-      />
+      <div className="composer-input">
+        <textarea
+          ref={areaRef}
+          value={value}
+          placeholder="给 Cheerly 发送消息"
+          rows={2}
+          disabled={loading}
+          onChange={(event) => {
+            onChange(event.target.value)
+            resize()
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault()
+              onSend()
+            }
+          }}
+        />
+      </div>
       <div className="composer-bar">
         <div className="chips">
           <button
