@@ -1,0 +1,1969 @@
+/* 知识库整页视图：覆盖对话界面（fixed 铺满视口），
+   顶部栏 + 左侧可折起文件面板 + 右侧知识图谱 */
+
+.kb-page {
+  position: fixed;
+  inset: 0;
+  z-index: 36;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #222;
+}
+
+/* 权限待定期间的占位：铺白底 + 一行提示，避免刷新 #/kb 时闪一帧对话页 */
+.kb-boot {
+  margin: auto;
+  color: #9aa0a6;
+  font-size: 13px;
+}
+
+/* ——— 返回 / 收起控件 ———
+   面板展开时在面板首行；收起后浮在左上角（与首行位置重合，切换不跳动） */
+
+.kb-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #4b5563;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.kb-back:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.kb-panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.kb-panel-toggle:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.kb-float {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #eef0f3;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 8px rgba(17, 24, 39, 0.06);
+}
+
+/* ——— 主体：左面板 + 图谱区 ——— */
+
+.kb-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.kb-panel {
+  width: 300px;
+  flex-shrink: 0;
+  border-right: 1px solid #eef0f3;
+  background: #fbfcfe;
+  overflow: hidden;
+  transition:
+    width 0.22s ease,
+    border-color 0.22s ease;
+}
+
+/* 收起时宽度归零，内层保持固定宽度以免内容被挤扁 */
+.kb-body.panel-collapsed .kb-panel {
+  width: 0;
+  border-right-color: transparent;
+}
+
+.kb-panel-inner {
+  width: 300px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* 首行：返回 · 功能tab · 处理中 · 收起 装进同一个胶囊容器 */
+.kb-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid #eef0f3;
+  border-radius: 9px;
+  background: #f6f7fa;
+}
+
+/* tab 在工具条里占满剩余宽度，两个按钮均分 */
+.kb-panel-head .kb-tabs {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 返回 / 收起与中间 tab 之间留出间隔，避免贴在一起 */
+.kb-panel-head .kb-back {
+  margin-right: 5px;
+}
+
+.kb-panel-head .kb-panel-toggle {
+  margin-left: 5px;
+}
+
+/* 文件 tab 顶部：上传文件按钮（取代原「文件列表」标题位）+ 进度 */
+.kb-upload-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* 文件名/标签筛选框：普通用户也能用（读能力人人有） */
+.kb-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 10px;
+  padding: 7px 11px;
+  border: 1px solid #d8dbe1;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  color: #1f2937;
+}
+
+.kb-search:focus {
+  outline: none;
+  border-color: #8fa8e8;
+}
+
+.kb-search::placeholder {
+  color: #9aa0a6;
+}
+
+.kb-upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #dbe4ff;
+  border-radius: 8px;
+  background: #eef2ff;
+  color: #4d6bfe;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.kb-upload svg {
+  width: 14px;
+  height: 14px;
+}
+
+.kb-upload:hover:not(:disabled) {
+  background: #e3eaff;
+  border-color: #c7d4ff;
+}
+
+.kb-upload:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.kb-error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fcebeb;
+  color: #a32d2d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.kb-empty {
+  margin: 0;
+  padding: 8px 2px;
+  color: #8a8f98;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* ——— 文件列表 ——— */
+
+.kb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kb-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  /* 透明边框：卡片是纯色块，但边框位保留，盒子尺寸与选中态一致，切换时不跳动 */
+  border: 1px solid transparent;
+  border-radius: 10px;
+  /* 未选中＝会话列表的 hover 灰（.history-item:hover #eceef1） */
+  background: #eceef1;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+/* 悬停再深半档：会话列表没有这一档，但灰底常态下总得给鼠标一点反馈 */
+.kb-item:hover {
+  background: #e3e5e9;
+}
+
+/* 选中项悬停再深一档（会话列表没有这一档，这里补上，免得悬停时反而变灰） */
+.kb-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  /* 铺满整张卡片：卡片自身的 9px/10px 内边距原本是点击死区（事件绑在这一层），
+     点边缘没反应会显得「不好选中」。负 margin 把点击区顶到卡片边缘，
+     再用同样的 padding 把内容顶回原位；删除按钮是定位元素，加 z-index 压在上面 */
+  flex: 1;
+  margin: -9px -10px;
+  padding: 9px 10px;
+  cursor: pointer;
+}
+
+/* 卡片可聚焦（键盘可操作），但不要浏览器的焦点圈（蓝色 ring） */
+.kb-item-main:focus,
+.kb-item-main:focus-visible {
+  outline: none;
+}
+
+/* 失败卡片不再单独描红边：整列已是灰/蓝色块，一圈描边会显得被框住；
+   失败状态由红点 + 红色状态文案（「失败 · 解析超时」）表达，信息没丢 */
+
+/* ——— 选中态：沿用会话列表（.history-item.active）那套「纯色块 + 文字变色」 ———
+   底色取会话的 active:hover #e4ebff，而不是 active 的 #eef3ff：
+   列表常态已经是 hover 灰，若选中仍用 #eef3ff，两者明度几乎一样，只剩色相差，
+   扫一眼分不出哪张被选中。深一档后蓝块从灰块里浮出来，也仍是同一套配色。
+   边框设成 transparent，靠 background-clip 默认的 border-box 让填充铺满整块，
+   视觉上是无描边的色块，盒子尺寸又与未选中一致，切换时不跳动。 */
+
+.kb-item.kb-selected {
+  border-color: transparent;
+  background: #d6e0ff;
+  box-shadow: none;
+}
+
+.kb-item.kb-selected .kb-name-text {
+  color: #3b5bdb;
+}
+
+/* 蓝底上的次要信息改用蓝灰：原来的灰绿 #0f6e56 / 灰红 #a32d2d 在蓝底上发脏 */
+.kb-item.kb-selected .kb-meta {
+  color: #7a89b8;
+}
+
+/* 选中项悬停再深一档（会话列表没有这一档，这里补上，免得悬停时反而变灰） */
+
+.kb-name {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 13px;
+  color: #222;
+  min-width: 0;
+}
+
+/* 文件名最多两行，超出省略（完整名见 title 悬浮提示） */
+.kb-name-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+  line-height: 1.45;
+}
+
+/* ——— 文件类型徽标：按扩展名着色 ——— */
+
+.kb-ext {
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+  margin-right: 5px;
+}
+
+.kb-ext.ext-pdf {
+  background: #fdeaea;
+  color: #cf3f3f;
+}
+
+.kb-ext.ext-doc {
+  background: #e8effd;
+  color: #2f6bdb;
+}
+
+.kb-ext.ext-xls {
+  background: #e6f5ee;
+  color: #158357;
+}
+
+.kb-ext.ext-csv {
+  background: #f1eafd;
+  color: #7a4bd6;
+}
+
+.kb-ext.ext-txt {
+  background: #f1f3f6;
+  color: #5b6472;
+}
+
+.kb-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #8a8f98;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #c9ced6;
+  flex-shrink: 0;
+}
+
+.kb-ready .kb-dot {
+  background: #1a9d6b;
+}
+
+.kb-parsing .kb-dot,
+.kb-embedding .kb-dot {
+  background: #4d6bfe;
+  animation: kb-pulse 1.4s ease-in-out infinite;
+}
+
+.kb-failed .kb-dot {
+  background: #d5392f;
+}
+
+.kb-ready .kb-meta {
+  color: #0f6e56;
+}
+
+.kb-failed .kb-meta {
+  color: #a32d2d;
+}
+
+@keyframes kb-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* 卡片右侧操作区（下载/标签/删除）：整组绝对定位浮在右缘，
+   hover 卡片时才出现；z-index 压过铺满整卡的 .kb-item-main，点击区不被吃掉 */
+.kb-item-side {
+  position: absolute;
+  z-index: 1;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.kb-item:hover .kb-item-side,
+.kb-item-side:focus-within {
+  opacity: 1;
+}
+
+/* 下载/标签/删除三个按钮同一规格：比卡片 hover 灰深一档，图标才立得住 */
+.kb-item-side button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: #dcdfe5;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.kb-item-side button svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* 选中卡片悬停时底色是 #d6e0ff：按钮跟着再深一档，不在蓝块上留灰底 */
+.kb-item.kb-selected .kb-item-side button {
+  background: #cdd9ff;
+  color: #5b6ea8;
+}
+
+/* 悬停分两档：只有删除是危险操作才染红，下载/标签保持中性灰 */
+.kb-item-side button:hover {
+  background: #cdd1d8;
+  color: #374151;
+}
+
+/* 选中卡片上按钮底色是蓝：hover 在蓝底上再深一档，不能跳回灰 */
+.kb-item.kb-selected .kb-item-side button:hover {
+  background: #bccdff;
+  color: #2f4a8f;
+}
+
+/* 删除保持红色危险态；第二条带 button 类型的选择器用来压过上面的选中态规则 */
+.kb-item-side .kb-delete:hover,
+.kb-item.kb-selected .kb-item-side button.kb-delete:hover {
+  background: #fcebeb;
+  color: #a32d2d;
+}
+
+/* 标签 chips：与图谱徽标同款蓝，纯展示（点卡片仍是看切片） */
+.kb-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.kb-tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #dbe6fb;
+  color: #1d4ed8;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* ——— 标签编辑弹窗（骨架复用 .session-dialog，这里只补内容区）——— */
+/* 双类选择器压过 chat.css 里的 .session-dialog 宽度，避免加载顺序影响 */
+.session-dialog.tag-dialog {
+  width: min(460px, calc(100vw - 48px));
+}
+
+.tag-dialog-file {
+  margin: -6px 0 14px;
+  overflow: hidden;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* chips 与输入框同框换行：点框内任意空白都聚焦到输入 */
+.tag-dialog-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  max-height: 168px;
+  padding: 7px 9px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  cursor: text;
+  transition: border-color 0.15s;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.tag-dialog-field:hover,
+.tag-dialog-field:focus-within {
+  border-color: #3b7bff;
+  scrollbar-color: rgba(15, 23, 42, 0.24) transparent;
+}
+
+.tag-dialog-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 2px 4px 2px 8px;
+  border-radius: 999px;
+  background: #dbe6fb;
+  color: #1d4ed8;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: nowrap;
+}
+
+.tag-dialog-chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #4a6ea8;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.tag-dialog-chip button:hover {
+  background: rgba(29, 78, 216, 0.16);
+  color: #1e3a8a;
+}
+
+.tag-dialog-chip button svg {
+  width: 9px;
+  height: 9px;
+}
+
+.tag-dialog-field input {
+  flex: 1;
+  min-width: 96px;
+  height: 26px;
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.tag-dialog-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  color: #9aa1ac;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.tag-dialog-error {
+  color: #c2410c;
+}
+
+.tag-dialog-error-line {
+  margin: 10px 0 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #fdecec;
+  color: #a32d2d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* 已有标签候选：点一下就加，省得重复手打同样的词 */
+.tag-dialog-suggests {
+  margin-top: 14px;
+}
+
+.tag-dialog-suggests-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.tag-dialog-suggests-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 96px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.tag-dialog-suggests-list:hover {
+  scrollbar-color: rgba(15, 23, 42, 0.24) transparent;
+}
+
+.tag-dialog-suggest {
+  padding: 3px 9px;
+  border: 1px dashed #cfd6e4;
+  border-radius: 999px;
+  background: #fff;
+  color: #4b5563;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+}
+
+.tag-dialog-suggest:hover {
+  border-color: #8fa8e8;
+  border-style: solid;
+  background: #f2f6ff;
+  color: #1d4ed8;
+}
+
+/* 弹窗底部按钮离内容远一点（骨架里靠 <p> 的 margin 撑开，这里没有 p） */
+.tag-dialog .session-dialog-actions {
+  margin-top: 20px;
+}
+
+.tag-dialog .session-dialog-actions .primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+
+/* ——— 文件切片查看区（选中文件后替换图谱占位）——— */
+
+.kb-chunks {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  /* 右侧不留 padding：让滚动条贴住页面最右缘 */
+  padding: 14px 0 0 24px;
+  overflow: hidden;
+}
+
+.kb-chunks-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-right: 24px;
+  flex-shrink: 0;
+  height: 30px;
+}
+
+.kb-chunks-title {
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: #222;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 左面板收起后，.kb-float（返回+展开）浮在左上角，标题行让出按钮宽度 */
+.kb-body.panel-collapsed .kb-chunks-head {
+  padding-left: 72px;
+}
+
+/* 标题里的类型标签：文件名已去掉后缀，标签是唯一的类型标识，比列表徽标大一档 */
+.kb-chunks-title .kb-ext {
+  margin-right: 7px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  vertical-align: 1px;
+}
+
+.kb-chunks-empty {
+  margin: 0;
+  padding: 20px 2px;
+  color: #8a8f98;
+  font-size: 12px;
+}
+
+/* 虚拟滚动视口：只有它自己滚动，内部列表用总高撑开 */
+.kb-chunk-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-top: 12px;
+}
+
+.kb-chunk-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+/* 卡片绝对定位（top 由虚拟滚动按前缀和计算），右侧留 24px 不贴住滚动条 */
+.kb-chunk {
+  position: absolute;
+  left: 0;
+  right: 24px;
+  padding: 10px 12px;
+  border: 1px solid #eef0f3;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.kb-chunk-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.kb-chunk-kind {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.kb-chunk-kind.kind-text {
+  background: #f1f3f6;
+  color: #5b6472;
+}
+
+.kb-chunk-kind.kind-table {
+  background: #e8f6ef;
+  color: #0f6e56;
+}
+
+.kb-chunk-kind.kind-figure {
+  background: #f3eeff;
+  color: #6d4dc4;
+}
+
+.kb-chunk-pos {
+  color: #9aa0a6;
+  font-size: 11px;
+}
+
+.kb-chunk-text {
+  margin: 0;
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: #333;
+  /* 内容完整展示，卡片高度随内容 auto（虚拟滚动按每张卡片实测高度布局） */
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ——— 知识图谱 ——— */
+
+/* 标题旁的小字：说明当前是全库总览 */
+.kb-graph-sub {
+  margin-left: 8px;
+  color: #9aa0a6;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+/* 统计跟着标题走：跟在「实体关系总览」后面，比副标题再淡一档 */
+.kb-graph-stat {
+  color: #b3b8c2;
+  font-size: 11px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-graph-stat::before {
+  content: '·';
+  margin: 0 6px;
+}
+
+.kb-kg {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* ——— 检索栏 ——— */
+
+.kb-kg-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-right: 24px;
+}
+
+.kb-kg-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #e3e6eb;
+  border-radius: 9px;
+  background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.kb-kg-search:focus-within {
+  border-color: #b9c8ff;
+  box-shadow: 0 0 0 3px rgba(77, 107, 254, 0.1);
+}
+
+.kb-kg-search svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  margin-right: 7px;
+  color: #9aa0a6;
+}
+
+.kb-kg-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: #222;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.kb-kg-search input::placeholder {
+  color: #a8adb6;
+}
+
+.kb-kg-clear {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #eceef1;
+  color: #6b7280;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.kb-kg-depth {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 9px;
+  background: #eceef1;
+}
+
+.kb-kg-depth button {
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #5b6472;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.kb-kg-depth button.is-on {
+  background: #fff;
+  color: #3b5bdb;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.kb-kg-go {
+  height: 34px;
+  flex-shrink: 0;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 9px;
+  background: #4d6bfe;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.kb-kg-go:hover:not(:disabled) {
+  background: #3f5ce8;
+}
+
+.kb-kg-go:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* 命中实体 */
+.kb-kg-seeds {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+  padding-right: 24px;
+}
+
+.kb-kg-seeds-label {
+  color: #9aa0a6;
+  font-size: 11px;
+}
+
+.kb-kg-seed {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3b5bdb;
+  font-size: 11.5px;
+}
+
+.kb-kg-seed i {
+  color: #8b9bea;
+  font-style: normal;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-kg-seeds-empty {
+  color: #9aa0a6;
+  font-size: 11px;
+}
+
+.kb-kg-building {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #eef4ff;
+  color: #3b5bdb;
+  font-size: 12px;
+}
+
+/* 画布容器 */
+.kb-kg-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin-right: 24px;
+  border: 1px solid #eceef2;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fcfdff;
+}
+
+/* ——— 画布本体 ——— */
+
+.kg-shell {
+  /* 详情面板是盖在画布右侧的浮层，需要定位上下文 */
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+.kg-canvas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background-color: #fcfdff;
+  background-image: radial-gradient(#e6eaf2 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.kg-svg {
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+.kg-svg:active {
+  cursor: grabbing;
+}
+
+.kg-link {
+  stroke: #bfc9d9;
+  stroke-width: 1;
+  transition: stroke 0.15s, opacity 0.15s;
+}
+
+.kg-link.is-dim {
+  opacity: 0.25;
+}
+
+.kg-link.is-hot {
+  stroke: #4d6bfe;
+  stroke-width: 1.6;
+  opacity: 0.85;
+}
+
+/* 关系名：白色描边压在线上，避免和连线叠在一起看不清 */
+.kg-link-label {
+  fill: #7b8494;
+  font-size: 9.5px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  paint-order: stroke;
+  stroke: rgba(252, 253, 255, 0.92);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+  user-select: none;
+}
+
+.kg-link-label.is-on {
+  opacity: 1;
+}
+
+.kg-link.is-hover {
+  stroke: #93a6c4;
+}
+
+.kg-node-g {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.kg-node-g.is-dim {
+  opacity: 0.22;
+}
+
+.kg-node-g.is-active circle {
+  stroke-width: 2.8;
+}
+
+/* 命中实体：把节点本身也提亮，只靠光环在密图里不够醒目 */
+.kg-node-g.is-hit circle:not(.kg-halo) {
+  fill-opacity: 0.46;
+  stroke-width: 2.6;
+}
+
+.kg-node-label {
+  fill: #334155;
+  font-size: 10.5px;
+  paint-order: stroke;
+  stroke: rgba(252, 253, 255, 0.94);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+  user-select: none;
+}
+
+.kg-legend {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  max-width: calc(100% - 110px);
+  padding: 5px 9px;
+  border-radius: 8px;
+  /* 半透明底：图谱铺满时图例直接压在节点上，没有底会觉得脏 */
+  background: rgba(252, 253, 255, 0.88);
+  pointer-events: none;
+}
+
+.kg-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #7b8494;
+  font-size: 10.5px;
+}
+
+.kg-legend-item i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.kg-zoom {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kg-zoom button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #e3e6eb;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #5b6472;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.kg-zoom button:hover {
+  background: #fff;
+  color: #222;
+}
+
+.kg-tip {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  margin: 0;
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: rgba(252, 253, 255, 0.88);
+  color: #a8adb6;
+  font-size: 10.5px;
+  pointer-events: none;
+}
+
+.kg-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 24px;
+  text-align: center;
+}
+
+.kg-placeholder h2 {
+  margin: 10px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #222;
+}
+
+.kg-placeholder p {
+  margin: 0;
+  max-width: 380px;
+  color: #8a8f98;
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.kg-empty-cta {
+  margin-top: 12px;
+  padding: 7px 16px;
+  border: 1px solid #c9d4ff;
+  border-radius: 8px;
+  background: #fff;
+  color: #3b5bdb;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.kg-empty-cta:hover {
+  background: #f2f5ff;
+}
+
+.kg-loading {
+  position: absolute;
+  left: 50%;
+  top: 16px;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #6b7280;
+  font-size: 12px;
+  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.08);
+}
+
+.kg-error {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  right: 16px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fdf0f0;
+  color: #a32d2d;
+  font-size: 12px;
+}
+
+/* ——— 节点详情：默认收起，选中节点才从右侧滑出 ———
+   做成浮层而不是常驻列：常驻列在选中/取消时会让画布宽度变化，
+   ResizeObserver 一触发整张图就重新布局，节点会跳一下。
+
+   定位用 fixed 而不是 absolute：absolute 只能贴在「画布卡片」里，
+   上下要减掉检索栏和命中依据，卡片还有 12px 圆角和 overflow:hidden，
+   抽屉就被裁成一个矮盒子。fixed 以视口为基准（.kb-page 本身就是
+   inset:0 的整页层），高度自然铺满，也贴着页面右缘。 */
+
+.kg-detail {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  width: min(300px, 86%);
+  padding: 14px 16px 18px;
+  border-left: 1px solid #eceef2;
+  background: #fff;
+  box-shadow: -10px 0 28px rgba(15, 23, 42, 0.1);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* 收起：推到画布外；visibility 让里面的按钮退出 Tab 顺序 */
+  transform: translateX(101%);
+  visibility: hidden;
+  opacity: 0;
+  transition:
+    transform 0.2s ease,
+    opacity 0.16s ease,
+    visibility 0s linear 0.2s;
+}
+
+.kg-detail.is-open {
+  transform: none;
+  visibility: visible;
+  opacity: 1;
+  transition:
+    transform 0.2s ease,
+    opacity 0.16s ease;
+}
+
+/* 概览统计挪到页面标题里（见 .kb-graph-stat），画布上不再浮标签 */
+
+.kg-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.kg-detail-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.kg-detail-head h3 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #222;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kg-detail-close {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #9aa0a6;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.kg-detail-close:hover {
+  background: #f1f2f5;
+  color: #222;
+}
+
+.kg-detail-type {
+  margin: 6px 0 0;
+  color: #9aa0a6;
+  font-size: 11px;
+}
+
+.kg-detail-desc {
+  margin: 10px 0 0;
+  color: #4b5563;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.kg-detail-src {
+  margin: 8px 0 0;
+  color: #9aa0a6;
+  font-size: 11px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.kg-detail-sub {
+  margin: 16px 0 6px;
+  color: #6b7280;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.kg-detail-empty {
+  margin: 0;
+  color: #a8adb6;
+  font-size: 11.5px;
+}
+
+.kg-rel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.kg-rel-list button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #374151;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kg-rel-list button:hover {
+  background: #f4f6fb;
+}
+
+.kg-rel-arrow {
+  color: #b3b8c2;
+  font-size: 11px;
+}
+
+.kg-rel-name {
+  flex-shrink: 0;
+  color: #4d6bfe;
+}
+
+.kg-rel-target {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #6b7280;
+}
+
+.kg-evidence {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kg-evidence li {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fafbfd;
+}
+
+.kg-evidence-head {
+  color: #9aa0a6;
+  font-size: 10.5px;
+  margin-bottom: 4px;
+}
+
+.kg-evidence p {
+  margin: 0;
+  color: #55607a;
+  font-size: 11.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ——— 检索证据（画布下方横条）——— */
+
+.kb-kg-evidence {
+  flex-shrink: 0;
+  margin-right: 24px;
+  /* 底部不留白：横向滚动条就落在面板底边上，而不是悬在卡片下面 */
+  padding: 8px 10px 0;
+  border: 1px solid #eceef2;
+  border-radius: 10px;
+  background: #fbfcfe;
+}
+
+.kb-kg-evidence-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #8a8f98;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.kb-kg-evidence-head button {
+  border: 0;
+  background: transparent;
+  color: #6b7280;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.kb-kg-evidence-head button:hover {
+  color: #222;
+}
+
+.kb-kg-evidence ul {
+  list-style: none;
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  /* 6px 是给悬浮式滚动条留的落点：它压在卡片下沿之外，
+     既不遮住卡片边框，又是面板最底下的一条 */
+  padding: 0 0 6px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.kb-kg-evidence li {
+  width: 260px;
+  flex-shrink: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #eef0f4;
+}
+
+.kb-kg-evidence-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: #9aa0a6;
+  font-size: 10.5px;
+  margin-bottom: 4px;
+  /* 文件名/实体名可能很长，别把卡片撑开 */
+  overflow-wrap: anywhere;
+}
+
+.kb-kg-evidence-entity {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3b5bdb;
+  font-size: 10px;
+}
+
+.kb-kg-evidence li p {
+  margin: 0;
+  color: #55607a;
+  font-size: 11.5px;
+  line-height: 1.6;
+  /* 只做断词，不保留原文换行：切片里的硬换行是解析时折的，
+     照搬会把卡片撑成一条长条。白色空格按常规折叠，段落保持紧凑。 */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ——— 滚动条：知识库内一套 ———
+   细 6px、平时全透明，鼠标移入或键盘聚焦到容器内才显形；轨道与转角始终不画。
+   与对话界面（chat.css）同一套参数。新增可滚动容器时，只把选择器加进这里的
+   清单即可，别再单写一份。 */
+
+:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul) {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul):hover,
+:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul):focus-within {
+  scrollbar-color: rgba(15, 23, 42, 0.28) transparent;
+}
+
+:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul)::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul)::-webkit-scrollbar-track,
+:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul)::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul)::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  background-clip: padding-box;
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+
+:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul):hover::-webkit-scrollbar-thumb,
+:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul):focus-within::-webkit-scrollbar-thumb {
+  background-color: rgba(15, 23, 42, 0.2);
+}
+
+:is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul)::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(15, 23, 42, 0.38);
+}
+
+/* 触屏没有 hover，直接常显一档浅色 */
+@media (hover: none) {
+  :is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul) {
+    scrollbar-color: rgba(15, 23, 42, 0.22) transparent;
+  }
+
+  :is(.kb-panel-inner, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence ul)::-webkit-scrollbar-thumb {
+    background-color: rgba(15, 23, 42, 0.2);
+  }
+}
+
+/* ——— 窄屏 ——— */
+
+@media (max-width: 860px) {
+  .kb-page {
+    /* 移动端留出安全区，避免刘海/圆角遮挡 */
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+
+  .kb-panel {
+    width: 260px;
+  }
+
+  .kb-panel-inner {
+    width: 260px;
+    padding: 12px 12px 14px;
+  }
+
+  .kb-stat {
+    display: none;
+  }
+
+  .kb-chunks {
+    padding: 12px 0 0 16px;
+  }
+
+  .kb-chunks-head {
+    padding-right: 16px;
+  }
+
+  .kb-body.panel-collapsed .kb-chunks-head {
+    /* 窄屏 .kb-chunks 左 padding 更小，多让出 4px 以免仍被按钮压住 */
+    padding-left: 76px;
+  }
+
+  .kb-kg-bar,
+  .kb-kg-seeds {
+    padding-right: 16px;
+  }
+
+  .kb-kg-canvas,
+  .kb-kg-evidence {
+    margin-right: 16px;
+  }
+}
+
+/* 窄屏时详情更窄一些，尽量少盖住画布 */
+@media (max-width: 900px) {
+  .kg-detail {
+    width: min(276px, 84%);
+    /* 抽屉改成贴视口定位后，.kb-page 的安全区 padding 管不到它，得自己避让刘海/底部横条 */
+    padding-top: calc(14px + env(safe-area-inset-top));
+    padding-bottom: calc(18px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 640px) {
+  .kb-kg-depth {
+    display: none;
+  }
+
+  .kg-tip {
+    display: none;
+  }
+
+  .kb-kg-go {
+    padding: 0 12px;
+  }
+
+  .kb-legend,
+  .kg-legend {
+    max-width: calc(100% - 56px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kb-panel,
+  .kb-item,
+  .kb-upload,
+  .kb-back,
+  .kb-panel-toggle,
+  .kg-detail {
+    transition: none;
+  }
+
+  .kb-parsing .kb-dot,
+  .kb-embedding .kb-dot {
+    animation: none;
+  }
+}
+
+/* ——— 左侧功能 tab：文件 / 图谱 ———
+   tab 自己不再带容器底，直接嵌在 .kb-panel-head 的胶囊里 */
+
+.kb-tabs {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kb-tabs button {
+  flex: 1;
+  height: 28px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #6b7280;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.kb-tabs button.is-on {
+  background: #fff;
+  color: #222;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+/* ——— 图谱 tab：勾选即查看（无按钮）——— */
+
+.kb-glist {
+  margin: 0;
+  padding: 2px 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* 轻量行风格：不加边框，hover 浮现底色，选中行用主色浅底 */
+.kb-gitem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.kb-gitem:hover {
+  background: #f4f5f8;
+}
+
+.kb-gitem.is-picked {
+  background: #eef2ff;
+}
+
+/* 图谱未生成/失败的行整体降一点存在感，把注意力让给「构建图谱」按钮 */
+.kb-gitem.is-muted .kb-gname {
+  color: #6b7280;
+}
+
+/* 未生成行的文件名也可点（进构建视图）：做成链接感的文字 */
+.kb-gname-action {
+  cursor: pointer;
+}
+
+.kb-gname-action:hover {
+  color: #4d6bfe;
+}
+
+.kb-gcheck {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  flex: 1;
+  cursor: pointer;
+}
+
+.kb-gcheck input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: #4d6bfe;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.kb-gcheck input:disabled {
+  cursor: not-allowed;
+}
+
+.kb-gname {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #222;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* 状态文字：纯文字（非按钮）。动作型蓝色，说明型灰色 */
+.kb-gbadge {
+  color: #8a8f98;
+  font: inherit;
+  font-size: 11.5px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+/* 动作型（未生成→可构建图谱 / 失败→重新构建）：一眼可点的蓝色纯文字 */
+.kb-gbadge.st-action {
+  color: #4d6bfe;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.kb-gbadge.st-action:hover {
+  color: #3b5bdb;
+}
+
+.kb-gbadge.st-busy,
+.kb-gbadge.st-none {
+  color: #9aa1ad;
+}
+
+.kb-gbadge.st-stale {
+  color: #9a6b1f;
+  cursor: pointer;
+}
+
+.kb-gbadge.st-stale:hover {
+  color: #7a5417;
+}
+
+/* 已完成组与未完成组之间的分割线 */
+.kb-gdivider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 6px 2px;
+}
+
+/* 未完成行没有复选框，整行可点进构建视图 */
+.kb-gitem.is-muted {
+  cursor: pointer;
+}
+
+/* 文件名 + 实体数：两行排版 */
+.kb-gtext {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.kb-gcount {
+  font-size: 11px;
+  color: #8a8f98;
+  line-height: 1.4;
+}
+
+/* ——— 切片人工修订（改切片即审核）——— */
+
+.kb-chunk-edit {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: #4d6bfe;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  /* 默认隐藏，hover 卡片才浮现，避免满屏「编辑」按钮抢视觉 */
+  opacity: 0;
+  transition: opacity 0.12s, background 0.15s;
+}
+
+.kb-chunk:hover .kb-chunk-edit,
+.kb-chunk:focus-within .kb-chunk-edit {
+  opacity: 1;
+}
+
+/* 键盘聚焦到按钮本身也要可见（tab 进列表时卡片本身未 hover） */
+.kb-chunk-edit:focus-visible {
+  opacity: 1;
+  outline: 2px solid #c9d4ff;
+}
+
+/* 触屏没有 hover：始终显示，否则用户找不到入口 */
+@media (hover: none) {
+  .kb-chunk-edit {
+    opacity: 1;
+  }
+}
+
+.kb-chunk-edit:hover {
+  background: #eef2ff;
+}
+
+.kb-chunk-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kb-chunk-editor textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid #c9d4ff;
+  border-radius: 8px;
+  background: #fff;
+  color: #222;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.7;
+  resize: vertical;
+}
+
+.kb-chunk-editor textarea:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(77, 107, 254, 0.1);
+}
+
+.kb-chunk-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.kb-chunk-actions button {
+  height: 26px;
+  padding: 0 14px;
+  border-radius: 7px;
+  border: none;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.kb-chunk-save {
+  background: #4d6bfe;
+  color: #fff;
+  font-weight: 600;
+}
+
+.kb-chunk-save:hover:not(:disabled) {
+  background: #3b5bdb;
+}
+
+.kb-chunk-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kb-chunk-cancel {
+  border: 1px solid #e3e6eb !important;
+  background: #fff;
+  color: #6b7280;
+}
+
+.kb-chunk-cancel:hover:not(:disabled) {
+  color: #222;
+}
+
+/* ——— 图谱待重建横幅（切片修订后）——— */
+
+.kb-kg-stale {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #f0d9a8;
+  border-radius: 9px;
+  background: #fdf6e9;
+  color: #9a6b1f;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.kb-kg-stale button {
+  border: none;
+  background: transparent;
+  color: #9a6b1f;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 4px;
+  text-decoration: underline;
+}
+
+.kb-kg-stale button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}

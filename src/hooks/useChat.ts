@@ -308,7 +308,9 @@ export function useChat(initialUser?: UserInfo | null) {
     setMessages((prev) =>
       prev.filter((item) => {
         if (item.id !== assistantId || item.role !== 'assistant') return true
-        return Boolean(item.content || (item.tools && item.tools.length))
+        return Boolean(
+          item.content || (item.tools && item.tools.length) || item.sources?.length,
+        )
       }),
     )
   }
@@ -390,6 +392,8 @@ export function useChat(initialUser?: UserInfo | null) {
           }))
         }
         if (event.type === 'tool_end') {
+          // 引用是累积后的整表（后端已按切片去重），直接替换
+          const cited = event.sources
           // 把对应工具标记为已完成；之后到下一批 token 到达前是「模型思考」状态
           patchMessage(assistantId, (item) => ({
             ...item,
@@ -398,7 +402,14 @@ export function useChat(initialUser?: UserInfo | null) {
                 ? { ...tool, running: false }
                 : tool,
             ),
+            sources: cited?.length ? cited : item.sources,
           }))
+        }
+        if (event.type === 'done') {
+          const cited = event.sources
+          if (cited?.length) {
+            patchMessage(assistantId, (item) => ({ ...item, sources: cited }))
+          }
         }
         if (event.type === 'error') {
           sawError = true
@@ -488,7 +499,10 @@ export function useChat(initialUser?: UserInfo | null) {
     return created.session_id
   }
 
-  async function send(text?: string, options: { webSearch?: boolean } = {}) {
+  async function send(
+    text?: string,
+    options: { webSearch?: boolean; kb?: boolean } = {},
+  ) {
     const content = (text ?? input).trim()
     if (!content || loading || !user) return
 
@@ -520,10 +534,14 @@ export function useChat(initialUser?: UserInfo | null) {
     ])
     await streamReply(content, assistantId, activeId, {
       webSearch: options.webSearch,
+      kb: options.kb,
     })
   }
 
-  async function regenerate(id: string, options: { webSearch?: boolean } = {}) {
+  async function regenerate(
+    id: string,
+    options: { webSearch?: boolean; kb?: boolean } = {},
+  ) {
     if (loading || !user || !sessionId) return
     clearResumeState()
     const last = messages[messages.length - 1]
@@ -540,6 +558,7 @@ export function useChat(initialUser?: UserInfo | null) {
     await streamReply(previous.content, assistantId, sessionId, {
       regenerate: true,
       webSearch: options.webSearch,
+      kb: options.kb,
     })
   }
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { PaperclipIcon, SendIcon, StopIcon } from './icons'
+import { KbIcon, PaperclipIcon, SendIcon, StopIcon } from './icons'
 import { GlobeToggleIcon } from './GlobeToggleIcon'
 
 type Props = {
@@ -7,6 +7,9 @@ type Props = {
   loading: boolean
   webSearch: boolean
   onToggleWebSearch: () => void
+  /** 「知识库」开关：开启时本轮挂载 kb_search 工具，对话即可查知识库 */
+  kbOn?: boolean
+  onToggleKb?: () => void
   onChange: (value: string) => void
   onSend: () => void
   /** 流式回复期间传入：发送按钮变为停止按钮 */
@@ -18,6 +21,8 @@ export function Composer({
   loading,
   webSearch,
   onToggleWebSearch,
+  kbOn = false,
+  onToggleKb,
   onChange,
   onSend,
   onStop,
@@ -74,6 +79,19 @@ export function Composer({
             <GlobeToggleIcon enabled={webSearch} size={14} />
             智能搜索
           </button>
+          {onToggleKb ? (
+            <button
+              type="button"
+              className={`chip chip-toggle${kbOn ? ' active' : ''}`}
+              aria-pressed={kbOn}
+              title={kbOn ? '知识库检索已开启' : '开启后回答可检索知识库文档'}
+              disabled={loading}
+              onClick={onToggleKb}
+            >
+              <KbIcon enabled={kbOn} size={16} />
+              知识库
+            </button>
+          ) : null}
         </div>
         <div className="composer-actions">
           <button type="button" className="composer-attach" aria-label="上传附件" disabled={loading}>

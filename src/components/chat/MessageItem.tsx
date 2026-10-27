@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { ChatMessage } from '../../types'
+import type { ChatMessage, ChatSource } from '../../types'
 import { CheckIcon, CopyIcon, EditIcon, RefreshIcon } from './icons'
 import { Markdown } from './Markdown'
 
@@ -39,6 +39,7 @@ export function MessageItem({
   }
 
   const toolRuns = message.tools ?? []
+  const sources = message.sources ?? []
   const waiting = loading && !message.content && !toolRuns.length
   // 有工具记录但都在执行完、还没等到下一批 token：展示「正在思考」，
   // 避免工具已跑完还一直挂着「正在调用 xx」
@@ -57,6 +58,9 @@ export function MessageItem({
         {waiting ? <span className="typing" /> : null}
         {message.content ? (
           <Markdown content={message.content} streaming={loading} />
+        ) : null}
+        {sources.length > 0 && (done || interrupted) ? (
+          <SourceList sources={sources} />
         ) : null}
         {done || interrupted ? (
           <MessageActions>
@@ -205,6 +209,57 @@ function UserMessage({
 
 function MessageActions({ children }: { children: ReactNode }) {
   return <div className="msg-actions">{children}</div>
+}
+
+/**
+ * 参考来源：回答里用到的知识库切片。
+ *
+ * 一排小卡片（编号 + 文件名 + 位置），点任意一张就在下面展开这段原文——
+ * 用户想核实「这句话是从文档哪一段来的」，需要看到原文本身，而不是只看到
+ * 文件名。默认全部收起：回答已经是主体，引用不该抢注意力。
+ */
+function SourceList({ sources }: { sources: ChatSource[] }) {
+  const [openKey, setOpenKey] = useState<string | null>(null)
+  const active = sources.find((item) => item.key === openKey) ?? null
+
+  return (
+    <div className="msg-sources">
+      <span className="msg-sources-label">参考来源</span>
+      <div className="msg-sources-chips">
+        {sources.map((source, index) => {
+          const open = source.key === openKey
+          return (
+            <button
+              key={source.key}
+              type="button"
+              className={`msg-source${open ? ' is-open' : ''}`}
+              title={`${source.filename} · ${source.where}`}
+              aria-expanded={open}
+              onClick={() => setOpenKey(open ? null : source.key)}
+            >
+              <span className="msg-source-idx">{index + 1}</span>
+              <span className="msg-source-name">{source.filename}</span>
+              <span className="msg-source-where">{source.where}</span>
+            </button>
+          )
+        })}
+      </div>
+      {active ? (
+        <div className="msg-source-detail">
+          <div className="msg-source-head">
+            <span className="msg-source-file" title={active.filename}>
+              {active.filename}
+            </span>
+            <span className="msg-source-where">{active.where}</span>
+            {active.kind === 'figure' ? (
+              <span className="msg-source-note">图像识别，可能有误差</span>
+            ) : null}
+          </div>
+          <pre className="msg-source-text">{active.excerpt}</pre>
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 function CopyButton({ text }: { text: string }) {

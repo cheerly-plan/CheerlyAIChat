@@ -5,7 +5,8 @@ import { Logo } from '../chat/Logo'
 import './auth.css'
 
 type Props = {
-  onAuthed: (user: AuthUser) => void
+  /** 允许异步：调用方可能要在跳转前拉一次权威用户信息，期间保持按钮 loading */
+  onAuthed: (user: AuthUser) => void | Promise<void>
 }
 
 type Mode = 'login' | 'register'
@@ -35,7 +36,7 @@ export function LoginView({ onAuthed }: Props) {
           ? await login(name, password)
           : await register(name, password, displayName)
       writeAuthToken(result.token)
-      onAuthed(result.user)
+      await onAuthed(result.user)
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败')
     } finally {

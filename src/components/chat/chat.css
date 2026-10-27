@@ -45,9 +45,17 @@
 }
 
 .brand,
-.new-chat,
 .account {
   margin-right: 12px;
+}
+
+/* 两个入口按钮的右边界与会话列表项对齐（历史列表右侧留 16px），
+   不给 width: 100%——否则 100% + margin 会溢出侧栏被裁掉，看起来像贴着右边；
+   min-width 相应扣掉右侧间距，收起动画时不至于被挤压换行 */
+.new-chat,
+.kb-entry {
+  min-width: 232px;
+  margin-right: 16px;
 }
 
 .brand {
@@ -67,22 +75,55 @@
   color: #4d6bfe;
 }
 
-.new-chat {
+/* 「开启新对话」与「知识库」共用同一套尺寸：等高、等宽、icon 与文字居左，
+   两者唯一区别是外观（前者白底描边、后者透明 ghost） */
+.new-chat,
+.kb-entry {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 10px;
   height: 40px;
-  border: 1px solid #e5e7eb;
+  padding: 0 12px;
   border-radius: 12px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.new-chat {
+  margin-top: 2px;
+  border: 1px solid #e5e7eb;
   background: #fff;
   color: #222;
-  font: inherit;
-  cursor: pointer;
 }
 
 .new-chat:hover {
   background: #f3f4f6;
+}
+
+.kb-entry {
+  margin-top: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #4b5563;
+}
+
+.kb-entry:hover {
+  background: #eef1f5;
+  color: #222;
+}
+
+.new-chat > svg {
+  flex-shrink: 0;
+}
+
+.kb-entry-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: block;
 }
 
 .history {
@@ -581,7 +622,8 @@
 .history,
 .markdown pre,
 .composer textarea,
-.inline-composer textarea {
+.inline-composer textarea,
+.msg-source-text {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
@@ -594,7 +636,8 @@
 .composer textarea:hover,
 .composer textarea:focus,
 .inline-composer textarea:hover,
-.inline-composer textarea:focus {
+.inline-composer textarea:focus,
+.msg-source-text:hover {
   scrollbar-color: rgba(15, 23, 42, 0.28) transparent;
 }
 
@@ -602,7 +645,8 @@
 .history::-webkit-scrollbar,
 .markdown pre::-webkit-scrollbar,
 .composer textarea::-webkit-scrollbar,
-.inline-composer textarea::-webkit-scrollbar {
+.inline-composer textarea::-webkit-scrollbar,
+.msg-source-text::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
@@ -612,6 +656,7 @@
 .markdown pre::-webkit-scrollbar-track,
 .composer textarea::-webkit-scrollbar-track,
 .inline-composer textarea::-webkit-scrollbar-track,
+.msg-source-text::-webkit-scrollbar-track,
 .list::-webkit-scrollbar-corner,
 .history::-webkit-scrollbar-corner,
 .markdown pre::-webkit-scrollbar-corner {
@@ -622,7 +667,8 @@
 .history::-webkit-scrollbar-thumb,
 .markdown pre::-webkit-scrollbar-thumb,
 .composer textarea::-webkit-scrollbar-thumb,
-.inline-composer textarea::-webkit-scrollbar-thumb {
+.inline-composer textarea::-webkit-scrollbar-thumb,
+.msg-source-text::-webkit-scrollbar-thumb {
   background-color: transparent;
   background-clip: padding-box;
   border: 1px solid transparent;
@@ -637,7 +683,8 @@
 .composer textarea:hover::-webkit-scrollbar-thumb,
 .composer textarea:focus::-webkit-scrollbar-thumb,
 .inline-composer textarea:hover::-webkit-scrollbar-thumb,
-.inline-composer textarea:focus::-webkit-scrollbar-thumb {
+.inline-composer textarea:focus::-webkit-scrollbar-thumb,
+.msg-source-text:hover::-webkit-scrollbar-thumb {
   background-color: rgba(15, 23, 42, 0.2);
 }
 
@@ -645,7 +692,8 @@
 .history::-webkit-scrollbar-thumb:hover,
 .markdown pre::-webkit-scrollbar-thumb:hover,
 .composer textarea::-webkit-scrollbar-thumb:hover,
-.inline-composer textarea::-webkit-scrollbar-thumb:hover {
+.inline-composer textarea::-webkit-scrollbar-thumb:hover,
+.msg-source-text::-webkit-scrollbar-thumb:hover {
   background-color: rgba(15, 23, 42, 0.38);
 }
 
@@ -654,7 +702,8 @@
   .history,
   .markdown pre,
   .composer textarea,
-  .inline-composer textarea {
+  .inline-composer textarea,
+  .msg-source-text {
     scrollbar-color: rgba(15, 23, 42, 0.22) transparent;
   }
 
@@ -662,7 +711,8 @@
   .history::-webkit-scrollbar-thumb,
   .markdown pre::-webkit-scrollbar-thumb,
   .composer textarea::-webkit-scrollbar-thumb,
-  .inline-composer textarea::-webkit-scrollbar-thumb {
+  .inline-composer textarea::-webkit-scrollbar-thumb,
+  .msg-source-text::-webkit-scrollbar-thumb {
     background-color: rgba(15, 23, 42, 0.2);
   }
 }
@@ -1035,6 +1085,137 @@
   flex: 1;
 }
 
+/* ——— 参考来源（知识库引用）——— */
+.msg-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #eef0f3;
+}
+
+.msg-sources-label {
+  font-size: 12px;
+  color: #9aa0a6;
+}
+
+.msg-sources-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.msg-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 320px;
+  padding: 4px 9px 4px 6px;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  background: #fbfcfd;
+  color: #4b5563;
+  font-size: 12.5px;
+  line-height: 1.5;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.msg-source:hover {
+  border-color: #cfd6e4;
+  background: #f5f7fb;
+  color: #1f2937;
+}
+
+.msg-source.is-open {
+  border-color: #b9c6e4;
+  background: #eef3fd;
+  color: #1d4ed8;
+}
+
+.msg-source-idx {
+  flex-shrink: 0;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: #eceff4;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.msg-source.is-open .msg-source-idx {
+  background: #dbe6fb;
+  color: #1d4ed8;
+}
+
+.msg-source-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msg-source-where {
+  flex-shrink: 0;
+  color: #9aa0a6;
+  font-size: 12px;
+}
+
+.msg-source.is-open .msg-source-where {
+  color: #6f8fd8;
+}
+
+.msg-source-detail {
+  padding: 10px 12px;
+  border: 1px solid #eef0f3;
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.msg-source-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #9aa0a6;
+}
+
+.msg-source-file {
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #4b5563;
+  font-weight: 500;
+}
+
+.msg-source-note {
+  color: #b45309;
+}
+
+.msg-source-text {
+  margin: 0 -12px 0 0;
+  padding-right: 12px;
+  max-height: 240px;
+  overflow: auto;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.75;
+  color: #374151;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .markdown {
   font-size: 16px;
   line-height: 1.8;
@@ -1301,16 +1482,35 @@
 }
 
 /* Lottie 图标路径强制继承 chip 文字色（灰→蓝），与 DeepSeek 同款做法 */
-.globe-toggle-icon svg {
+.globe-toggle-icon svg,
+.book-toggle-icon svg {
   display: block;
+}
+
+/* 书本 Lottie 画布留白比地球多，略放大让视觉重量对齐 */
+.book-toggle-icon svg {
+  transform: scale(1.2);
+  transform-origin: center;
 }
 
 .globe-toggle-icon svg path[fill] {
   fill: currentColor;
 }
 
-.globe-toggle-icon svg path[stroke] {
+.globe-toggle-icon svg path[stroke],
+.book-toggle-icon svg path[stroke],
+.book-toggle-icon svg rect[stroke] {
   stroke: currentColor;
+}
+
+.book-toggle-icon svg path[fill],
+.book-toggle-icon svg rect {
+  fill: none;
+}
+
+.book-toggle-icon {
+  flex-shrink: 0;
+  overflow: visible;
 }
 
 .chip-toggle:focus-visible {

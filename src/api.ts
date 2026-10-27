@@ -1,4 +1,4 @@
-import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, MemoryMessage, SessionInfo, SessionTitle, UserInfo } from './types'
+import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, ChatSource, MemoryMessage, SessionInfo, SessionTitle, UserInfo } from './types'
 
 export const CHAT_MEMORY_PAGE_SIZE = 20
 export const DEFAULT_SESSION_TITLE = '新会话'
@@ -242,10 +242,14 @@ export async function fetchChatMemory(
 export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
   const result: ChatMessage[] = []
   let pendingTools: string[] = []
+  // 引用挂在带正文的那条回答上；万一某轮只调了工具没留正文，
+  // 就顺延给下一条有正文的回答，别把引用丢了
+  let pendingSources: ChatSource[] = []
 
   for (const msg of raw) {
     if (msg.role === 'user') {
       pendingTools = []
+      pendingSources = []
       result.push({
         id: crypto.randomUUID(),
         role: 'user',
@@ -256,8 +260,10 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
     if (msg.role !== 'assistant') continue
 
     const tools = (msg.tool_calls ?? []).map((item) => item.name).filter(Boolean)
+    const sources = msg.meta?.sources ?? []
     if (tools.length && !(msg.content ?? '').trim()) {
       pendingTools = [...pendingTools, ...tools]
+      if (sources.length) pendingSources = sources
       continue
     }
 
@@ -265,14 +271,17 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
     const historyTools = (pendingTools.length ? pendingTools : tools).map(
       (name) => ({ label: name, running: false }),
     )
+    const merged = sources.length ? sources : pendingSources
 
     result.push({
       id: crypto.randomUUID(),
       role: 'assistant',
       content: msg.content ?? '',
       tools: historyTools.length ? historyTools : undefined,
+      sources: merged.length ? merged : undefined,
     })
     pendingTools = []
+    pendingSources = []
   }
 
   return result
@@ -314,6 +323,8 @@ export async function sendChatStream(
   options: {
     regenerate?: boolean
     webSearch?: boolean
+    /** 「知识库」开关：开启时后端为模型挂载 kb_search 工具，可检索全库文档 */
+    kb?: boolean
     signal?: AbortSignal
   } = {},
 ): Promise<void> {
@@ -330,6 +341,7 @@ export async function sendChatStream(
       chat_session_id: chatSessionId,
       regenerate: options.regenerate ?? false,
       web_search: options.webSearch ?? false,
+      use_kb: options.kb ?? false,
     }),
     signal: options.signal,
   })
@@ -375,4 +387,312 @@ export async function fetchPendingRun(
   if (!response.ok) return null
   const data = (await response.json()) as { run_id?: string | null }
   return data.run_id ?? null
+}
+
+// ——— 知识库（P1）：分片上传、列表、删除 ———
+
+export type KbFile = {
+  file_id: string
+  filename: string
+  size_bytes: number
+  status: 'uploaded' | 'parsing' | 'embedding' | 'ready' | 'failed'
+  error: string
+  chunk_count: number
+  // 图谱进度：'' 未构建 / building / ready / stale（切片修订后待重建）/ failed / skipped
+  graph_status?: string
+  graph_entity_count?: number
+  tags?: string[]
+  created_at: string
+}
+
+// 与后端 kb_part_size_mb 对齐
+const KB_PART_SIZE = 4 * 1024 * 1024
+
+// 分片上传完整流程：建档 → 逐片上传 → 触发解析。
+// 顺序上传、不做断点续传；任一步失败整体报错，用户重传整个文件。
+export async function uploadKbFile(file: File): Promise<string> {
+  const initRes = await authedFetch('/v1/kb/files', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ filename: file.name, size_bytes: file.size }),
+  })
+  if (!initRes.ok) {
+    throw new Error(await errorMessage(initRes, '创建上传任务失败'))
+  }
+  const { file_id: fileId } = (await initRes.json()) as { file_id: string }
+
+  const total = Math.ceil(file.size / KB_PART_SIZE)
+  for (let i = 0; i < total; i += 1) {
+    const blob = file.slice(i * KB_PART_SIZE, (i + 1) * KB_PART_SIZE)
+    const res = await authedFetch(`/v1/kb/files/${fileId}/parts/${i}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/octet-stream', ...authHeaders() },
+      body: blob,
+    })
+    if (!res.ok) {
+      throw new Error(await errorMessage(res, `分片 ${i + 1}/${total} 上传失败`))
+    }
+  }
+
+  const done = await authedFetch(`/v1/kb/files/${fileId}/complete`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
+  if (!done.ok) {
+    throw new Error(await errorMessage(done, '触发解析失败'))
+  }
+  return fileId
+}
+
+export async function fetchKbFiles(): Promise<KbFile[]> {
+  const response = await authedFetch('/v1/kb/files', { headers: authHeaders() })
+  if (!response.ok) {
+    throw new Error(`获取知识库文件列表失败 ${response.status}`)
+  }
+  const data = (await response.json()) as { files?: KbFile[] }
+  return data.files ?? []
+}
+
+export async function deleteKbFile(fileId: string): Promise<void> {
+  const response = await authedFetch(`/v1/kb/files/${fileId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '删除文件失败'))
+  }
+}
+
+// 全量覆盖式设置文件标签：传空数组即清空
+export async function setKbFileTags(fileId: string, tags: string[]): Promise<void> {
+  const response = await authedFetch(`/v1/kb/files/${fileId}/tags`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ tags }),
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '保存标签失败'))
+  }
+}
+
+// 下载原始文件：鉴权走请求头，不能用 <a href> 直链，先取 blob 再触发保存
+export async function downloadKbFile(file: KbFile): Promise<void> {
+  const response = await authedFetch(`/v1/kb/files/${file.file_id}/download`, {
+    headers: authHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '下载失败'))
+  }
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = file.filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+export type KbChunk = {
+  seq: number
+  page: number | null
+  kind: 'text' | 'table' | 'figure'
+  text: string
+}
+
+// 人工修订切片：保存即单片重嵌入；图谱已建的话会被后端标成 stale
+export async function editKbChunk(
+  fileId: string,
+  seq: number,
+  text: string,
+): Promise<{ changed: boolean; graph_status: string }> {
+  const response = await authedFetch(
+    `/v1/kb/files/${fileId}/chunks/${seq}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ text }),
+    },
+  )
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '保存切片失败'))
+  }
+  const data = (await response.json()) as {
+    changed?: boolean
+    graph_status?: string
+  }
+  return { changed: data.changed ?? true, graph_status: data.graph_status ?? '' }
+}
+
+// 管理员选文件批量生成图谱（上传后不再自动建图）
+export async function buildKgGraphs(
+  fileIds: string[],
+): Promise<{ file_id: string; status: string }[]> {
+  const response = await authedFetch('/v1/kg/graph/build', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ file_ids: fileIds }),
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '提交图谱构建失败'))
+  }
+  const data = (await response.json()) as { results?: { file_id: string; status: string }[] }
+  return data.results ?? []
+}
+
+export async function fetchKbChunks(
+  fileId: string,
+  offset = 0,
+  limit = 50,
+): Promise<{ chunks: KbChunk[]; total: number }> {
+  const response = await authedFetch(
+    `/v1/kb/files/${fileId}/chunks?limit=${limit}&offset=${offset}`,
+    { headers: authHeaders() },
+  )
+  if (!response.ok) {
+    throw new Error(`获取切片列表失败 ${response.status}`)
+  }
+  const data = (await response.json()) as {
+    chunks?: KbChunk[]
+    total?: number
+  }
+  return { chunks: data.chunks ?? [], total: data.total ?? 0 }
+}
+
+// ——— 知识图谱（P2）：看图、检索、重建 ———
+
+export type KgEntityType =
+  | 'person'
+  | 'org'
+  | 'product'
+  | 'technology'
+  | 'metric'
+  | 'event'
+  | 'location'
+  | 'concept'
+  | 'other'
+
+export type KgNode = {
+  id: string
+  name: string
+  /** 跨文件同名实体的合并键；检索命中靠它对齐到画布节点 */
+  norm_name?: string
+  type: KgEntityType
+  description: string
+  mentions: number
+  /** 在返回边集里的连接数：全库视图据此隐藏孤独点、挑枢纽节点 */
+  degree?: number
+  file_id: string
+  filename: string
+}
+
+export type KgEdge = {
+  id: string
+  source: string
+  target: string
+  relation: string
+  description: string
+  weight: number
+  chunk_seq: number | null
+}
+
+export type KgGraph = {
+  nodes: KgNode[]
+  edges: KgEdge[]
+  stats?: { entities: number; relations: number; files: number }
+  filename?: string
+  graph_status?: string
+  entity_count?: number
+}
+
+export type KgSeed = {
+  id: string
+  name: string
+  /** 与 KgNode.norm_name 对应：命中记录和画布上的代表记录可能不是同一条 */
+  norm_name?: string
+  type: KgEntityType
+  score: number
+  filename: string
+}
+
+export type KgEvidence = {
+  chunk_seq: number
+  page: number | null
+  kind: string
+  text: string
+  filename: string
+  entity?: string
+}
+
+export type KgSearchResult = KgGraph & {
+  query: string
+  seeds: KgSeed[]
+  chunks: KgEvidence[]
+  empty: boolean
+}
+
+// 图谱范围：不传 = 全库；fileId = 单文件；fileIds = 勾选的合并视图
+export type KgScope = { fileId?: string; fileIds?: string[] }
+
+function kgScopeParams(scope?: KgScope): URLSearchParams {
+  const params = new URLSearchParams()
+  if (scope?.fileId) {
+    params.set('file_id', scope.fileId)
+  } else if (scope?.fileIds?.length) {
+    params.set('file_ids', scope.fileIds.join(','))
+  }
+  return params
+}
+
+// 不传范围 = 全库图谱；fileId 拿单文件图谱；fileIds 拿勾选文件的合并图谱
+export async function fetchKgGraph(scope?: KgScope): Promise<KgGraph> {
+  const params = kgScopeParams(scope)
+  const qs = params.toString()
+  const url = scope?.fileId
+    ? `/v1/kg/files/${scope.fileId}/graph`
+    : `/v1/kg/graph${qs ? `?${qs}` : ''}`
+  const response = await authedFetch(url, { headers: authHeaders() })
+  if (!response.ok) {
+    throw new Error(`获取知识图谱失败 ${response.status}`)
+  }
+  return (await response.json()) as KgGraph
+}
+
+export async function searchKg(
+  query: string,
+  options: { topK?: number; depth?: number } & KgScope = {},
+): Promise<KgSearchResult> {
+  const params = kgScopeParams(options)
+  params.set('q', query)
+  params.set('top_k', String(options.topK ?? 6))
+  params.set('depth', String(options.depth ?? 1))
+  const response = await authedFetch(`/v1/kg/search?${params}`, {
+    headers: authHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(
+      response.status === 502 ? '向量化服务暂时不可用' : `图谱检索失败 ${response.status}`,
+    )
+  }
+  return (await response.json()) as KgSearchResult
+}
+
+export async function fetchKgEntityChunks(
+  entityId: string,
+): Promise<KgEvidence[]> {
+  const response = await authedFetch(`/v1/kg/entities/${entityId}/chunks`, {
+    headers: authHeaders(),
+  })
+  if (!response.ok) return []
+  const data = (await response.json()) as { chunks?: KgEvidence[] }
+  return data.chunks ?? []
+}
+
+export async function rebuildKgGraph(fileId: string): Promise<void> {
+  const response = await authedFetch(`/v1/kg/files/${fileId}/rebuild`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(`重建图谱失败 ${response.status}`)
+  }
 }

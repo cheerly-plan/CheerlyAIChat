@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { hasCachedActiveSession } from '../../api'
 import { useChat } from '../../hooks/useChat'
+import { navigate, useRoute } from '../../router'
 import type { UserInfo } from '../../types'
+import { KnowledgeBase } from '../kb/KnowledgeBase'
 import { ChatHeader } from './ChatHeader'
 import { Composer } from './Composer'
 import { Logo } from './Logo'
@@ -74,6 +76,21 @@ export function Chat({ onLogout, initialUser = null }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(
     () => window.matchMedia('(min-width: 861px)').matches,
   )
+  // 主区域视图由 URL 决定（#/kb = 知识库），刷新后仍停在原页面
+  const route = useRoute()
+  // 知识库页（上传/编辑切片/建图）只对管理员开放：入口不渲染 + 直接
+  // 访问 #/kb 时回落到对话。对话里的「知识库」开关是另一回事——所有
+  // 用户都能开（挂载 kb_search 工具查库）
+  const isAdmin = Boolean(user?.is_admin)
+  // 用户信息未就绪前不能做权限判定：#/kb 刷新进来时 user 还是 null，
+  // 此时 isAdmin 必为 false，若立即判会把管理员也打回对话页（表现为刷新后回退）。
+  // sessionsReady 同时作为「初始化已结束」的兜底信号：取用户信息失败时
+  // ready 会一直为 false，靠它把占位页收掉，不至于永久停在加载中。
+  const kbAccessPending = route === 'kb' && !ready && !sessionsReady
+  useEffect(() => {
+    if (route !== 'kb' || kbAccessPending || isAdmin) return
+    navigate('chat')
+  }, [route, kbAccessPending, isAdmin])
   // 「智能搜索」开关：开启时本轮请求携带 web_search=true，
   // 后端为模型提供 web_search 工具；重新生成沿用同一开关。
   // 默认开启，并记住用户上次的选择（localStorage）
@@ -84,6 +101,12 @@ export function Chat({ onLogout, initialUser = null }: Props) {
       saveWebSearchPref(next)
       return next
     })
+  // 「知识库」开关：与智能搜索同一套交互——开启时本轮挂载 kb_search
+  // 工具，通过对话即可查全库文档；默认关闭，每次进入都从关开始
+  // （检索要花钱且有延迟，不该默认替用户开）
+  const [kbOn, setKbOn] = useState(false)
+  const toggleKb = () => setKbOn((on) => !on)
+
   const isLanding =
     !sessionId &&
     messages.length === 0 &&
@@ -94,9 +117,15 @@ export function Chat({ onLogout, initialUser = null }: Props) {
     <div className={`shell${sidebarOpen ? '' : ' sidebar-collapsed'}`}>
       <div className="sidebar-mask" onClick={() => setSidebarOpen(false)} />
       <Sidebar
-        onNewChat={reset}
+        onNewChat={() => {
+          navigate('chat')
+          reset()
+        }}
         onCollapse={() => setSidebarOpen(false)}
-        onSelectSession={(id) => void selectSession(id)}
+        onSelectSession={(id) => {
+          navigate('chat')
+          void selectSession(id)
+        }}
         onRenameSession={(id, next) => renameSessionTitle(id, next)}
         onDeleteSession={(id) => removeSession(id)}
         sessions={sessions}
@@ -107,74 +136,94 @@ export function Chat({ onLogout, initialUser = null }: Props) {
         chatLoading={loading}
         userName={user?.user_name}
         onLogout={onLogout}
+        onOpenKb={isAdmin ? () => navigate('kb') : undefined}
       />
       <main className="chat">
-        <ChatHeader
-          title={title}
-          titleLoading={!sessionsReady && hasCachedActiveSession()}
-          collapsed={!sidebarOpen}
-          onToggleSidebar={() => setSidebarOpen((open) => !open)}
-          onNewChat={reset}
-        />
-        {isLanding ? (
-          <div className="landing">
-            {error ? <p className="error">{error}</p> : null}
-            <div className="landing-hero">
-              <h1 className="landing-hello">
-                <Logo size={36} />
-                <span>{timeGreeting()}，让我们开始聊天吧</span>
-              </h1>
-              <Composer
-                value={input}
-                loading={loading || !ready}
-                webSearch={webSearch}
-                onToggleWebSearch={toggleWebSearch}
-                onChange={setInput}
-                onSend={() => void send(undefined, { webSearch })}
-                onStop={() => stop()}
-              />
-            </div>
+        {kbAccessPending ? (
+          // 权限待定：先铺知识库的白底，避免闪一帧对话页再切走
+          <div className="kb-page">
+            <p className="kb-boot">正在加载知识库…</p>
           </div>
+        ) : route === 'kb' && isAdmin ? (
+          <KnowledgeBase onBack={() => navigate('chat')} canManage={isAdmin} />
         ) : (
           <>
-            <MessageList
-              key={sessionId ?? 'new'}
-              messages={messages}
-              loading={loading}
-              historyLoading={historyLoading}
-              hasMore={hasMore}
-              canResume={canResume}
-              onEditSubmit={(text) => void send(text, { webSearch })}
-              onRegenerate={(id) => void regenerate(id, { webSearch })}
-              onResume={() => void resumeRun()}
-              onLoadOlder={() => void loadOlder()}
+            <ChatHeader
+              title={title}
+              titleLoading={!sessionsReady && hasCachedActiveSession()}
+              collapsed={!sidebarOpen}
+              onToggleSidebar={() => setSidebarOpen((open) => !open)}
+              onNewChat={reset}
             />
-            <div className="dock">
-              {canResume &&
-              !loading &&
-              messages[messages.length - 1]?.role !== 'assistant' ? (
-                <button
-                  type="button"
-                  className="chat-resume-btn"
-                  onClick={() => void resumeRun()}
-                >
-                  继续生成
-                </button>
-              ) : null}
-              {error ? <p className="error">{error}</p> : null}
-              <Composer
-                value={input}
-                loading={loading || !ready}
-                webSearch={webSearch}
-                onToggleWebSearch={toggleWebSearch}
-                onChange={setInput}
-                onSend={() => void send(undefined, { webSearch })}
-                onStop={() => stop()}
-              />
-            </div>
+            {isLanding ? (
+              <div className="landing">
+                {error ? <p className="error">{error}</p> : null}
+                <div className="landing-hero">
+                  <h1 className="landing-hello">
+                    <Logo size={36} />
+                    <span>{timeGreeting()}，让我们开始聊天吧</span>
+                  </h1>
+                  <Composer
+                    value={input}
+                    loading={loading || !ready}
+                    webSearch={webSearch}
+                    onToggleWebSearch={toggleWebSearch}
+                    kbOn={kbOn}
+                    onToggleKb={toggleKb}
+                    onChange={setInput}
+                    onSend={() => void send(undefined, { webSearch, kb: kbOn })}
+                    onStop={() => stop()}
+                  />
+                </div>
+              </div>
+            ) : (
+              <>
+                <MessageList
+                  key={sessionId ?? 'new'}
+                  messages={messages}
+                  loading={loading}
+                  historyLoading={historyLoading}
+                  hasMore={hasMore}
+                  canResume={canResume}
+                  onEditSubmit={(text) =>
+                    void send(text, { webSearch, kb: kbOn })
+                  }
+                  onRegenerate={(id) =>
+                    void regenerate(id, { webSearch, kb: kbOn })
+                  }
+                  onResume={() => void resumeRun()}
+                  onLoadOlder={() => void loadOlder()}
+                />
+                <div className="dock">
+                  {canResume &&
+                  !loading &&
+                  messages[messages.length - 1]?.role !== 'assistant' ? (
+                    <button
+                      type="button"
+                      className="chat-resume-btn"
+                      onClick={() => void resumeRun()}
+                    >
+                      继续生成
+                    </button>
+                  ) : null}
+                  {error ? <p className="error">{error}</p> : null}
+                  <Composer
+                    value={input}
+                    loading={loading || !ready}
+                    webSearch={webSearch}
+                    onToggleWebSearch={toggleWebSearch}
+                    kbOn={kbOn}
+                    onToggleKb={toggleKb}
+                    onChange={setInput}
+                    onSend={() => void send(undefined, { webSearch, kb: kbOn })}
+                    onStop={() => stop()}
+                  />
+                </div>
+              </>
+            )}
+            <p className="disclaimer">内容由 AI 生成，请仔细甄别</p>
           </>
         )}
-        <p className="disclaimer">内容由 AI 生成，请仔细甄别</p>
       </main>
     </div>
   )
