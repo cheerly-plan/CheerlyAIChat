@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   fetchKgGraph,
   rebuildKgGraph,
+  alignKgGraph,
+  fetchKgAliases,
   searchKg,
   type KbFile,
   type KgGraph,
@@ -54,6 +56,7 @@ export default function KbGraphPanel({
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
   const [rebuilding, setRebuilding] = useState(false)
+  const [aligning, setAligning] = useState(false)
 
   const requestIdRef = useRef(0)
   const searchIdRef = useRef(0)
@@ -98,6 +101,32 @@ export default function KbGraphPanel({
     const raf = requestAnimationFrame(() => void load())
     return () => cancelAnimationFrame(raf)
   }, [load])
+
+  /**
+   * 实体对齐：把同一实体的简称/全称并成一个点（后台任务，几十秒）。
+   *
+   * 对齐跑在服务端的图谱线程池里，接口立刻返回；这里轮询 aliases 接口的
+   * align_status，等它从 aligning 落定再重拉图——否则用户点完按钮看到的
+   * 还是旧图，会以为没生效。
+   */
+  const runAlign = async () => {
+    if (!fileId || aligning) return
+    setAligning(true)
+    setError('')
+    try {
+      await alignKgGraph(fileId)
+      for (let i = 0; i < 90; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+        const state = await fetchKgAliases(fileId)
+        if (state.align_status !== 'aligning') break
+      }
+      await load({ quiet: true })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '实体对齐失败')
+    } finally {
+      setAligning(false)
+    }
+  }
 
   // 图谱构建中：单文件视图看自己的 graph_status，全库/合并视图看父组件给的 building
   const isBuilding = building || graph?.graph_status === 'building'
@@ -424,6 +453,23 @@ export default function KbGraphPanel({
                 </button>
               ))}
             </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {fileId && graph?.graph_status === 'ready' && (canManage || (graph?.alias_count ?? 0) > 0) ? (
+        <div className="kb-kg-align">
+          <span className="kb-kg-align-text">
+            {aligning
+              ? '正在对齐同一实体的多种写法…'
+              : (graph?.alias_count ?? 0) > 0
+                ? `已合并 ${graph?.alias_count} 个写法（简称/全称并成一个点）`
+                : '把简称与全称并成一个实体'}
+          </span>
+          {canManage ? (
+            <button type="button" onClick={() => void runAlign()} disabled={aligning}>
+              {aligning ? '对齐中…' : (graph?.alias_count ?? 0) > 0 ? '重新对齐' : '对齐实体'}
+            </button>
           ) : null}
         </div>
       ) : null}
