@@ -683,6 +683,49 @@
   cursor: default;
 }
 
+/* 重命名弹窗：单输入框，复用标签弹窗的骨架与底部按钮规则 */
+.rename-dialog-field input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  transition: border-color 0.15s;
+}
+
+.rename-dialog-field input:hover,
+.rename-dialog-field input:focus {
+  border-color: #3b7bff;
+  outline: none;
+}
+
+.rename-dialog-hint,
+.rename-dialog-error {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.rename-dialog-hint {
+  color: #8a8f98;
+}
+
+.rename-dialog-error {
+  color: #d64545;
+}
+
+.rename-dialog .session-dialog-actions {
+  margin-top: 20px;
+}
+
+.rename-dialog .session-dialog-actions .primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 
 /* ——— 文件切片查看区（选中文件后替换图谱占位）——— */
 
@@ -737,6 +780,59 @@
   padding: 20px 2px;
   color: #8a8f98;
   font-size: 12px;
+}
+
+/* 文件 tab 空态：没有文件 / 没选文件时的右侧引导。
+   居中一列，别再让空画布占着这块地方 */
+.kb-chunks-hint {
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px 24px 64px;
+  text-align: center;
+}
+
+.kb-hint-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #222;
+}
+
+.kb-hint-text {
+  margin: 0;
+  max-width: 420px;
+  color: #8a8f98;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.kb-hint-upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid #dbe4ff;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #4d6bfe;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.kb-hint-upload:hover:not(:disabled) {
+  background: #e4ebff;
+  border-color: #c7d4ff;
+}
+
+.kb-hint-upload:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 /* 虚拟滚动视口：只有它自己滚动，内部列表用总高撑开 */

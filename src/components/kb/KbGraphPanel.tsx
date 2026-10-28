@@ -226,7 +226,7 @@ export default function KbGraphPanel({
     if (isBuilding) {
       return {
         title: '正在构建图谱',
-        hint: '正在从切片里抽取实体与关系，通常几十秒，完成后自动出现。',
+        hint: '正在从切片里抽取实体与关系。已抽到的部分会陆续上图，完成后自动刷新。',
         action: undefined,
       }
     }

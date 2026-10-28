@@ -6,6 +6,7 @@ import {
   editKbChunk,
   fetchKbChunks,
   fetchKbFiles,
+  renameKbFile,
   setKbFileTags,
   uploadKbFile,
   type KbChunk,
@@ -15,6 +16,7 @@ import {
 import {
   BackIcon,
   DownloadIcon,
+  EditIcon,
   PanelIcon,
   TagIcon,
   TrashIcon,
@@ -22,6 +24,7 @@ import {
 } from '../chat/icons'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import KbGraphPanel from './KbGraphPanel'
+import { RenameDialog } from './RenameDialog'
 import { TagDialog } from './TagDialog'
 import './kb.css'
 
@@ -571,6 +574,33 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
     }
   }
 
+  // ——— 重命名（管理员）：弹窗改名，后端同步磁盘并按需重嵌 ———
+
+  const [renamingFile, setRenamingFile] = useState<KbFile | null>(null)
+  const [savingRename, setSavingRename] = useState(false)
+  // 改名失败显示在弹窗内（页面顶部 error 会被蒙层盖住）
+  const [renameError, setRenameError] = useState('')
+
+  const saveRename = async (filename: string) => {
+    if (!renamingFile || savingRename) return
+    const fileId = renamingFile.file_id
+    setSavingRename(true)
+    setRenameError('')
+    try {
+      await renameKbFile(fileId, filename)
+      // selectedFile 由 files 派生，改列表右侧标题/下载名即跟着变
+      setFiles((cur) =>
+        cur.map((f) => (f.file_id === fileId ? { ...f, filename } : f)),
+      )
+      setRenamingFile(null)
+    } catch (e) {
+      // 弹窗不关：保住刚输入的名字，用户改完可以直接重试
+      setRenameError(e instanceof Error ? e.message : '重命名失败')
+    } finally {
+      setSavingRename(false)
+    }
+  }
+
   const onDownload = async (item: KbFile) => {
     setError('')
     try {
@@ -765,6 +795,21 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                             title="编辑标签"
                           >
                             <TagIcon />
+                          </button>
+                        ) : null}
+                        {/* 后端只允许 ready 改名（重嵌依赖切片就绪），其他状态不显示入口 */}
+                        {canManage && item.status === 'ready' ? (
+                          <button
+                            type="button"
+                            className="kb-tag-btn"
+                            onClick={() => {
+                              setRenameError('')
+                              setRenamingFile(item)
+                            }}
+                            aria-label={`重命名 ${item.filename}`}
+                            title="重命名"
+                          >
+                            <EditIcon />
                           </button>
                         ) : null}
                         {canManage ? (
@@ -1023,9 +1068,46 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
               </div>
             )}
           </section>
+        ) : tab === 'files' ? (
+          // 文件 tab 但没有可看的文件：此前会落到下面的全库图谱兜底，
+          // 空库时右侧挂着一张空画布，既没解释也没入口。
+          // 首屏请求未回来时不渲染，避免「还没有文件」闪一下又消失
+          !filesLoaded ? (
+            <section className="kb-chunks" aria-label="文件" />
+          ) : (
+            <section className="kb-chunks kb-chunks-hint" aria-label="文件提示">
+              {files.length === 0 ? (
+                <>
+                  <h2 className="kb-hint-title">知识库里还没有文件</h2>
+                  <p className="kb-hint-text">
+                    {canManage
+                      ? '支持 PDF / DOCX / XLSX / MD / TXT / CSV。上传后系统会自动解析、切片并建立索引，完成后就能在对话里直接提问文档内容。'
+                      : '管理员上传文档后，这里会显示文件与切片，你也可以在对话里直接提问文档内容。'}
+                  </p>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      className="kb-hint-upload"
+                      onClick={() => inputRef.current?.click()}
+                      disabled={uploading !== null}
+                    >
+                      <UploadIcon />
+                      <span>{uploading ? `上传中 · ${uploading}` : '选择文件上传'}</span>
+                    </button>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <h2 className="kb-hint-title">选择一份文件</h2>
+                  <p className="kb-hint-text">
+                    点左侧文件名查看切片内容；在图谱 tab 勾选文件可以查看实体关系。
+                  </p>
+                </>
+              )}
+            </section>
+          )
         ) : (
-          // 图谱视图：由图谱 tab 的勾选驱动（勾 1 个=单文件，多选=合并，0=全库）；
-          // 文件 tab 未选中文件时也落在这里，作为兜底
+          // 图谱视图：由图谱 tab 的勾选驱动（勾 1 个=单文件，多选=合并，0=全库）
           <section className="kb-chunks" aria-label="知识图谱">
             <header className="kb-chunks-head">
               <h2 className="kb-chunks-title">
@@ -1082,6 +1164,16 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
           error={tagError}
           onCancel={() => setTaggingFile(null)}
           onSave={(tags) => void saveTags(tags)}
+        />
+      ) : null}
+
+      {renamingFile ? (
+        <RenameDialog
+          filename={renamingFile.filename}
+          saving={savingRename}
+          error={renameError}
+          onCancel={() => setRenamingFile(null)}
+          onSave={(name) => void saveRename(name)}
         />
       ) : null}
 

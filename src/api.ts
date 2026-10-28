@@ -475,6 +475,18 @@ export async function setKbFileTags(fileId: string, tags: string[]): Promise<voi
   }
 }
 
+// 重命名文件：后端同步改 DB 与磁盘文件名；stem 变化会触发后台整份重嵌
+export async function renameKbFile(fileId: string, filename: string): Promise<void> {
+  const response = await authedFetch(`/v1/kb/files/${fileId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ filename }),
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '重命名失败'))
+  }
+}
+
 // 下载原始文件：鉴权走请求头，不能用 <a href> 直链，先取 blob 再触发保存
 export async function downloadKbFile(file: KbFile): Promise<void> {
   const response = await authedFetch(`/v1/kb/files/${file.file_id}/download`, {
