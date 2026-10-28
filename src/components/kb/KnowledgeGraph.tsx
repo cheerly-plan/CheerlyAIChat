@@ -310,19 +310,6 @@ type Props = {
    * 取消选中回到纯枢纽图。文件越多图越乱的问题靠它兜住。
    */
   prune?: boolean
-  /**
-   * 折叠孤立实体（单文件大图启用）。
-   *
-   * 孤立实体 = 一条关系都没抽到的点。它们画出来只是一个浮在边缘的名字，
-   * 没有连线可读，却实打实占着力导向的算力：实测 331 页招股书 407 个实体
-   * 里 225 个是孤立的（55%）。所以大图默认按「度数从高到低」只放一批，
-   * 剩下的靠画布左下角「加载更多」逐批补进来——想看全量仍然看得到，
-   * 只是不必一上来就对着 400 个散点。
-   *
-   * 与 prune 的区别：prune 是跨文件全库图的枢纽分层（只留 60 个 + 点节点
-   * 展开邻域），这里是同一份文档内部按预算分批，不做邻域裁剪。
-   */
-  foldIsolated?: boolean
   selectedId?: string | null
   onSelect?: (node: KgNode | null) => void
   emptyTitle: string
@@ -333,18 +320,6 @@ type Props = {
 /** 枢纽模式下默认渲染的最大节点数：力导向是 O(n²)，六十个点是流畅和可读的平衡点 */
 const HUB_CAP = 60
 
-/**
- * 单文件大图的首屏实体预算。
- *
- * 与折叠阈值（KbGraphPanel 的 FOLD_ISOLATED_OVER = 200）取同一个数：
- * 有连接的实体不超过 200 个时全都给出来，超出部分才排队等「加载更多」，
- * 孤立实体永远排在队尾——所以「超过 200 就不显示孤独实体」是这条预算
- * 的直接结果，不需要额外开关。
- */
-const FOLD_FIRST_BUDGET = 200
-/** 每次「加载更多」补多少个实体 */
-const FOLD_MORE_STEP = 100
-
 export default function KnowledgeGraph({
   graph,
   loading,
@@ -352,7 +327,6 @@ export default function KnowledgeGraph({
   hitIds = [],
   dimOthers = true,
   prune = false,
-  foldIsolated = false,
   selectedId = null,
   onSelect,
   emptyTitle,
@@ -420,82 +394,38 @@ export default function KnowledgeGraph({
    *   选中节点的一跳邻居全部补进来 —— 这就是「点击下钻」，点谁展开谁的
    *   周边，取消选中收回去，交互没有多出任何按钮。
    * 全集都被裁空（所有实体都没抽到关系）时退回全量，宁可乱也别开天窗。
-   *
-   * foldIsolated 开启 = 单文件大图分批：候选顺序是「有连接的（按权重）→
-   * 孤立的（按提及）」，只取前 budget 个。孤立点排在队尾，所以只要预算没用完
-   * 有连接的实体，它们一个都不会出现——正是「不显示孤独实体」；而点「加载更多」
-   * 把预算推过 linked.length 之后，它们才开始进场。
    */
-  const degreeOf = useCallback(
-    (node: KgNode) => {
-      if (typeof node.degree === 'number') return node.degree
-      let hits = 0
-      for (const edge of edges) {
-        if (edge.source === node.id || edge.target === node.id) hits += 1
-      }
-      return hits
-    },
-    [edges],
-  )
-
-  /** 有连接 / 孤立两组，各自排好序：前者按权重，后者按提及数 */
-  const split = useMemo(() => {
-    const linked: KgNode[] = []
-    const isolated: KgNode[] = []
-    for (const node of nodes) {
-      if (degreeOf(node) > 0) linked.push(node)
-      else isolated.push(node)
-    }
-    linked.sort(
-      (a, b) =>
-        weightOf(b, degreeOf(b)) - weightOf(a, degreeOf(a)) || a.id.localeCompare(b.id),
-    )
-    isolated.sort(
-      (a, b) => (b.mentions || 1) - (a.mentions || 1) || a.id.localeCompare(b.id),
-    )
-    return { linked, isolated }
-  }, [nodes, degreeOf])
-
-  // 「加载更多」补出来的额外名额。首屏预算随数据算，这里只记额外部分——
-  // 构建中图谱会一批批进来，首屏要跟着新数据走，额外名额不能被重置
-  const [extraSlots, setExtraSlots] = useState(0)
-
   const display = useMemo(() => {
-    if (prune) {
-      const keep = new Set<string>()
-      for (const node of split.linked.slice(0, HUB_CAP)) keep.add(node.id)
-      if (activeNodeId) {
-        keep.add(activeNodeId)
-        for (const edge of edges) {
-          if (edge.source === activeNodeId) keep.add(edge.target)
-          if (edge.target === activeNodeId) keep.add(edge.source)
-        }
-      }
-      if (keep.size === 0) return { nodes, edges }
-      return {
-        nodes: nodes.filter((node) => keep.has(node.id)),
-        edges: edges.filter((edge) => keep.has(edge.source) && keep.has(edge.target)),
+    if (!prune) return { nodes, edges }
+    const deg = new Map<string, number>()
+    for (const edge of edges) {
+      deg.set(edge.source, (deg.get(edge.source) ?? 0) + 1)
+      deg.set(edge.target, (deg.get(edge.target) ?? 0) + 1)
+    }
+    const degOf = (node: KgNode) => node.degree ?? deg.get(node.id) ?? 0
+    const keep = new Set<string>()
+    const linked = nodes
+      .filter((node) => degOf(node) > 0)
+      .sort(
+        (a, b) =>
+          weightOf(b, degOf(b)) - weightOf(a, degOf(a)) || a.id.localeCompare(b.id),
+      )
+    for (const node of linked.slice(0, HUB_CAP)) keep.add(node.id)
+    if (activeNodeId) {
+      keep.add(activeNodeId)
+      for (const edge of edges) {
+        if (edge.source === activeNodeId) keep.add(edge.target)
+        if (edge.target === activeNodeId) keep.add(edge.source)
       }
     }
-    if (!foldIsolated) return { nodes, edges }
-    // 首屏先给「有连接的」：小图（linked 不足一个预算）时孤立点一个都不出现，
-    // 大图时按权重取前 FOLD_FIRST_BUDGET 个，都靠 extraSlots 往上加
-    const budget =
-      Math.min(split.linked.length, FOLD_FIRST_BUDGET) + extraSlots
-    const candidates = split.linked.concat(split.isolated)
-    if (budget >= candidates.length) return { nodes, edges }
-    const keep = new Set(candidates.slice(0, budget).map((node) => node.id))
+    if (keep.size === 0) return { nodes, edges }
     return {
       nodes: nodes.filter((node) => keep.has(node.id)),
       edges: edges.filter((edge) => keep.has(edge.source) && keep.has(edge.target)),
     }
-  }, [prune, foldIsolated, split, extraSlots, nodes, edges, activeNodeId])
+  }, [prune, nodes, edges, activeNodeId])
   const displayNodes = display.nodes
   const displayEdges = display.edges
-
-  /** 折叠态下还剩多少个实体没上画布（含孤立点），用于「加载更多」按钮与提示 */
-  const hiddenCount = nodes.length - displayNodes.length
-  const canLoadMore = foldIsolated && hiddenCount > 0
 
   const paint = useCallback(() => {
     const sim = simRef.current
@@ -1021,22 +951,10 @@ export default function KnowledgeGraph({
                 ⟲
               </button>
             </div>
-            {canLoadMore ? (
-              <button
-                type="button"
-                className="kg-more"
-                onClick={() => setExtraSlots((v) => v + FOLD_MORE_STEP)}
-                title="无关联的实体排在后面，继续加载会把它们补上"
-              >
-                加载更多（还有 {hiddenCount} 个）
-              </button>
-            ) : null}
             <p className="kg-tip">
               {prune && displayNodes.length < nodes.length
-                ? `显示 ${displayNodes.length} / ${nodes.length} 个实体（无关联实体已折叠）· 点节点展开邻域 · 滚轮缩放`
-                : foldIsolated && displayNodes.length < nodes.length
-                  ? `显示 ${displayNodes.length} / ${nodes.length} 个实体 · 无关联实体排在后面`
-                  : '拖节点调位置 · 滚轮缩放 · 点节点看关系与原文'}
+                ? `显示 ${displayNodes.length} / ${nodes.length} 个实体（孤独点已隐藏）· 点节点展开邻域 · 滚轮缩放`
+                : '拖节点调位置 · 滚轮缩放 · 点节点看关系与原文'}
             </p>
           </>
         ) : null}

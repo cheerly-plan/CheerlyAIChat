@@ -610,8 +610,7 @@ export type KgEdge = {
 export type KgGraph = {
   nodes: KgNode[]
   edges: KgEdge[]
-  /** 全量口径统计（不受节点上限影响）：entities 用来判断要不要折叠孤立点 */
-  stats?: { entities: number; relations: number; files: number; isolated?: number }
+  stats?: { entities: number; relations: number; files: number }
   filename?: string
   graph_status?: string
   entity_count?: number

@@ -28,9 +28,6 @@ type Props = {
   onStatus?: (fileId: string, graphStatus: string) => void
 }
 
-/** 单文件图实体超过这个数就不再默认铺开孤立实体（见下方 foldIsolated） */
-const FOLD_ISOLATED_OVER = 200
-
 /**
  * 图谱视图：检索栏 + 画布 + 检索证据。
  *
@@ -289,18 +286,6 @@ export default function KbGraphPanel({
   }, [result, graph])
 
   /**
-   * 单文件图实体多到这个数，就把孤立实体折到后面分批加载。
-   *
-   * 200 是「还看得过来」的上限：力导向是 O(n²)，点多了既卡又读不出结构。
-   * 判定用 stats.entities（全量口径）而不是画布已有节点数——后者受后端
-   * 节点上限约束，会被截断成恒定值，永远触发不了。
-   * 检索子图不折叠：命中的实体哪怕孤立，也必须出现在结果里。
-   */
-  const totalEntities = graph?.stats?.entities ?? graph?.nodes.length ?? 0
-  const foldIsolated =
-    Boolean(fileId) && !filtered && totalEntities > FOLD_ISOLATED_OVER
-
-  /**
    * 命中实体 → 画布节点。
    *
    * 不能直接拿 seed.id 去比：全库图会把跨文件的同名实体合并成一个节点，
@@ -438,7 +423,6 @@ export default function KbGraphPanel({
           // 枢纽分层只对「完整图」启用：全库/合并视图文件多了点会铺满画布，
           // 单文件图和检索子图本来就小，全显更直观
           prune={!fileId && !filtered}
-          foldIsolated={foldIsolated}
           emptyTitle={canvasState.title}
           emptyHint={canvasState.hint}
           emptyAction={canvasState.action}
