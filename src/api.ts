@@ -535,14 +535,20 @@ export async function editKbChunk(
   return { changed: data.changed ?? true, graph_status: data.graph_status ?? '' }
 }
 
-// 管理员选文件批量生成图谱（上传后不再自动建图）
+// 管理员选文件批量生成图谱（上传后不再自动建图）。
+// 可顺带套一套抽取配置（docType/level）：批量选同一类文档时省得逐个设
 export async function buildKgGraphs(
   fileIds: string[],
+  options?: { docType?: string; level?: string },
 ): Promise<{ file_id: string; status: string }[]> {
   const response = await authedFetch('/v1/kg/graph/build', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ file_ids: fileIds }),
+    body: JSON.stringify({
+      file_ids: fileIds,
+      doc_type: options?.docType ?? '',
+      level: options?.level ?? '',
+    }),
   })
   if (!response.ok) {
     throw new Error(await errorMessage(response, '提交图谱构建失败'))
@@ -632,6 +638,43 @@ export type KgGraph = {
   /** 实体对齐进度与合并数量（P2） */
   align_status?: string
   alias_count?: number
+  /** 这份图用的抽取配置：doc_type 是配置 key，空 = 全局默认（通用） */
+  doc_type?: string
+  extract_level?: string
+}
+
+/** 抽取配置（文档类型）：换类型 = 换 prompt 里的配置块，抽取器只有一份 */
+export type KgDocType = {
+  key: string
+  label: string
+  doc_name: string
+  entity_scope: string[]
+  predicates: string[]
+  note_count: number
+  is_general: boolean
+}
+
+export async function fetchKgDocTypes(): Promise<{ types: KgDocType[]; default: string }> {
+  const response = await authedFetch('/v1/kg/doc-types', { headers: authHeaders() })
+  if (!response.ok) return { types: [], default: 'general' }
+  return (await response.json()) as { types: KgDocType[]; default: string }
+}
+
+/** 保存文件的抽取配置（管理员）：只改配置，不自动重抽（重抽很贵，由人决定） */
+export async function setKgDocType(
+  fileId: string,
+  docType: string,
+  level = 'full',
+): Promise<void> {
+  const response = await authedFetch(`/v1/kg/files/${fileId}/doc-type`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ doc_type: docType, level }),
+  })
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({}))
+    throw new Error(detail?.detail || `保存抽取配置失败 ${response.status}`)
+  }
 }
 
 export type KgSeed = {

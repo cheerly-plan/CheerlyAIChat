@@ -1283,6 +1283,54 @@
   color: #8b93a3;
 }
 
+/* 抽取配置：文档类型 + 粒度。选择即保存，重建才生效，所以一行放得下 */
+.kb-kg-profile {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 2px 7px;
+  font-size: 11.5px;
+  color: #8b93a3;
+}
+
+.kb-kg-profile-label {
+  flex: none;
+  color: #a4abba;
+}
+
+.kb-kg-profile-select {
+  flex: none;
+  max-width: 190px;
+  padding: 3px 8px;
+  border: 1px solid #e2e6ef;
+  border-radius: 7px;
+  background: #fff;
+  color: #4a5261;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.kb-kg-profile-select:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.kb-kg-profile .kb-kg-depth {
+  padding: 1px;
+}
+
+.kb-kg-profile .kb-kg-depth button {
+  padding: 3px 8px;
+  font-size: 11.5px;
+}
+
+.kb-kg-profile-hint {
+  flex: none;
+  color: #3b5bdb;
+}
+
 /* 实体对齐：一行说明 + 一个按钮，不占画布高度 */
 .kb-kg-align {
   display: flex;

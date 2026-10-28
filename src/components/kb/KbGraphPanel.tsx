@@ -5,8 +5,11 @@ import {
   rebuildKgGraph,
   alignKgGraph,
   fetchKgAliases,
+  fetchKgDocTypes,
+  setKgDocType,
   searchKg,
   type KbFile,
+  type KgDocType,
   type KgGraph,
   type KgSearchResult,
 } from '../../api'
@@ -58,6 +61,18 @@ export default function KbGraphPanel({
   const [rebuilding, setRebuilding] = useState(false)
   const [aligning, setAligning] = useState(false)
 
+  // 抽取配置（文档类型 + 粒度）：换类型只是换 prompt 里的配置块，
+  // 抽取器始终是同一个。选完即保存，但要重建才生效（重抽很贵，不替用户决定）
+  const [docTypes, setDocTypes] = useState<KgDocType[]>([])
+  const [defaultDocType, setDefaultDocType] = useState('general')
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [profileHint, setProfileHint] = useState('')
+  // 刚保存的值：比等 load 回来更跟手，也避免网络抖动时下拉回弹到旧值
+  const [savedProfile, setSavedProfile] = useState<{
+    docType: string
+    level: string
+  } | null>(null)
+
   const requestIdRef = useRef(0)
   const searchIdRef = useRef(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -101,6 +116,52 @@ export default function KbGraphPanel({
     const raf = requestAnimationFrame(() => void load())
     return () => cancelAnimationFrame(raf)
   }, [load])
+
+  /**
+   * 可选抽取配置只给管理员拉：普通用户不建图，拿到列表也用不上。
+   *
+   * 列表来自后端（内置 + data/kb_doc_profiles.json 的自定义类型），
+   * 前端不硬编码文档类型——加一种新文档只改后端配置，不用发版。
+   */
+  useEffect(() => {
+    if (!canManage) return
+    let alive = true
+    void fetchKgDocTypes().then((data) => {
+      if (!alive) return
+      setDocTypes(data.types)
+      setDefaultDocType(data.default)
+    })
+    return () => {
+      alive = false
+    }
+  }, [canManage])
+
+  const activeDocType = savedProfile?.docType || graph?.doc_type || defaultDocType
+  const activeLevel = savedProfile?.level || graph?.extract_level || 'full'
+
+  /**
+   * 保存抽取配置：选完即存，但不自动重抽。
+   *
+   * 后端会把已有图谱标成 stale（图确实基于旧配置），这里重拉一次把
+   * 状态同步过来，提示用户点「重新生成」才真正生效。
+   */
+  const applyProfile = async (nextType: string, nextLevel: string) => {
+    if (!fileId || savingProfile) return
+    if (nextType === activeDocType && nextLevel === activeLevel) return
+    setSavingProfile(true)
+    setError('')
+    setProfileHint('')
+    try {
+      await setKgDocType(fileId, nextType, nextLevel)
+      setSavedProfile({ docType: nextType, level: nextLevel })
+      setProfileHint('已保存，重建后生效')
+      await load({ quiet: true })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '保存抽取配置失败')
+    } finally {
+      setSavingProfile(false)
+    }
+  }
 
   /**
    * 实体对齐：把同一实体的简称/全称并成一个点（后台任务，几十秒）。
@@ -227,6 +288,8 @@ export default function KbGraphPanel({
     setRebuilding(true)
     try {
       await rebuildKgGraph(fileId)
+      // 重建 = 按新配置重抽，提示语到此为止（stale 也会随之清掉）
+      setProfileHint('')
       // 后端已把人状态改成 building，立刻重拉一次就能看到「构建中」
       await load()
     } catch (e) {
@@ -457,6 +520,62 @@ export default function KbGraphPanel({
         </div>
       ) : null}
 
+      {fileId && canManage && docTypes.length > 0 ? (
+        <div className="kb-kg-profile">
+          <span className="kb-kg-profile-label">抽取配置</span>
+          <select
+            className="kb-kg-profile-select"
+            value={activeDocType}
+            disabled={savingProfile || isBuilding}
+            onChange={(e) => void applyProfile(e.target.value, activeLevel)}
+            title={
+              docTypes.find((t) => t.key === activeDocType)?.entity_scope.length
+                ? `重点实体：${docTypes
+                    .find((t) => t.key === activeDocType)!
+                    .entity_scope.slice(0, 6)
+                    .join('、')}`
+                : '不限定实体白名单：按通用规则抽取'
+            }
+            aria-label="文档类型"
+          >
+            {docTypes.map((item) => (
+              <option key={item.key} value={item.key}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+
+          <div className="kb-kg-depth" role="group" aria-label="抽取粒度">
+            {(
+              [
+                { key: 'full', label: '完整' },
+                { key: 'light', label: '轻量' },
+              ] as const
+            ).map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={activeLevel === item.key ? 'is-on' : ''}
+                aria-pressed={activeLevel === item.key}
+                disabled={savingProfile || isBuilding}
+                onClick={() => void applyProfile(activeDocType, item.key)}
+                title={
+                  item.key === 'full'
+                    ? '尽量抽全实体与关系'
+                    : '只留主干（主体、主产品、核心指标），跳过零散供应商与次要指标'
+                }
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          <span className="kb-kg-profile-hint">
+            {savingProfile ? '保存中…' : profileHint}
+          </span>
+        </div>
+      ) : null}
+
       {fileId && graph?.graph_status === 'ready' && (canManage || (graph?.alias_count ?? 0) > 0) ? (
         <div className="kb-kg-align">
           <span className="kb-kg-align-text">
@@ -504,7 +623,7 @@ export default function KbGraphPanel({
         <p className="kb-kg-stale">
           {canManage ? (
             <>
-              切片已人工修订，当前图谱基于旧文本。
+              图谱已过期（切片修订或抽取配置变更），当前显示的是旧图。
               <button
                 type="button"
                 onClick={() => void onRebuild()}
@@ -514,7 +633,7 @@ export default function KbGraphPanel({
               </button>
             </>
           ) : (
-            '切片已人工修订，图谱基于旧文本，等待管理员重建。'
+            '图谱基于旧切片或旧抽取配置，等待管理员重建。'
           )}
         </p>
       ) : null}
