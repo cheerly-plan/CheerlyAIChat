@@ -293,6 +293,22 @@ export default function KbGraphPanel({
    * 记录 id 不同，只按 id 高亮就会出现「明明命中了，图上却不亮」。
    * 所以 id 之外再按 norm_name、名称对一次。
    */
+  // 簇视图（P4）：配色口径 + 当前聚焦的社区。
+  // 聚焦复用检索那套高亮（hitIds），非成员自动压暗，不额外加渲染分支
+  const [colorMode, setColorMode] = useState<'type' | 'community'>('type')
+  const [focusCluster, setFocusCluster] = useState<number | null>(null)
+
+  const clusters = useMemo(
+    () => (viewGraph?.communities ?? []).filter((c) => !c.isolated),
+    [viewGraph],
+  )
+
+  const clusterHitIds = useMemo(() => {
+    if (focusCluster === null) return null
+    const target = clusters.find((c) => c.id === focusCluster)
+    return target ? target.node_ids : null
+  }, [focusCluster, clusters])
+
   const hitIds = useMemo(() => {
     const list = result?.seeds ?? []
     const nodes = viewGraph?.nodes ?? []
@@ -367,6 +383,51 @@ export default function KbGraphPanel({
         </button>
       </div>
 
+      {clusters.length > 0 ? (
+        <div className="kb-kg-clusters">
+          <span className="kb-kg-clusters-label">着色</span>
+          <button
+            type="button"
+            className={colorMode === 'type' ? 'is-on' : ''}
+            aria-pressed={colorMode === 'type'}
+            onClick={() => {
+              setColorMode('type')
+              setFocusCluster(null)
+            }}
+          >
+            按类型
+          </button>
+          <button
+            type="button"
+            className={colorMode === 'community' ? 'is-on' : ''}
+            aria-pressed={colorMode === 'community'}
+            onClick={() => setColorMode('community')}
+            title="按社区分组着色：连得紧的实体是一簇"
+          >
+            按簇
+          </button>
+          {colorMode === 'community' ? (
+            <div className="kb-kg-cluster-list">
+              {clusters.slice(0, 10).map((cluster) => (
+                <button
+                  key={cluster.id}
+                  type="button"
+                  className={`kb-kg-cluster${focusCluster === cluster.id ? ' is-on' : ''}`}
+                  aria-pressed={focusCluster === cluster.id}
+                  title={`${cluster.label} 等 ${cluster.size} 个：${cluster.members.join('、')}`}
+                  onClick={() =>
+                    setFocusCluster((prev) => (prev === cluster.id ? null : cluster.id))
+                  }
+                >
+                  {cluster.label}
+                  <i>{cluster.size}</i>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {seeds.length > 0 ? (
         <div className="kb-kg-seeds">
           <span className="kb-kg-seeds-label">
@@ -417,9 +478,10 @@ export default function KbGraphPanel({
           graph={viewGraph}
           loading={loading}
           error={error}
-          hitIds={hitIds}
+          hitIds={clusterHitIds ?? hitIds}
+          colorMode={colorMode}
           // 过滤后的子图里全是命中和它们的邻居，再压暗就把扩展出来的关系藏掉了
-          dimOthers={!filtered}
+          dimOthers={!filtered || focusCluster !== null}
           // 枢纽分层只对「完整图」启用：全库/合并视图文件多了点会铺满画布，
           // 单文件图和检索子图本来就小，全显更直观
           prune={!fileId && !filtered}

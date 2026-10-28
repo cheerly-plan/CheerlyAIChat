@@ -595,6 +595,19 @@ export type KgNode = {
   degree?: number
   file_id: string
   filename: string
+  /** 社区编号（P4 簇视图）：0 表示孤立点，其余从 1 开始按规模降序 */
+  community?: number
+}
+
+/** 一个「抱团的块」：社区检测的产物，前端用来做簇列表与配色 */
+export type KgCommunity = {
+  id: number
+  /** 簇代表名：簇内提及最多的实体，比"簇 3"有用 */
+  label: string
+  size: number
+  members: string[]
+  node_ids: string[]
+  isolated: boolean
 }
 
 export type KgEdge = {
@@ -614,6 +627,11 @@ export type KgGraph = {
   filename?: string
   graph_status?: string
   entity_count?: number
+  /** 社区检测结果（按规模降序，孤立簇在最后） */
+  communities?: KgCommunity[]
+  /** 实体对齐进度与合并数量（P2） */
+  align_status?: string
+  alias_count?: number
 }
 
 export type KgSeed = {
@@ -706,5 +724,44 @@ export async function rebuildKgGraph(fileId: string): Promise<void> {
   })
   if (!response.ok) {
     throw new Error(`重建图谱失败 ${response.status}`)
+  }
+}
+
+/** 触发实体对齐（管理员）：后台跑，进度看 align_status */
+export async function alignKgGraph(fileId: string): Promise<void> {
+  const response = await authedFetch(`/v1/kg/files/${fileId}/align`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({}))
+    throw new Error(detail?.detail || `实体对齐失败 ${response.status}`)
+  }
+}
+
+export type KgAlias = {
+  alias_name: string
+  alias_norm: string
+  canonical_name: string
+  entity_id: string
+  type: KgEntityType
+  method: string
+  score: number
+}
+
+/** 该文件里被合并掉的写法（"国电集团" → "中国国电集团公司"） */
+export async function fetchKgAliases(fileId: string): Promise<{
+  aliases: KgAlias[]
+  align_status: string
+  alias_count: number
+}> {
+  const response = await authedFetch(`/v1/kg/files/${fileId}/aliases`, {
+    headers: authHeaders(),
+  })
+  if (!response.ok) return { aliases: [], align_status: '', alias_count: 0 }
+  return (await response.json()) as {
+    aliases: KgAlias[]
+    align_status: string
+    alias_count: number
   }
 }

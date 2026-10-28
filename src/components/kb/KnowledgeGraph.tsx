@@ -32,6 +32,29 @@ const TYPE_META: Record<KgEntityType, { label: string; color: string }> = {
   other: { label: '其他', color: '#94a3b8' },
 }
 
+/**
+ * 簇视图配色：按社区编号轮转。色相刻意拉开（相邻社区不会撞色），
+ * 孤立点固定灰——它不属于任何业务板块，给彩色会误导。
+ */
+const COMMUNITY_COLORS = [
+  '#4d6bfe',
+  '#0ea5a4',
+  '#f59e0b',
+  '#db2777',
+  '#7c5cff',
+  '#16a34a',
+  '#ef4444',
+  '#0ea5e9',
+  '#a16207',
+  '#64748b',
+]
+const ISOLATED_COLOR = '#94a3b8'
+
+function communityColor(community: number | undefined): string {
+  if (!community) return ISOLATED_COLOR
+  return COMMUNITY_COLORS[(community - 1) % COMMUNITY_COLORS.length]
+}
+
 const NODE_MIN_R = 6.5
 const NODE_MAX_R = 11.5
 const LINK_LENGTH = 104
@@ -52,6 +75,8 @@ type SimNode = {
   type: KgEntityType
   mentions: number
   r: number
+  /** 社区编号（P4 簇视图）：0 = 孤立点 */
+  community: number
   x: number
   y: number
   vx: number
@@ -143,6 +168,7 @@ function buildSim(
       name: node.name,
       type: node.type,
       mentions: node.mentions,
+      community: node.community ?? 0,
       r: radiusOf(node.mentions),
       x: carried ? carried.x : cx + Math.cos(angle) * laneT * rx,
       y: carried ? carried.y : cy + Math.sin(angle) * laneT * ry,
@@ -312,6 +338,8 @@ type Props = {
   prune?: boolean
   selectedId?: string | null
   onSelect?: (node: KgNode | null) => void
+  /** 配色口径：按实体类型（默认）或按社区（簇视图） */
+  colorMode?: 'type' | 'community'
   emptyTitle: string
   emptyHint: string
   emptyAction?: { label: string; onClick: () => void }
@@ -329,6 +357,7 @@ export default function KnowledgeGraph({
   prune = false,
   selectedId = null,
   onSelect,
+  colorMode = 'type',
   emptyTitle,
   emptyHint,
   emptyAction,
@@ -348,6 +377,11 @@ export default function KnowledgeGraph({
   // 上一次渲染用的源数据（注意不是显示集）：只有源数据变了才值得重置视图
   const lastDataRef = useRef<{ nodes: KgNode[]; edges: KgEdge[] } | null>(null)
   const nodeElsRef = useRef(new Map<string, SVGGElement>())
+  // 建图 effect 不依赖 colorMode（切配色不该重排力导向），用 ref 读最新值
+  const colorModeRef = useRef(colorMode)
+  useEffect(() => {
+    colorModeRef.current = colorMode
+  }, [colorMode])
   const rafRef = useRef(0)
   const runningRef = useRef(false)
   const viewRef = useRef({ k: 1, x: 0, y: 0 })
@@ -536,24 +570,30 @@ export default function KnowledgeGraph({
     }
     for (const node of sim.nodes) {
       const meta = TYPE_META[node.type] ?? TYPE_META.other
+      // 配色口径由 colorMode 决定：属性挂在元素上，切换时不用重建整张图
+      const color = colorModeRef.current === 'community'
+        ? communityColor(node.community)
+        : meta.color
       const g = document.createElementNS(SVG_NS, 'g')
       g.setAttribute('class', 'kg-node-g')
       g.dataset.id = node.id
+      g.dataset.type = node.type
+      g.dataset.community = String(node.community ?? 0)
 
       const halo = document.createElementNS(SVG_NS, 'circle')
       halo.setAttribute('class', 'kg-halo')
       halo.setAttribute('r', String(node.r + 6))
       halo.setAttribute('fill', 'none')
-      halo.setAttribute('stroke', meta.color)
+      halo.setAttribute('stroke', color)
       halo.setAttribute('stroke-width', '2.2')
       halo.setAttribute('opacity', '0')
       g.appendChild(halo)
 
       const circle = document.createElementNS(SVG_NS, 'circle')
       circle.setAttribute('r', String(node.r))
-      circle.setAttribute('fill', meta.color)
+      circle.setAttribute('fill', color)
       circle.setAttribute('fill-opacity', '0.26')
-      circle.setAttribute('stroke', meta.color)
+      circle.setAttribute('stroke', color)
       circle.setAttribute('stroke-width', '2')
       g.appendChild(circle)
 
@@ -722,6 +762,22 @@ export default function KnowledgeGraph({
     highlightRef.current = applyHighlight
     applyHighlight()
   }, [applyHighlight])
+
+  // 切换配色口径：只改已渲染节点的描边/填充，不动布局也不用重建 sim
+  useEffect(() => {
+    for (const el of nodeElsRef.current.values()) {
+      const community = Number(el.dataset.community || 0)
+      const type = (el.dataset.type as KgEntityType) || 'other'
+      const color =
+        colorMode === 'community'
+          ? communityColor(community)
+          : (TYPE_META[type] ?? TYPE_META.other).color
+      el.querySelector('.kg-halo')?.setAttribute('stroke', color)
+      const circle = el.querySelector('circle:not(.kg-halo)')
+      circle?.setAttribute('fill', color)
+      circle?.setAttribute('stroke', color)
+    }
+  }, [colorMode, graph])
 
   // 拖拽 / 平移 / 缩放
   useEffect(() => {
@@ -923,14 +979,25 @@ export default function KnowledgeGraph({
         {hasData ? (
           <>
             <div className="kg-legend">
-              {Object.entries(TYPE_META)
-                .filter(([type]) => displayNodes.some((n) => n.type === type))
-                .map(([type, meta]) => (
-                  <span key={type} className="kg-legend-item">
-                    <i style={{ background: meta.color }} />
-                    {meta.label}
-                  </span>
-                ))}
+              {colorMode === 'community'
+                ? (graph?.communities ?? [])
+                    .filter((c) => !c.isolated)
+                    .slice(0, 6)
+                    .map((c) => (
+                      <span key={c.id} className="kg-legend-item" title={c.members.join('、')}>
+                        <i style={{ background: communityColor(c.id) }} />
+                        {c.label}
+                        <em className="kg-legend-count">{c.size}</em>
+                      </span>
+                    ))
+                : Object.entries(TYPE_META)
+                    .filter(([type]) => displayNodes.some((n) => n.type === type))
+                    .map(([type, meta]) => (
+                      <span key={type} className="kg-legend-item">
+                        <i style={{ background: meta.color }} />
+                        {meta.label}
+                      </span>
+                    ))}
             </div>
             <div className="kg-zoom">
               <button type="button" onClick={() => zoomBy(1.25)} aria-label="放大" title="放大">

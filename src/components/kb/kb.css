@@ -1264,6 +1264,83 @@
   border-radius: 50%;
 }
 
+/* 簇视图图例里的成员数：簇名常常很长，数字放末尾做次要信息 */
+.kg-legend-count {
+  margin-left: 1px;
+  color: #a4abba;
+  font-style: normal;
+  font-size: 9.5px;
+}
+
+/* 着色切换 + 簇列表：夹在检索栏和画布之间的一条细带，不抢画布高度 */
+.kb-kg-clusters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 2px 7px;
+  font-size: 11.5px;
+  color: #8b93a3;
+}
+
+.kb-kg-clusters-label {
+  color: #a4abba;
+}
+
+.kb-kg-clusters > button {
+  padding: 2px 9px;
+  border: 1px solid #e2e6ef;
+  border-radius: 999px;
+  background: #fff;
+  color: #5f6779;
+  font-size: 11.5px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.kb-kg-clusters > button.is-on {
+  border-color: #4d6bfe;
+  background: #eef2ff;
+  color: #3247c8;
+}
+
+.kb-kg-cluster-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-left: 2px;
+}
+
+.kb-kg-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 210px;
+  padding: 2px 8px;
+  border: 1px solid #e8ebf3;
+  border-radius: 7px;
+  background: #f8f9fc;
+  color: #59617a;
+  font-size: 11px;
+  line-height: 17px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-kg-cluster i {
+  color: #9aa2b4;
+  font-style: normal;
+  font-size: 10px;
+}
+
+.kb-kg-cluster.is-on {
+  border-color: #4d6bfe;
+  background: #eef2ff;
+  color: #2f43bd;
+}
+
 .kg-zoom {
   position: absolute;
   right: 10px;
