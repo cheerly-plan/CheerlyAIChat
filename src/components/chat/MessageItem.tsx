@@ -224,6 +224,10 @@ function MessageActions({ children }: { children: ReactNode }) {
  * 一排小卡片（编号 + 文件名 + 位置），点任意一张就在下面展开这段原文——
  * 用户想核实「这句话是从文档哪一段来的」，需要看到原文本身，而不是只看到
  * 文件名。默认全部收起：回答已经是主体，引用不该抢注意力。
+ *
+ * 位置按「P134」/「P134–P135」展示：按章节切块后同节内允许跨页聚合，
+ * 约一半切片跨两页，只写起始页会让用户翻错页。章节名放详情里——它比
+ * 页码长得多，塞进小卡片会把文件名挤没。
  */
 function SourceList({ sources }: { sources: ChatSource[] }) {
   const [openKey, setOpenKey] = useState<string | null>(null)
@@ -240,7 +244,7 @@ function SourceList({ sources }: { sources: ChatSource[] }) {
               key={source.key}
               type="button"
               className={`msg-source${open ? ' is-open' : ''}`}
-              title={`${source.filename} · ${source.where}`}
+              title={[source.filename, source.where, source.section].filter(Boolean).join(' · ')}
               aria-expanded={open}
               onClick={() => setOpenKey(open ? null : source.key)}
             >
@@ -254,12 +258,19 @@ function SourceList({ sources }: { sources: ChatSource[] }) {
       {active ? (
         <div className="msg-source-detail">
           <div className="msg-source-head">
-            {/* <span className="msg-source-file" title={active.filename}>
-              {active.filename}
-            </span>
-            <span className="msg-source-where">{active.where}</span> */}
+            {active.section ? (
+              <span className="msg-source-section" title={active.section}>
+                {active.section}
+              </span>
+            ) : null}
             {active.kind === 'figure' ? (
               <span className="msg-source-note">图像识别，可能有误差</span>
+            ) : null}
+            {isCrossPage(active) ? (
+              <span className="msg-source-hint">
+                该片段跨第 {active.page_start ?? active.page}–
+                {active.page_end ?? active.page} 页
+              </span>
             ) : null}
           </div>
           <pre className="msg-source-text"><span className="msg-source-text-inner">{active.excerpt}</span></pre>
@@ -267,6 +278,13 @@ function SourceList({ sources }: { sources: ChatSource[] }) {
       ) : null}
     </div>
   )
+}
+
+/** 切片是否跨页：页码区间不一致即跨页（老数据没有 page_end，视为单页） */
+function isCrossPage(source: ChatSource): boolean {
+  const start = source.page_start ?? source.page
+  const end = source.page_end ?? source.page
+  return start != null && end != null && start !== end
 }
 
 function CopyButton({ text }: { text: string }) {

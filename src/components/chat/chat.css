@@ -1223,6 +1223,21 @@
   color: #b45309;
 }
 
+/* 章节名：比页码长，给上限并省略；卡片里只放位置，章节放这里 */
+.msg-source-section {
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #4b5563;
+}
+
+/* 跨页提示：中性色，避免和「图像识别」的告警色混在一起 */
+.msg-source-hint {
+  flex-shrink: 0;
+  color: #8a94a6;
+}
+
 .msg-source-text {
   margin: 0;
   padding: 0;

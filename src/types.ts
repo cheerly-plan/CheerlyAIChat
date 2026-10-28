@@ -47,8 +47,14 @@ export type ChatSource = {
   filename: string
   seq: number
   page: number | null
+  /** 切片起始页；无页文档为 null（旧后端只有 page，等价于 page_start） */
+  page_start?: number | null
+  /** 切片结束页：跨页切片（同节内聚合）时大于 page_start，单页时相等 */
+  page_end?: number | null
+  /** 所属一级节，如「第十节 管理层讨论与分析」；无章节结构时为 null */
+  section?: string | null
   kind: string
-  /** 人读的位置：第3页 / 表2 / 第5页图表 / 第7段 */
+  /** 人读的位置：第3页 / 第134–135页 / 表2 / 第5页图表 / 第7段 */
   where: string
   excerpt: string
 }
