@@ -1357,8 +1357,8 @@
   margin-right: 1px;
 }
 
-/* 「第 N 页」：PDF 可点，新标签打开原件对应页。常驻蓝色下划线——
-   这一列里它是唯一的可点项，不下划线就没人知道能点 */
+/* 「第 N 页」：PDF 可点，新标签打开原件对应页。蓝色已说明它跟旁边的灰色
+   元信息不同，下划线留给 hover——常驻下划线会让整个头部显得很吵 */
 .kb-chunk-page {
   padding: 0;
   border: none;
@@ -1367,16 +1367,17 @@
   font: inherit;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  text-decoration: underline;
-  text-decoration-color: currentColor;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
+  text-decoration: none;
   cursor: pointer;
   transition: color 0.15s;
 }
 
 .kb-chunk-page:hover {
   color: #2f4fdb;
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
 }
 
 /* 跳页落点：淡蓝底 + 主色光圈，1.6s 后由 JS 摘掉 is-flash */
