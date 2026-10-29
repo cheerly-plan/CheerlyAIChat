@@ -20,7 +20,9 @@ import {
   BackIcon,
   MoreIcon,
   PanelIcon,
+  SearchIcon,
   UploadIcon,
+  WarningIcon,
 } from '../chat/icons'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { KgBuildDialog } from './KgBuildDialog'
@@ -108,6 +110,17 @@ function docTypeStyle(key?: string): string {
   return !key || key === 'general' ? 'is-general' : 'is-prospectus'
 }
 
+/**
+ * 文档类型名：招股意向书 / 通用文档…
+ *
+ * 通用（general）是兜底类型，名字固定；其余取后端 doc-types 里的中文名。
+ * 文件列表的分组和行内标签共用这一份，避免出现两个地方叫法不一样。
+ */
+function docTypeLabel(key: string, docTypes: KgDocType[]): string {
+  if (!key || key === 'general') return '通用文档'
+  return docTypes.find((t) => t.key === key)?.label || key
+}
+
 // 切片位置标注：与检索引用（_format_hit）同一套语义
 function chunkPos(chunk: KbChunk): string {
   if (chunk.kind === 'table') {
@@ -163,7 +176,14 @@ type KbFileRowProps = {
   item: KbFile
   isSelected: boolean
   canManage: boolean
+  /** 文档类型名（招股意向书 / 通用文档…）：行内标签与分组都用它 */
+  typeLabel: string
+  /** 通用文档用中性灰标签，招股书一类用主色标签 */
+  isGeneral: boolean
+  /** 图谱正在构建时重建按钮不可用 */
+  graphBuilding: boolean
   onToggle: (item: KbFile) => void
+  onRebuild: (item: KbFile) => void
   onDownload: (item: KbFile) => void
   onTagEdit: (item: KbFile) => void
   onRename: (item: KbFile) => void
@@ -174,7 +194,11 @@ function KbFileRow({
   item,
   isSelected,
   canManage,
+  typeLabel,
+  isGeneral,
+  graphBuilding,
   onToggle,
+  onRebuild,
   onDownload,
   onTagEdit,
   onRename,
@@ -213,11 +237,16 @@ function KbFileRow({
   const hasTagEdit = canManage
   const hasRename = canManage && item.status === 'ready'
   const hasDelete = canManage
+  // 重建是图谱动作，文件还没处理完就没得建
+  const hasRebuild = canManage && item.status === 'ready' && !graphBuilding
 
   return (
     <li
       className={`kb-item kb-${item.status}${isSelected ? ' kb-selected' : ''}`}
     >
+      {/* 选中态：左侧 3px 主色竖条 + 极浅蓝底，克制一点，
+          不再整块深蓝把整行压住（那样看着像弹窗遮罩而不是选中） */}
+      {isSelected ? <span className="kb-item-bar" aria-hidden="true" /> : null}
       <div
         className="kb-item-main"
         role="button"
@@ -233,13 +262,34 @@ function KbFileRow({
         }}
       >
         <span className="kb-name" title={item.filename}>
+          {extBadge(item)}
           <span className="kb-name-text">{item.filename}</span>
         </span>
+        {/* 元信息分三级：文档类型标签 → 片数（主信息，决定图谱规模与重建耗时）
+            → 大小（最弱）。就绪是最常态，不再占一格——只有处理中/失败
+            才在行尾亮出状态，否则每行一个绿点等于没有信息 */}
         <span className="kb-meta">
-          <span className="kb-dot" aria-hidden="true" />
-          {STATUS_LABEL[item.status]} · {formatSize(item.size_bytes)}
-          {item.status === 'ready' ? ` · ${item.chunk_count} 片` : ''}
-          {item.status === 'failed' && item.error ? ` · ${item.error}` : ''}
+          <span
+            className={`kb-type ${isGeneral ? 'is-general' : 'is-prospectus'}`}
+            title={`文档类型：${typeLabel}`}
+          >
+            {typeLabel}
+          </span>
+          <span className="kb-slices" title="切片数">
+            {item.chunk_count} 片
+          </span>
+          <span className="kb-size">{formatSize(item.size_bytes)}</span>
+          {item.status === 'failed' ? (
+            <span className="kb-state is-failed" title={item.error || '处理失败'}>
+              <WarningIcon />
+              {STATUS_LABEL.failed}
+            </span>
+          ) : item.status === 'ready' ? null : (
+            <span className="kb-state is-busy">
+              <span className="kb-gspinner" aria-hidden="true" />
+              {STATUS_LABEL[item.status]}
+            </span>
+          )}
         </span>
         {item.tags && item.tags.length > 0 ? (
           <span className="kb-tags">
@@ -252,6 +302,18 @@ function KbFileRow({
         ) : null}
       </div>
       <div className={`kb-item-side${menuOpen ? ' menu-open' : ''}`}>
+        {/* 重建：hover 才露出的图标按钮，点了弹构建配置弹窗 */}
+        {hasRebuild ? (
+          <button
+            type="button"
+            className="kb-item-act"
+            onClick={() => onRebuild(item)}
+            aria-label={`重建图谱 · ${item.filename}`}
+            title="重建图谱"
+          >
+            <GraphRefreshIcon />
+          </button>
+        ) : null}
         <button
           type="button"
           ref={moreRef}
@@ -422,6 +484,16 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
   // 图谱 tab 两组文件的折叠状态：文件多了先收起不关心的那组
   const [todoOpen, setTodoOpen] = useState(true)
   const [doneOpen, setDoneOpen] = useState(true)
+  // 文件 tab 按文档类型分组，组头可折叠（默认全展开）
+  const [closedGroups, setClosedGroups] = useState<Set<string>>(() => new Set())
+
+  const toggleGroup = (key: string) =>
+    setClosedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   const inputRef = useRef<HTMLInputElement>(null)
 
   const refresh = useCallback(async () => {
@@ -513,6 +585,27 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
         (f.tags ?? []).some((t) => t.toLowerCase().includes(q)),
     )
   }, [files, query])
+
+  // 文件按文档类型分组：招股书一类是图谱重活（几百上千切片），通用技术文档
+  // 只有十几片，混排时扫不出差异。组头写明数量并可折叠，文件多了把不关心的收起来
+  const fileGroups = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; items: KbFile[] }>()
+    for (const f of visibleFiles) {
+      // 没设过类型的文件归入通用组（后端默认也是 general）
+      const key = (f.doc_type ?? '').trim() || 'general'
+      const group = map.get(key)
+      if (group) group.items.push(f)
+      else map.set(key, { key, label: docTypeLabel(key, docTypes), items: [f] })
+    }
+    const list = [...map.values()]
+    // 类型化文档在上，通用文档垫底；同档按组里文件数从多到少
+    list.sort(
+      (a, b) =>
+        Number(a.key === 'general') - Number(b.key === 'general') ||
+        b.items.length - a.items.length,
+    )
+    return list
+  }, [visibleFiles, docTypes])
 
   const graphDone = useMemo(
     () =>
@@ -724,10 +817,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
 
   // 当前图用的抽取配置（中文名 + 粒度）：展示在列表文件名下方，
   // 取代原来画布左上的 provenance 浮层——配置是「这份文件」的属性，跟着文件走更自然
-  const docTypeLabelOf = (key?: string) => {
-    if (!key || key === 'general') return '通用文档'
-    return docTypes.find((t) => t.key === key)?.label || key
-  }
+  const docTypeLabelOf = (key?: string) => docTypeLabel(key ?? '', docTypes)
   const levelLabelOf = (level?: string) => (level === 'light' ? '轻量' : '完整')
 
   // ——— 切片人工修订：保存即单片重嵌入 ———
@@ -942,29 +1032,34 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
 
             {error ? <p className="kb-error">{error}</p> : null}
 
-            {/* 文件名/标签筛选：两个 tab 共用 */}
+            {/* 搜索 + 上传：装进同一条工具条，两者同高，视觉上是一组。
+                文件 tab 才显示上传（只有管理员能传），搜索两个 tab 共用 */}
             {filesLoaded && files.length > 0 ? (
-              <input
-                type="search"
-                className="kb-search"
-                placeholder="按文件名或标签筛选…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            ) : null}
-
-            {tab === 'files' && canManage ? (
-              <div className="kb-upload-row">
-                <button
-                  type="button"
-                  className="kb-upload"
-                  onClick={() => inputRef.current?.click()}
-                  disabled={uploading !== null}
-                  title={uploading ? '正在上传' : undefined}
-                >
-                  <UploadIcon />
-                  <span>上传文件</span>
-                </button>
+              <div className="kb-toolbar">
+                <div className="kb-search-wrap">
+                  <span className="kb-search-icon" aria-hidden="true">
+                    <SearchIcon />
+                  </span>
+                  <input
+                    type="search"
+                    className="kb-search"
+                    placeholder="搜索文档、标签…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
+                {tab === 'files' && canManage ? (
+                  <button
+                    type="button"
+                    className="kb-upload"
+                    onClick={() => inputRef.current?.click()}
+                    disabled={uploading !== null}
+                    title={uploading ? '正在上传' : undefined}
+                  >
+                    <UploadIcon />
+                    <span>上传</span>
+                  </button>
+                ) : null}
               </div>
             ) : null}
             </div>
@@ -985,24 +1080,61 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                 ) : visibleFiles.length === 0 ? (
                   <p className="kb-empty">没有匹配「{query}」的文件。</p>
                 ) : (
-              <ul className="kb-list">
-                {visibleFiles.map((item) => (
-                  <KbFileRow
-                    key={item.file_id}
-                    item={item}
-                    isSelected={item.file_id === selectedId}
-                    canManage={canManage}
-                    onToggle={toggleSelect}
-                    onDownload={(f) => void onDownload(f)}
-                    onTagEdit={startTagEdit}
-                    onRename={(f) => {
-                      setRenameError('')
-                      setRenamingFile(f)
-                    }}
-                    onDelete={setPendingDelete}
-                  />
-                ))}
-              </ul>
+                  // 按文档类型分组：招股书一组、通用文档一组，组内是卡片行
+                  <div className="kb-fgroups">
+                    {fileGroups.map((group) => {
+                      const open = !closedGroups.has(group.key)
+                      return (
+                        <div className="kb-ggroup" key={group.key}>
+                          <button
+                            type="button"
+                            className="kb-ggroup-head"
+                            onClick={() => toggleGroup(group.key)}
+                            aria-expanded={open}
+                          >
+                            <span className={`kb-gcaret${open ? ' is-open' : ''}`}>
+                              <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+                                <path
+                                  d="M4.5 2.5 8 6l-3.5 3.5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            </span>
+                            <span className="kb-ggroup-title">{group.label}</span>
+                            <span className="kb-ggroup-count">{group.items.length}</span>
+                          </button>
+                          {open ? (
+                            <ul className="kb-list">
+                              {group.items.map((item) => (
+                                <KbFileRow
+                                  key={item.file_id}
+                                  item={item}
+                                  isSelected={item.file_id === selectedId}
+                                  canManage={canManage}
+                                  typeLabel={group.label}
+                                  isGeneral={group.key === 'general'}
+                                  graphBuilding={item.graph_status === 'building'}
+                                  onToggle={toggleSelect}
+                                  onRebuild={setRebuildTarget}
+                                  onDownload={(f) => void onDownload(f)}
+                                  onTagEdit={startTagEdit}
+                                  onRename={(f) => {
+                                    setRenameError('')
+                                    setRenamingFile(f)
+                                  }}
+                                  onDelete={setPendingDelete}
+                                />
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
               </>
             ) : (

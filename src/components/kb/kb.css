@@ -156,53 +156,85 @@
   margin-left: 5px;
 }
 
-/* 文件 tab 顶部：上传文件按钮（取代原「文件列表」标题位）+ 进度 */
-.kb-upload-row {
+/* 文件面板工具条：搜索 + 上传同高并排，视觉上是一组 */
+.kb-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
 }
 
-/* 文件名/标签筛选框：普通用户也能用（读能力人人有） */
+.kb-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* 放大镜压在输入框左侧，点它等于点输入框（穿透） */
+.kb-search-icon {
+  position: absolute;
+  top: 50%;
+  left: 9px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: #9aa0a6;
+  pointer-events: none;
+}
+
+.kb-search-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* 文件名/标签筛选框：浅灰底、无边框（白底细边在灰面板上会浮出来），
+   聚焦才转白底蓝边。普通用户也能用（读能力人人有） */
 .kb-search {
   width: 100%;
   box-sizing: border-box;
-  padding: 7px 11px;
-  border: 1px solid #d8dbe1;
-  border-radius: 8px;
-  background: #fff;
+  height: 32px;
+  padding: 0 10px 0 30px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: #f1f3f7;
   font: inherit;
-  font-size: 13px;
+  font-size: 12.5px;
   color: #1f2937;
+  /* Safari 给 search 框加的内阴影和原生清除按钮都不需要 */
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.kb-search::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .kb-search:focus {
   outline: none;
-  border-color: #8fa8e8;
+  background: #fff;
+  border-color: #c7d4ff;
 }
 
 .kb-search::placeholder {
   color: #9aa0a6;
 }
 
+/* 上传：实心主色按钮（淡蓝底蓝字），与搜索框同高，组内最显眼的一个 */
 .kb-upload {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid #dbe4ff;
-  border-radius: 8px;
-  background: #eef2ff;
+  height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 10px;
+  background: #e6ecff;
   color: #4d6bfe;
   font: inherit;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s;
 }
 
 .kb-upload svg {
@@ -211,8 +243,7 @@
 }
 
 .kb-upload:hover:not(:disabled) {
-  background: #e3eaff;
-  border-color: #c7d4ff;
+  background: #d9e3ff;
 }
 
 .kb-upload:disabled {
@@ -238,7 +269,16 @@
   line-height: 1.7;
 }
 
-/* ——— 文件列表 ——— */
+/* ——— 文件列表：按文档类型分组，组内是卡片行 ——— */
+
+.kb-fgroups {
+  display: flex;
+  flex-direction: column;
+}
+
+.kb-ggroup > .kb-list {
+  margin-top: 4px;
+}
 
 .kb-list {
   list-style: none;
@@ -256,17 +296,15 @@
   justify-content: space-between;
   gap: 8px;
   padding: 9px 10px;
-  /* 透明边框：卡片是纯色块，但边框位保留，盒子尺寸与选中态一致，切换时不跳动 */
-  border: 1px solid transparent;
-  border-radius: 10px;
-  /* 未选中＝会话列表的 hover 灰（.history-item:hover #eceef1） */
   border: 1px solid #eef0f3;
+  border-radius: 10px;
+  background: #fff;
   transition: border-color 0.15s, background-color 0.15s;
 }
 
-/* 悬停再深半档：会话列表没有这一档，但灰底常态下总得给鼠标一点反馈 */
 .kb-item:hover {
-  background: #e3e5e9;
+  background: #f5f7fa;
+  border-color: #e6eaf0;
 }
 
 /* 选中项悬停再深一档（会话列表没有这一档，这里补上，免得悬停时反而变灰） */
@@ -293,35 +331,42 @@
 /* 失败卡片不再单独描红边：整列已是灰/蓝色块，一圈描边会显得被框住；
    失败状态由红点 + 红色状态文案（「失败 · 解析超时」）表达，信息没丢 */
 
-/* ——— 选中态：沿用会话列表（.history-item.active）那套「纯色块 + 文字变色」 ———
-   底色取会话的 active:hover #e4ebff，而不是 active 的 #eef3ff：
-   列表常态已经是 hover 灰，若选中仍用 #eef3ff，两者明度几乎一样，只剩色相差，
-   扫一眼分不出哪张被选中。深一档后蓝块从灰块里浮出来，也仍是同一套配色。
-   边框设成 transparent，靠 background-clip 默认的 border-box 让填充铺满整块，
-   视觉上是无描边的色块，盒子尺寸又与未选中一致，切换时不跳动。 */
+/* ——— 选中态：左侧 3px 主色竖条 + 极浅蓝底 ———
+   之前是整块 #d6e0ff 深蓝，压得整行像个弹窗遮罩；现在底色只到 #f0f5ff，
+   靠竖条给出确切的「在哪儿」的指向，选中行仍能从白卡片里浮出来。 */
 
 .kb-item.kb-selected {
-  border: 1px solid #d6e0ff;
-  background: #d6e0ff;
+  border-color: #cfe0ff;
+  background: #f0f5ff;
   box-shadow: none;
+}
+
+/* 竖条贴在卡片左内缘，上下留 8px，看着是一条把手而不是一道边框 */
+.kb-item-bar {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: #4d6bfe;
 }
 
 .kb-item.kb-selected .kb-name-text {
   color: #3b5bdb;
 }
 
-/* 蓝底上的次要信息改用蓝灰：原来的灰绿 #0f6e56 / 灰红 #a32d2d 在蓝底上发脏 */
-.kb-item.kb-selected .kb-meta {
-  color: #7a89b8;
+/* 选中行 hover 再深半档，免得鼠标移上去反而变淡 */
+.kb-item.kb-selected:hover {
+  background: #e8f0ff;
 }
-
-/* 选中项悬停再深一档（会话列表没有这一档，这里补上，免得悬停时反而变灰） */
 
 .kb-name {
   display: flex;
   align-items: flex-start;
   gap: 6px;
   font-size: 13px;
+  font-weight: 500;
   color: #222;
   min-width: 0;
 }
@@ -346,7 +391,6 @@
   line-height: 1.5;
   letter-spacing: 0.3px;
   flex-shrink: 0;
-  margin-right: 5px;
 }
 
 .kb-ext.ext-pdf {
@@ -374,6 +418,7 @@
   color: #5b6472;
 }
 
+/* 元信息行：三级信息合一行，靠字重和明度分主次，不再每个都一个颜色 */
 .kb-meta {
   display: inline-flex;
   align-items: center;
@@ -381,48 +426,74 @@
   color: #8a8f98;
   font-size: 11px;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.kb-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #c9ced6;
+/* 文档类型标签：招股书一类用主色（图谱重活），通用文档用中性灰 */
+.kb-type {
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  line-height: 16px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.kb-type.is-prospectus {
+  background: #eef3ff;
+  color: #4d6bfe;
+}
+
+.kb-type.is-general {
+  background: #f1f3f6;
+  color: #6b7280;
+}
+
+/* 片数是主信息：它决定图谱规模和重建耗时，比文件大小重要得多 */
+.kb-slices {
+  color: #4a5160;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 
-.kb-ready .kb-dot {
-  background: #1a9d6b;
+/* 大小最弱：只作参照，扫一眼时应该是背景信息 */
+.kb-size {
+  color: #a2a8b3;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
-.kb-parsing .kb-dot,
-.kb-embedding .kb-dot {
-  background: #4d6bfe;
-  animation: kb-pulse 1.4s ease-in-out infinite;
+/* 行尾状态：就绪不显示（每行一个绿点等于没信息），只有处理中/失败才亮 */
+.kb-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding-left: 4px;
+  font-size: 10.5px;
+  flex-shrink: 0;
 }
 
-.kb-failed .kb-dot {
-  background: #d5392f;
+.kb-state.is-busy {
+  color: #4d6bfe;
 }
 
-.kb-ready .kb-meta {
-  color: #0f6e56;
+.kb-state.is-failed {
+  color: #d5392f;
 }
 
-.kb-failed .kb-meta {
-  color: #a32d2d;
+.kb-state svg {
+  width: 11px;
+  height: 11px;
 }
 
-@keyframes kb-pulse {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 1;
-  }
+/* 复用图谱列表那个小转圈，文件行里再缩一档 */
+.kb-state .kb-gspinner {
+  width: 9px;
+  height: 9px;
+  border-width: 1.5px;
+  vertical-align: middle;
 }
 
 /* 卡片右侧操作区（下载/标签/删除）：整组绝对定位浮在右缘，
@@ -480,6 +551,37 @@
 .kb-item.kb-selected .kb-item-side .kb-item-more:hover {
   background: #bccdff;
   color: #2f4a8f;
+}
+
+/* 重建图谱：与「更多」同款圆形图标按钮，只换主色。
+   图标按钮比文字按钮弱，hover 才出现，高危操作不常驻吸注意力 */
+.kb-item-side .kb-item-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: #dce4fe;
+  color: #4d6bfe;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.kb-item-side .kb-item-act svg {
+  width: 13px;
+  height: 13px;
+}
+
+.kb-item-side .kb-item-act:hover {
+  background: #c6d4ff;
+  color: #3b56d9;
+}
+
+.kb-item.kb-selected .kb-item-side .kb-item-act {
+  background: #d3e0ff;
 }
 
 /* 更多菜单：与会话列表 history-menu 同款紧凑风格，纯文字 */
