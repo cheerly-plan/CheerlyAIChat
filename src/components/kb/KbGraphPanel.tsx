@@ -679,13 +679,6 @@ export default function KbGraphPanel({
       ) : null}
 
       {searchError ? <p className="kb-error">{searchError}</p> : null}
-      {isBuilding ? (
-        <p className="kb-kg-building">
-          {pollWhileBuilding
-            ? '图谱构建中，当前显示已抽取的部分…'
-            : '有文件正在构建图谱，完成后这里自动刷新。'}
-        </p>
-      ) : null}
       {file?.graph_status === 'stale' ? (
         // 切片人工修订后图谱就基于旧文本了：保留旧图供参考。
         // 重建按钮只给管理员；普通用户只看说明。这里按上次配置重抽，不弹配置窗

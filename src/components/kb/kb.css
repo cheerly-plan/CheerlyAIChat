@@ -1483,15 +1483,6 @@
   font-size: 11px;
 }
 
-.kb-kg-building {
-  margin: 0;
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: #eef4ff;
-  color: #3b5bdb;
-  font-size: 12px;
-}
-
 /* 画布容器 */
 .kb-kg-canvas {
   position: relative;
@@ -2402,6 +2393,8 @@
 
 /* 文件名下方：这份图谱用的抽取配置（文档类型 · 粒度），淡色小标签 */
 .kb-gprofile {
+  display: inline-block;
+  width: 100px;
   margin-right: 6px;
   color: #7b8290;
   font-size: 10.5px;
