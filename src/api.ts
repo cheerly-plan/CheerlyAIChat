@@ -411,6 +411,9 @@ export type KbFile = {
   status: 'uploaded' | 'parsing' | 'embedding' | 'ready' | 'failed'
   error: string
   chunk_count: number
+  // 向量化完成时记下的分类片数，列表标题后面展示
+  text_count?: number
+  table_count?: number
   // 文件类型后缀（如 .pdf），文件名本身已是纯名；下载/徽标按它识别类型
   mime?: string
   // 图谱进度：'' 未构建 / building / ready / stale（切片修订后待重建）/ failed / skipped

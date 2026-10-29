@@ -348,6 +348,13 @@ function formatSize(bytes: number): string {
   return `${bytes} B`
 }
 
+/** 向量化完成后的文本/表格片数，跟在文件名后面 */
+function kindCountsLabel(file: KbFile): string | null {
+  if (file.status !== 'ready') return null
+  if (file.text_count == null && file.table_count == null) return null
+  return `文本 ${file.text_count ?? 0} · 表格 ${file.table_count ?? 0}`
+}
+
 // 文件列表行的「更多」菜单：一个三点按钮，点击弹出下载/编辑标签/重命名/删除。
 // 菜单按权限与状态动态显隐，与会话列表「更多」同一套交互（左对齐 + 点外部关闭）。
 type KbFileRowProps = {
@@ -400,6 +407,7 @@ function KbFileRow({
   }, [menuOpen])
 
   const hasDownload = item.status !== 'uploaded'
+  const counts = kindCountsLabel(item)
   // 编辑（改名 + 标签）合成一项：两者都是「这份文件是什么」的元信息
   const hasEdit = canManage
   const hasDelete = canManage
@@ -436,13 +444,18 @@ function KbFileRow({
           {/* 标题与元信息放在同一列里：片数/大小左对齐到文件名首字，
               而不是退到格式标签的左边缘（那样看着像两套缩进） */}
           <span className="kb-row-body">
-            <span className="kb-name-text">{item.filename}</span>
+            <span className="kb-name-line">
+              <span className="kb-name-text">{item.filename}</span>
+              {counts ? <span className="kb-kind-counts">{counts}</span> : null}
+            </span>
             {/* 元信息一级就是结论：片数（决定图谱规模与重建耗时）用近黑加粗，
                 文件大小只作参照，浅灰。文档类型标签删掉——分组标题已经说了 */}
             <span className="kb-meta">
-              <span className="kb-slices" title="切片数">
-                {item.chunk_count} 片
-              </span>
+              {counts ? null : (
+                <span className="kb-slices" title="切片数">
+                  {item.chunk_count} 片
+                </span>
+              )}
               <span className="kb-size">{formatSize(item.size_bytes)}</span>
               {item.status === 'failed' ? (
                 <span className="kb-state is-failed" title={item.error || '处理失败'}>
@@ -1488,10 +1501,17 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                           <ul className="kb-glist">
                             {graphTodo.map((item) => {
                               // 构建入口是文件名右侧的按钮，徽标这里只留纯状态
-                              // （构建中/构建失败），不再显示可点的操作文字
-                              const badge =
-                                item.graph_status === 'building' ||
-                                item.graph_status === 'failed'
+                              // （构建中/构建失败），不再显示可点的操作文字。
+                              // 切片还没齐（解析/向量化）时后端会拒建图，按钮一并藏掉。
+                              const fileReady = item.status === 'ready'
+                              const badge = !fileReady
+                                ? {
+                                    label: STATUS_LABEL[item.status],
+                                    cls:
+                                      item.status === 'failed' ? 'st-none' : 'st-busy',
+                                  }
+                                : item.graph_status === 'building' ||
+                                    item.graph_status === 'failed'
                                   ? graphBadge(item.graph_status, false)
                                   : null
                               return (
@@ -1514,7 +1534,9 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                                       </span>
                                     </span>
                                   </span>
-                                  {canManage && item.graph_status !== 'building' ? (
+                                  {canManage &&
+                                  fileReady &&
+                                  item.graph_status !== 'building' ? (
                                     <button
                                       type="button"
                                       className="kb-gact"
@@ -1531,9 +1553,11 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                                     <span className={`kb-gbadge ${badge.cls}`}>
                                       {badge.cls === 'st-busy' ? (
                                         <span className="kb-gspinner" aria-hidden="true" />
-                                      ) : (
-                                        badge.label
-                                      )}
+                                      ) : null}
+                                      {/* 建图中只留转圈；解析/向量化要写出阶段，避免误点构建 */}
+                                      {badge.cls === 'st-busy' && fileReady
+                                        ? null
+                                        : badge.label}
                                     </span>
                                   ) : null}
                                 </li>
@@ -1685,7 +1709,12 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
             <header className="kb-chunks-head">
               <h2 className="kb-chunks-title" title={selectedFile.filename}>
                 {extBadge(selectedFile)}
-                {selectedFile.filename}
+                <span className="kb-chunks-name">{selectedFile.filename}</span>
+                {kindCountsLabel(selectedFile) ? (
+                  <span className="kb-kind-counts">
+                    {kindCountsLabel(selectedFile)}
+                  </span>
+                ) : null}
               </h2>
               {/* 跳页：只在有页码的文件（PDF 类）出现。收进气泡——头部不该
                   常驻一个输入框；气泡里输入页码，确定才跳，跳不到 toast */}

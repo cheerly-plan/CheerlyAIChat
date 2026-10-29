@@ -387,12 +387,29 @@
 /* 文件名只占一行，超出加省略号（完整名见 title 悬浮提示）。
    两行截断会让同一列表里行高忽高忽低，扫视时眼睛一直在跳；
    单行 + 省略号让每条等高，也更好比较片数 */
+.kb-name-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
 .kb-name-text {
-  display: block;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   line-height: 1.45;
+  min-width: 0;
+  flex: 1;
+}
+
+/* 向量化完成后的文本/表格片数：跟在文件名后面，不进省略号 */
+.kb-kind-counts {
+  flex-shrink: 0;
+  color: #8a8f98;
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ——— 文件类型徽标：按扩展名着色 ———
@@ -472,8 +489,9 @@
   flex-shrink: 0;
 }
 
-/* 两者之间的分隔点，避免「395 片 3.8 MB」糊成一串 */
-.kb-size::before {
+/* 两者之间的分隔点，避免「395 片 3.8 MB」糊成一串。
+   向量化完成后片数改挂标题后，元信息只剩大小，不再加前导点 */
+.kb-slices + .kb-size::before {
   content: '·';
   margin-right: 5px;
   color: #ccd0d8;
@@ -1309,12 +1327,25 @@
   min-width: 0;
   /* 按内容宽度占位（flex:1 会把跳页按钮顶到最右），太长才收缩出省略号 */
   flex: 0 1 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   font-size: 14px;
   font-weight: 600;
   color: #222;
   overflow: hidden;
+  white-space: nowrap;
+}
+
+.kb-chunks-name {
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+}
+
+.kb-chunks-title .kb-kind-counts {
+  font-size: 12px;
 }
 
 /* 左面板收起后，.kb-float（返回+展开）浮在左上角，标题行让出按钮宽度 */
@@ -1326,11 +1357,11 @@
 .kb-chunks-title .kb-ext {
   /* 标题栏这里按文字自然宽度，不用列表里那个定宽对齐的框 */
   width: auto;
-  margin-right: 7px;
+  margin-right: 0;
   padding: 2px 7px;
   border-radius: 5px;
   font-size: 10.5px;
-  vertical-align: 1px;
+  flex-shrink: 0;
 }
 
 .kb-chunks-empty {
