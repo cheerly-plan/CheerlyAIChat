@@ -169,37 +169,51 @@ export default function KbGraphPanel({
     if (fileId && status) onStatus?.(fileId, status)
   }, [fileId, graph?.graph_status, onStatus])
 
+  /**
+   * 检索是否在进行中。
+   *
+   * 用 ref 而不是 state 做「有请求在飞」的判断：state 是渲染快照，同一次
+   * 渲染里读到的永远是旧值，点击处理器里 setSearching(false) 完紧接着
+   * 调 runSearch 还是会被拦下来（切跳数时的真实场景）。
+   */
+  const searchingRef = useRef(false)
+
   /** 只清检索结果：图谱高亮、命中实体、命中依据一起收掉 */
   const resetResult = () => {
     // 让还在飞的检索请求失效，避免结果回填
     searchIdRef.current += 1
+    searchingRef.current = false
     setSearching(false)
     setResult(null)
     setSearchError('')
   }
 
   /**
-   * 检索只在「点检索 / 回车 / 点清空」时发生，输入过程一概不触发。
+   * 检索只在「输入停顿 / 回车 / 点清空 / 切跳数」时发生。
    *
    * 空词也是合法检索：不做实体匹配，直接取消筛选回到当前范围的全图。
    * 这条路径不发请求——图本来就在手上，后端也明确拒收空检索词。
+   *
+   * nextDepth：切跳数的那一次要把新跳数带进来。setDepth 是异步的，
+   * 紧接着调 runSearch 读到的还是旧值，只能显式传。
    */
-  const runSearch = async (raw?: string) => {
+  const runSearch = async (raw?: string, nextDepth?: number) => {
     const q = (raw ?? query).trim()
     // 放在 searching 判断之前：正在检索时点清空，也要立刻把画面还原
     if (!q) {
       resetResult()
       return
     }
-    if (searching) return
+    if (searchingRef.current) return
     // 检索期间用户可能清空或改词重检，用序号丢弃过期响应，
     // 否则清空之后迟到的结果会把命中依据又弹回来
     const token = ++searchIdRef.current
+    searchingRef.current = true
     setSearching(true)
     setSearchError('')
     try {
       const data = await searchKg(q, {
-        depth,
+        depth: nextDepth ?? depth,
         fileId: fileId ?? undefined,
         // 合并视图：检索范围与画布同源，命中实体保证在图上
         fileIds: fileId ? undefined : fileIds,
@@ -211,7 +225,10 @@ export default function KbGraphPanel({
       setSearchError(e instanceof Error ? e.message : '图谱检索失败')
       setResult(null)
     } finally {
-      if (token === searchIdRef.current) setSearching(false)
+      if (token === searchIdRef.current) {
+        searchingRef.current = false
+        setSearching(false)
+      }
     }
   }
 
@@ -607,6 +624,10 @@ export default function KbGraphPanel({
             }
             aria-label="图谱检索"
           />
+          {/* 检索中的转圈：切跳数/改词之后画布要等一个来回才变，没有它就只剩下按钮变个色 */}
+          {searching ? (
+            <span className="kb-gspinner" role="status" aria-label="检索中" />
+          ) : null}
           {query ? (
             <button type="button" className="kb-kg-clear" onClick={clearSearch} aria-label="清空">
               ✕
@@ -621,7 +642,17 @@ export default function KbGraphPanel({
               type="button"
               className={depth === d ? 'is-on' : ''}
               aria-pressed={depth === d}
-              onClick={() => setDepth(d)}
+              onClick={() => {
+                if (depth === d) return
+                setDepth(d)
+                // 换跳数 = 换一种扩展口径，得立刻按当前词重检一次。
+                // 只 setDepth 不发请求的话，画布还停在上一次的子图上，
+                // 点下去除了按钮自己变个色，图上什么都没变（看起来就是没反应）。
+                // 防抖的请求可能还在飞，先作废旧请求——那次用的是旧跳数
+                searchIdRef.current += 1
+                searchingRef.current = false
+                void runSearch(query, d)
+              }}
               title={d === 1 ? '沿关系扩展一跳' : '沿关系扩展两跳，召回更广但噪音更多'}
             >
               {d} 跳

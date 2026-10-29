@@ -1040,7 +1040,6 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                                   {item.filename}
                                 </span>
                                 <span className="kb-gcount">
-                                  {item.graph_entity_count ?? 0} 实体
                                   <span
                                     className="kb-gprofile"
                                     title="这份图谱用的抽取配置"
@@ -1048,6 +1047,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                                     {docTypeLabelOf(item.doc_type)} ·{' '}
                                     {levelLabelOf(item.extract_level)}
                                   </span>
+                                  {item.graph_entity_count ?? 0} 实体
                                 </span>
                               </span>
                             </label>

@@ -260,7 +260,7 @@
   border: 1px solid transparent;
   border-radius: 10px;
   /* 未选中＝会话列表的 hover 灰（.history-item:hover #eceef1） */
-  background: #eceef1;
+  border: 1px solid #eef0f3;
   transition: border-color 0.15s, background-color 0.15s;
 }
 
@@ -301,7 +301,7 @@
    视觉上是无描边的色块，盒子尺寸又与未选中一致，切换时不跳动。 */
 
 .kb-item.kb-selected {
-  border-color: transparent;
+  border: 1px solid #d6e0ff;
   background: #d6e0ff;
   box-shadow: none;
 }
@@ -1235,6 +1235,13 @@
   font-size: 10px;
   line-height: 1;
   cursor: pointer;
+}
+
+/* 检索中的转圈：复用列表徽标那只，放在清空按钮左边 */
+.kb-kg-search .kb-gspinner {
+  flex-shrink: 0;
+  margin-right: 7px;
+  color: #9aa0a6;
 }
 
 .kb-kg-depth {
@@ -2395,10 +2402,7 @@
 
 /* 文件名下方：这份图谱用的抽取配置（文档类型 · 粒度），淡色小标签 */
 .kb-gprofile {
-  margin-left: 6px;
-  padding: 0 6px;
-  border-radius: 8px;
-  background: #eef0f4;
+  margin-right: 6px;
   color: #7b8290;
   font-size: 10.5px;
   line-height: 1.5;
