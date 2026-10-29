@@ -137,26 +137,27 @@ function chunkPos(chunk: KbChunk): string {
   return chunk.page != null ? `第${chunk.page}页` : `第${chunk.seq + 1}段`
 }
 
-// 文件按扩展名着色（与状态点无关，纯粹区分文件类型）
-const EXT_STYLE: Record<string, { label: string; cls: string }> = {
-  pdf: { label: 'PDF', cls: 'ext-pdf' },
-  docx: { label: 'DOC', cls: 'ext-doc' },
-  doc: { label: 'DOC', cls: 'ext-doc' },
-  xlsx: { label: 'XLS', cls: 'ext-xls' },
-  xlsm: { label: 'XLS', cls: 'ext-xls' },
-  csv: { label: 'CSV', cls: 'ext-csv' },
-  md: { label: 'MD', cls: 'ext-txt' },
-  markdown: { label: 'MD', cls: 'ext-txt' },
-  txt: { label: 'TXT', cls: 'ext-txt' },
+// 扩展名 → 展示名。格式标签统一中性灰，不按类型上色：
+// 它只是「这是什么文件」的提示，红色要留给异常/警告状态
+const EXT_LABEL: Record<string, string> = {
+  pdf: 'PDF',
+  docx: 'DOC',
+  doc: 'DOC',
+  xlsx: 'XLS',
+  xlsm: 'XLS',
+  csv: 'CSV',
+  md: 'MD',
+  markdown: 'MD',
+  txt: 'TXT',
 }
 
 function extBadge(file: KbFile) {
   // 类型后缀优先取 mime（后端单独存，filename 已是纯名），mime 缺失时回退从 filename 切
   const raw = file.mime ?? file.filename.slice(file.filename.lastIndexOf('.') + 1)
   const ext = raw.replace(/^\./, '').toLowerCase()
-  const style = EXT_STYLE[ext]
-  if (!style) return null
-  return <span className={`kb-ext ${style.cls}`}>{style.label}</span>
+  const label = EXT_LABEL[ext]
+  if (!label) return null
+  return <span className="kb-ext">{label}</span>
 }
 
 // ——— 切片虚拟滚动（变高卡片）———
@@ -181,10 +182,6 @@ type KbFileRowProps = {
   item: KbFile
   isSelected: boolean
   canManage: boolean
-  /** 文档类型名（招股意向书 / 通用文档…）：行内标签与分组都用它 */
-  typeLabel: string
-  /** 通用文档用中性灰标签，招股书一类用主色标签 */
-  isGeneral: boolean
   /** 图谱正在构建时重建按钮不可用 */
   graphBuilding: boolean
   onToggle: (item: KbFile) => void
@@ -199,8 +196,6 @@ function KbFileRow({
   item,
   isSelected,
   canManage,
-  typeLabel,
-  isGeneral,
   graphBuilding,
   onToggle,
   onRebuild,
@@ -247,17 +242,20 @@ function KbFileRow({
 
   return (
     <li
-      className={`kb-item kb-${item.status}${isSelected ? ' kb-selected' : ''}`}
+      className={`kb-item kb-${item.status}${isSelected ? ' kb-selected' : ''}${
+        hasRebuild ? ' has-act' : ''
+      }`}
     >
       {/* 选中态：左侧 3px 主色竖条 + 极浅蓝底，克制一点，
           不再整块深蓝把整行压住（那样看着像弹窗遮罩而不是选中） */}
       {isSelected ? <span className="kb-item-bar" aria-hidden="true" /> : null}
+      {/* 提示只挂在标题区：原来挂在整个卡片上，鼠标扫到按钮旁边也会弹出
+          「点击查看切片」，位置看着很怪 */}
       <div
         className="kb-item-main"
         role="button"
         tabIndex={0}
         aria-pressed={isSelected}
-        title={item.status === 'ready' ? '点击查看切片' : '处理完成后可查看切片'}
         onClick={() => onToggle(item)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -266,20 +264,20 @@ function KbFileRow({
           }
         }}
       >
-        <span className="kb-name" title={item.filename}>
+        <span
+          className="kb-name"
+          title={
+            item.status === 'ready'
+              ? item.filename
+              : `${item.filename} · ${STATUS_LABEL[item.status]}`
+          }
+        >
           {extBadge(item)}
           <span className="kb-name-text">{item.filename}</span>
         </span>
-        {/* 元信息分三级：文档类型标签 → 片数（主信息，决定图谱规模与重建耗时）
-            → 大小（最弱）。就绪是最常态，不再占一格——只有处理中/失败
-            才在行尾亮出状态，否则每行一个绿点等于没有信息 */}
+        {/* 元信息一级就是结论：片数（决定图谱规模与重建耗时）用近黑加粗，
+            文件大小只作参照，浅灰。文档类型标签删掉——分组标题已经说了 */}
         <span className="kb-meta">
-          <span
-            className={`kb-type ${isGeneral ? 'is-general' : 'is-prospectus'}`}
-            title={`文档类型：${typeLabel}`}
-          >
-            {typeLabel}
-          </span>
           <span className="kb-slices" title="切片数">
             {item.chunk_count} 片
           </span>
@@ -1127,8 +1125,6 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                                   item={item}
                                   isSelected={item.file_id === selectedId}
                                   canManage={canManage}
-                                  typeLabel={group.label}
-                                  isGeneral={group.key === 'general'}
                                   graphBuilding={item.graph_status === 'building'}
                                   onToggle={toggleSelect}
                                   onRebuild={setRebuildTarget}
