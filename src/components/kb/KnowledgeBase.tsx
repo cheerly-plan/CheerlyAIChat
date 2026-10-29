@@ -66,6 +66,48 @@ function graphBadge(status: string | null | undefined, canManage: boolean) {
   return GRAPH_BADGE[key] ?? GRAPH_BADGE['']
 }
 
+/** 重建/构建按钮的图标：12px，比会话里的 RefreshIcon 小一号，list row 才不撑高 */
+function GraphRefreshIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
+      <path
+        d="M20 12a8 8 0 1 1-2.2-5.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M20 5v5h-5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/**
+ * 实体体量分级。
+ *
+ * 实体数不是个普通数字——它直接代表这份文档的抽取负荷：1057 个实体意味着
+ * 重建要跑很久、显存吃紧、还容易爆实体；10 个实体的小规范几乎瞬间完成。
+ * 所以按量级给不同色阶和体量条长度，让人在列表里一眼看出哪几份是重活。
+ */
+function entityTier(count: number): { cls: string; ratio: number } {
+  if (count >= 1000) return { cls: 'is-huge', ratio: 1 }
+  if (count >= 300) return { cls: 'is-mid', ratio: 0.62 }
+  if (count >= 50) return { cls: 'is-small', ratio: 0.36 }
+  return { cls: 'is-tiny', ratio: 0.18 }
+}
+
+/** 文档类型标签：招股书一类结构化文档用主色，通用文档用中性灰 */
+function docTypeStyle(key?: string): string {
+  return !key || key === 'general' ? 'is-general' : 'is-prospectus'
+}
+
 // 切片位置标注：与检索引用（_format_hit）同一套语义
 function chunkPos(chunk: KbChunk): string {
   if (chunk.kind === 'table') {
@@ -377,6 +419,9 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
   const [panelOpen, setPanelOpen] = useState(
     () => window.matchMedia('(min-width: 861px)').matches,
   )
+  // 图谱 tab 两组文件的折叠状态：文件多了先收起不关心的那组
+  const [todoOpen, setTodoOpen] = useState(true)
+  const [doneOpen, setDoneOpen] = useState(true)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const refresh = useCallback(async () => {
@@ -973,109 +1018,187 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                   </p>
                 ) : (
                   <>
-                    <ul className="kb-glist">
-                      {/* 可构建（未生成/失败）在上，已完成可勾选在下 */}
-                      {graphTodo.map((item) => {
-                        // 构建入口已经是文件名右侧的「构建」按钮，徽标这里只留
-                        // 纯状态（构建中/构建失败），不再显示可点的操作文字
-                        const badge =
-                          item.graph_status === 'building' ||
-                          item.graph_status === 'failed'
-                            ? graphBadge(item.graph_status, false)
-                            : null
-                        return (
-                          <li key={item.file_id} className="kb-gitem is-muted">
-                            <span className="kb-gcheck">
-                              <span className="kb-gtext">
-                                <span className="kb-gname" title={item.filename}>
-                                  {item.filename}
-                                </span>
-                              </span>
-                            </span>
-                            {canManage && item.graph_status !== 'building' ? (
-                              <button
-                                type="button"
-                                className="kb-gact"
-                                onClick={() => setRebuildTarget(item)}
-                                title="选择文档类型与抽取粒度后构建图谱"
-                              >
-                                构建
-                              </button>
-                            ) : null}
-                            {badge ? (
-                              <span className={`kb-gbadge ${badge.cls}`}>
-                                {badge.cls === 'st-busy' ? (
-                                  <span className="kb-gspinner" aria-hidden="true" />
-                                ) : (
-                                  badge.label
-                                )}
-                              </span>
-                            ) : null}
-                          </li>
-                        )
-                      })}
-                      {graphTodo.length > 0 && graphDone.length > 0 ? (
-                        <li className="kb-gdivider" aria-hidden="true" />
-                      ) : null}
-                      {graphDone.map((item) => {
-                        const badge =
-                          item.graph_status === 'ready'
-                            ? null
-                            : graphBadge(item.graph_status, canManage)
-                        const isPicked =
-                          checked.has(item.file_id) || buildFileId === item.file_id
-                        return (
-                          <li
-                            key={item.file_id}
-                            className={`kb-gitem${isPicked ? ' is-picked' : ''}`}
-                          >
-                            <label className="kb-gcheck">
-                              <input
-                                type="checkbox"
-                                checked={checked.has(item.file_id)}
-                                onChange={() => toggleChecked(item.file_id)}
+                    {/* 两组分开：可构建（未生成/失败）在上，已构建可勾选在下。
+                        组头写明数量并可折叠，文件多了先把不关心的那组收起来 */}
+                    {graphTodo.length > 0 ? (
+                      <div className="kb-ggroup">
+                        <button
+                          type="button"
+                          className="kb-ggroup-head"
+                          onClick={() => setTodoOpen(!todoOpen)}
+                          aria-expanded={todoOpen}
+                        >
+                          <span className={`kb-gcaret${todoOpen ? ' is-open' : ''}`}>
+                            <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+                              <path
+                                d="M4.5 2.5 8 6l-3.5 3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
                               />
-                              <span className="kb-gtext">
-                                <span className="kb-gname" title={item.filename}>
-                                  {item.filename}
-                                </span>
-                                <span className="kb-gcount">
-                                  <span
-                                    className="kb-gprofile"
-                                    title="这份图谱用的抽取配置"
-                                  >
-                                    {levelLabelOf(item.extract_level)}
-                                    {docTypeLabelOf(item.doc_type)}
+                            </svg>
+                          </span>
+                          <span className="kb-ggroup-title">未构建图谱</span>
+                          <span className="kb-ggroup-count">{graphTodo.length}</span>
+                        </button>
+                        {todoOpen ? (
+                          <ul className="kb-glist">
+                            {graphTodo.map((item) => {
+                              // 构建入口是文件名右侧的按钮，徽标这里只留纯状态
+                              // （构建中/构建失败），不再显示可点的操作文字
+                              const badge =
+                                item.graph_status === 'building' ||
+                                item.graph_status === 'failed'
+                                  ? graphBadge(item.graph_status, false)
+                                  : null
+                              return (
+                                <li key={item.file_id} className="kb-gitem is-muted">
+                                  <span className="kb-gcheck">
+                                    <span className="kb-gtext">
+                                      <span className="kb-gname" title={item.filename}>
+                                        {item.filename}
+                                      </span>
+                                      <span className="kb-gmeta">
+                                        <span className="kb-gcount is-muted">
+                                          {item.chunk_count} 切片
+                                        </span>
+                                      </span>
+                                    </span>
                                   </span>
-                                  {item.graph_entity_count ?? 0} 实体
-                                </span>
-                              </span>
-                            </label>
-                            {/* 已完成行：重建入口（默认显示的蓝色文字，无图标无边框） */}
-                            {canManage ? (
-                              <button
-                                type="button"
-                                className="kb-gact"
-                                onClick={() => setRebuildTarget(item)}
-                                disabled={item.graph_status === 'building'}
-                                title="按新的文档类型与抽取粒度重建这份图谱"
-                              >
-                                重建
-                              </button>
-                            ) : null}
-                            {badge ? (
-                              <span
-                                className={`kb-gbadge ${badge.cls}`}
-                                onClick={() => toggleBuildFile(item)}
-                                title="查看这份文件的图谱"
-                              >
-                                {badge.label}
-                              </span>
-                            ) : null}
-                          </li>
-                        )
-                      })}
-                    </ul>
+                                  {canManage && item.graph_status !== 'building' ? (
+                                    <button
+                                      type="button"
+                                      className="kb-gact"
+                                      onClick={() => setRebuildTarget(item)}
+                                      title="选择文档类型与抽取粒度后构建图谱"
+                                    >
+                                      <span className="kb-gact-icon" aria-hidden="true">
+                                        <GraphRefreshIcon />
+                                      </span>
+                                      <span className="kb-gact-text">构建</span>
+                                    </button>
+                                  ) : null}
+                                  {badge ? (
+                                    <span className={`kb-gbadge ${badge.cls}`}>
+                                      {badge.cls === 'st-busy' ? (
+                                        <span className="kb-gspinner" aria-hidden="true" />
+                                      ) : (
+                                        badge.label
+                                      )}
+                                    </span>
+                                  ) : null}
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {graphDone.length > 0 ? (
+                      <div className="kb-ggroup">
+                        <button
+                          type="button"
+                          className="kb-ggroup-head"
+                          onClick={() => setDoneOpen(!doneOpen)}
+                          aria-expanded={doneOpen}
+                        >
+                          <span className={`kb-gcaret${doneOpen ? ' is-open' : ''}`}>
+                            <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+                              <path
+                                d="M4.5 2.5 8 6l-3.5 3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </span>
+                          <span className="kb-ggroup-title">已构建图谱</span>
+                          <span className="kb-ggroup-count">{graphDone.length}</span>
+                        </button>
+                        {doneOpen ? (
+                          <ul className="kb-glist">
+                            {graphDone.map((item) => {
+                              const badge =
+                                item.graph_status === 'ready'
+                                  ? null
+                                  : graphBadge(item.graph_status, canManage)
+                              const isPicked =
+                                checked.has(item.file_id) || buildFileId === item.file_id
+                              const count = item.graph_entity_count ?? 0
+                              const tier = entityTier(count)
+                              return (
+                                <li
+                                  key={item.file_id}
+                                  className={`kb-gitem${isPicked ? ' is-picked' : ''}`}
+                                >
+                                  <label className="kb-gcheck">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked.has(item.file_id)}
+                                      onChange={() => toggleChecked(item.file_id)}
+                                    />
+                                    <span className="kb-gtext">
+                                      <span className="kb-gname" title={item.filename}>
+                                        {item.filename}
+                                      </span>
+                                      <span className="kb-gmeta">
+                                        <span
+                                          className={`kb-gtype ${docTypeStyle(item.doc_type)}`}
+                                          title={`这份图谱按「${docTypeLabelOf(item.doc_type)} · ${levelLabelOf(item.extract_level)}」抽取`}
+                                        >
+                                          {docTypeLabelOf(item.doc_type)}
+                                        </span>
+                                        {/* 实体体量：色阶 + 细条一起表达，
+                                            1057 这种量级一眼看出是重活 */}
+                                        <span
+                                          className={`kb-gcount ${tier.cls}`}
+                                          title={`${count} 个实体`}
+                                        >
+                                          <span className="kb-gvol" aria-hidden="true">
+                                            <i style={{ width: `${tier.ratio * 100}%` }} />
+                                          </span>
+                                          {count} 实体
+                                        </span>
+                                      </span>
+                                    </span>
+                                  </label>
+                                  {/* 重建：默认只有图标，hover 行才展开文字，
+                                      高危操作不该一直挂在行上吸注意力 */}
+                                  {canManage ? (
+                                    <button
+                                      type="button"
+                                      className="kb-gact"
+                                      onClick={() => setRebuildTarget(item)}
+                                      disabled={item.graph_status === 'building'}
+                                      title="按新的文档类型与抽取粒度重建这份图谱"
+                                    >
+                                      <span className="kb-gact-icon" aria-hidden="true">
+                                        <GraphRefreshIcon />
+                                      </span>
+                                      <span className="kb-gact-text">重建</span>
+                                    </button>
+                                  ) : null}
+                                  {badge ? (
+                                    <span
+                                      className={`kb-gbadge ${badge.cls}`}
+                                      onClick={() => toggleBuildFile(item)}
+                                      title="查看这份文件的图谱"
+                                    >
+                                      {badge.label}
+                                    </span>
+                                  ) : null}
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </>
                 )}
               </>
