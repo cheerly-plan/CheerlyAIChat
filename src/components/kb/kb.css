@@ -1343,6 +1343,14 @@
   font-weight: 600;
 }
 
+/* 编号 | 页码 的分栏线：留白由 margin 控制（不再靠 JSX 里的空格），
+   颜色比正文淡，只起分隔作用不抢视线 */
+.kb-chunk-sep {
+  margin: 0 7px;
+  color: #c7ccd4;
+  font-weight: 400;
+}
+
 .kb-chunk-pos-text {
   color: inherit;
 }

@@ -1713,7 +1713,9 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                               {KIND_LABEL[chunk.kind]}
                             </span>
                             <span className="kb-chunk-pos">
-                              <b className="kb-chunk-seq">No.{chunk.seq + 1}</b> |{' '}
+                              <b className="kb-chunk-seq">No.{chunk.seq + 1}</b>
+                              {/* 编号和页码是两级信息，用 | 分栏，两侧留白大一点 */}
+                              <span className="kb-chunk-sep">|</span>
                               <ChunkPageTag
                                 chunk={chunk}
                                 file={selectedFile}
