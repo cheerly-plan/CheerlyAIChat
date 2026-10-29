@@ -517,7 +517,7 @@ function stepSim(sim: Sim) {
     node.y = Math.max(pad, Math.min(sim.height - BOTTOM_PAD, node.y))
   }
   // 点多时加快冷却：否则从预热残留的 alpha 再跑两百多帧 O(n²)，拖动也会粘
-  sim.alpha *= nodes.length > 80 ? 0.97 : 0.985
+  sim.alpha *= nodes.length > 200 ? 0.94 : nodes.length > 80 ? 0.97 : 0.985
 }
 
 type Props = {
@@ -551,6 +551,35 @@ export const KG_HUB_CAP = 100
 const HUB_CAP = KG_HUB_CAP
 /** 下钻时额外带上的一跳邻居上限：星型枢纽可能有上百条边，全展开会再次卡死 */
 const NEIGHBOR_CAP = 36
+/**
+ * 画布上最多画多少条边。
+ *
+ * 密图里边数常常是点数的好几倍（七星那份 1057 实体 / 936 关系），
+ * 每条边每帧要写 4 个坐标属性——不设上限的话光刷线就能吃掉整个帧预算。
+ * 超出部分只是不画，实体还在，点开节点仍能看到它的关系。
+ */
+const MAX_EDGES = 400
+
+/**
+ * 两批数据是不是同一张图。
+ *
+ * 后台刷新（构建中轮询、构建完成补拉）拿回来的是全新对象，但内容常常一模一样。
+ * 按引用判等会把整层 DOM 推倒重建、力导向从头收敛，于是每 3 秒卡一下，
+ * 用户刚缩放拖动好的视图也被弹回原点。改按 id 集合比对——图没变就别动。
+ */
+function sameGraphData(
+  prev: { nodes: KgNode[]; edges: KgEdge[] } | null,
+  next: { nodes: KgNode[]; edges: KgEdge[] },
+): boolean {
+  if (!prev) return false
+  if (prev.nodes.length !== next.nodes.length) return false
+  if (prev.edges.length !== next.edges.length) return false
+  const sameIds = (a: { id: string }[], b: { id: string }[]) => {
+    const set = new Set(a.map((item) => item.id))
+    return b.every((item) => set.has(item.id))
+  }
+  return sameIds(prev.nodes, next.nodes) && sameIds(prev.edges, next.edges)
+}
 
 export default function KnowledgeGraph({
   graph,
@@ -751,9 +780,22 @@ export default function KnowledgeGraph({
       }
       for (const id of extras) keep.add(id)
     }
+    let kept = edges.filter(
+      (edge) => keep.has(edge.source) && keep.has(edge.target),
+    )
+    // 边比点密得多：一份招股书能抽出一千条关系，全画上去既糊成一片，
+    // 又让每帧要刷三四千次属性。超预算就按权重（关系出现次数）留下要紧的
+    if (kept.length > MAX_EDGES) {
+      kept = [...kept]
+        .sort(
+          (a, b) =>
+            (b.weight ?? 1) - (a.weight ?? 1) || a.id.localeCompare(b.id),
+        )
+        .slice(0, MAX_EDGES)
+    }
     return {
       nodes: nodes.filter((node) => keep.has(node.id)),
-      edges: edges.filter((edge) => keep.has(edge.source) && keep.has(edge.target)),
+      edges: kept,
     }
   }, [prune, nodes, edges, activeNodeId, hitIds, colorMode, focusCommunity])
   const displayNodes = display.nodes
@@ -762,30 +804,42 @@ export default function KnowledgeGraph({
   const paint = useCallback(() => {
     const sim = simRef.current
     if (!sim) return
-    for (const node of sim.nodes) {
+    const painted = paintedRef.current
+    // 这一帧真正位移过的点：两端都没动的边可以整条跳过
+    const moved = new Uint8Array(sim.nodes.length)
+    for (let i = 0; i < sim.nodes.length; i += 1) {
+      const node = sim.nodes[i]
       const el = nodeElsRef.current.get(node.id)
-      if (el) {
-        el.setAttribute(
-          'transform',
-          `translate(${node.x.toFixed(2)} ${node.y.toFixed(2)})`,
-        )
+      if (!el) continue
+      const prev = painted.get(node.id)
+      if (
+        prev &&
+        Math.abs(prev.x - node.x) < 0.05 &&
+        Math.abs(prev.y - node.y) < 0.05
+      ) {
+        continue
       }
+      el.setAttribute(
+        'transform',
+        `translate(${node.x.toFixed(1)} ${node.y.toFixed(1)})`,
+      )
+      painted.set(node.id, { x: node.x, y: node.y })
+      moved[i] = 1
     }
     for (const link of sim.links) {
       const a = sim.nodes[link.source]
       const b = sim.nodes[link.target]
-      if (link.el && a && b) {
-        link.el.setAttribute('x1', a.x.toFixed(2))
-        link.el.setAttribute('y1', a.y.toFixed(2))
-        link.el.setAttribute('x2', b.x.toFixed(2))
-        link.el.setAttribute('y2', b.y.toFixed(2))
-        // 高亮时按两端 id 判邻接，写进 dataset 免得每帧重新算
-        link.el.dataset.source = a.id
-        link.el.dataset.target = b.id
+      // data-source / data-target 建 DOM 时写一次就够：links 的端点索引不变，
+      // 每帧重写 dataset 是白花的开销（dataset 写还比 setAttribute 更贵）
+      if (link.el && a && b && (moved[link.source] || moved[link.target])) {
+        link.el.setAttribute('x1', a.x.toFixed(1))
+        link.el.setAttribute('y1', a.y.toFixed(1))
+        link.el.setAttribute('x2', b.x.toFixed(1))
+        link.el.setAttribute('y2', b.y.toFixed(1))
       }
-      if (link.labelEl && a && b) {
-        link.labelEl.setAttribute('x', ((a.x + b.x) / 2).toFixed(2))
-        link.labelEl.setAttribute('y', ((a.y + b.y) / 2).toFixed(2))
+      if (link.labelEl && a && b && (moved[link.source] || moved[link.target])) {
+        link.labelEl.setAttribute('x', ((a.x + b.x) / 2).toFixed(1))
+        link.labelEl.setAttribute('y', ((a.y + b.y) / 2).toFixed(1))
       }
     }
   }, [])
@@ -847,8 +901,7 @@ export default function KnowledgeGraph({
       Boolean(prevSize) &&
       Math.abs((prevSize?.w ?? 0) - w) < 2 &&
       Math.abs((prevSize?.h ?? 0) - h) < 2
-    const sameData =
-      lastDataRef.current?.nodes === nodes && lastDataRef.current?.edges === edges
+    const sameData = sameGraphData(lastDataRef.current, { nodes, edges })
     const live = simRef.current
     // 源数据没变也会换显示集：选中簇要把成员钉进画布，下钻要补邻居。
     // 只认 sameData 会直接 return，成员永远不进 DOM。
@@ -894,6 +947,8 @@ export default function KnowledgeGraph({
     )
     simRef.current = sim
     nodeElsRef.current = new Map()
+    // 老坐标作废：新一轮用的是新 sim，位置与上一轮不是一回事
+    paintedRef.current = new Map()
     nodeLayer.replaceChildren()
     linkLayer.replaceChildren()
     labelLayer?.replaceChildren()
