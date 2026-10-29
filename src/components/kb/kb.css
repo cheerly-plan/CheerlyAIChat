@@ -527,13 +527,19 @@
   border-radius: 8px;
   background-color: inherit;
   opacity: 0;
+  /* 隐身时不该能点到：opacity:0 仍然会接鼠标，误点会弹菜单 */
+  pointer-events: none;
   transition: opacity 0.15s;
 }
 
+/* 显形：鼠标在卡片上 / 菜单开着 / 键盘真的把焦点放进了这组按钮。
+   用 :has(:focus-visible) 而不是 :focus-within——后者在点过「⋯」之后
+   焦点留在按钮上，鼠标移出卡片按钮也一直亮着 */
 .kb-item:hover .kb-item-side,
-.kb-item-side:focus-within,
+.kb-item-side:has(:focus-visible),
 .kb-item-side.menu-open {
   opacity: 1;
+  pointer-events: auto;
 }
 
 /* 「更多」三点按钮：单按钮，点开菜单 */
@@ -2707,21 +2713,21 @@
     margin-left 0.16s ease;
 }
 
-/* 行 hover 或键盘聚焦到按钮时才显形（focus-within 让 Tab 也能走到它） */
+/* 显形只有两个入口：鼠标在行上，或键盘把焦点落到按钮本身。
+   这里绝不能用 :focus-within——行内还有复选框，点过一次勾选后焦点
+   留在 checkbox 上，整行就一直算「有焦点」，鼠标移走了按钮也不消失 */
 .kb-gitem:hover .kb-gact,
-.kb-gitem:focus-within .kb-gact {
+.kb-gact:focus-visible {
   color: #4d6bfe;
   opacity: 1;
   pointer-events: auto;
 }
 
-.kb-gitem:focus-within .kb-gact-text {
-  max-width: 34px;
-  opacity: 1;
-  margin-left: 3px;
-}
-
-.kb-gitem:hover .kb-gact-text,
+/* 文字折叠：行 hover 时只给一个图标（窄、不挤标题），
+   鼠标再落到图标上才把「构建/重建」滑出来。
+   之前写成 .kb-gitem:hover 展开，整行一 hover 文字就撑开 26px，
+   标题被挤短、行宽跳动，也丢掉了「先 icon 后文字」的层次 */
+.kb-gact:hover .kb-gact-text,
 .kb-gact:focus-visible .kb-gact-text {
   max-width: 34px;
   opacity: 1;
