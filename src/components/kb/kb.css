@@ -1388,6 +1388,12 @@
   text-underline-offset: 2px;
 }
 
+/* 「第 12 页」的数字两侧留白——「第」「页」是固定字，数字是要扫的信息，
+   分开一点才一眼看到页码 */
+.kb-chunk-page-num {
+  margin: 0 3px;
+}
+
 /* 跳页落点：淡蓝底 + 主色光圈，1.6s 后由 JS 摘掉 is-flash */
 .kb-chunk.is-flash {
   border-color: #bcd0ff;

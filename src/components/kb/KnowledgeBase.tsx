@@ -149,6 +149,20 @@ function chunkPos(chunk: KbChunk, isPdf = false): string {
   return page != null ? span : `第${chunk.seq + 1}段`
 }
 
+/** 位置标注里的数字单独一段：两侧留白大一点，扫读时页码更跳出来 */
+function PageLabel({ label }: { label: string }) {
+  // 形如 第12页 / 第134–135页 / 表3 / 第12页图表 / 第5段
+  const m = /^(第|表)([\d–]+)(页图表|页|段)?$/.exec(label)
+  if (!m) return <>{label}</>
+  return (
+    <>
+      {m[1]}
+      <span className="kb-chunk-page-num">{m[2]}</span>
+      {m[3] ?? ''}
+    </>
+  )
+}
+
 /** 页码标注：PDF 类文件可点，点开原件对应页；其它类型/无页码只作文字 */
 function ChunkPageTag({
   chunk,
@@ -172,7 +186,7 @@ function ChunkPageTag({
       onClick={() => onOpen(file, page)}
       title={`在新标签打开原件第 ${page} 页`}
     >
-      {label}
+      <PageLabel label={label} />
     </button>
   )
 }
