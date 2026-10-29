@@ -1,4 +1,4 @@
-import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, ChatSource, MemoryMessage, SessionInfo, SessionTitle, UserInfo } from './types'
+import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, ChatSource, MemoryMessage, SessionInfo, SessionTitle, TraceStep, UserInfo } from './types'
 
 export const CHAT_MEMORY_PAGE_SIZE = 20
 export const DEFAULT_SESSION_TITLE = '新会话'
@@ -241,14 +241,33 @@ export async function fetchChatMemory(
 
 export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
   const result: ChatMessage[] = []
-  let pendingTools: string[] = []
+  let steps: TraceStep[] = []
   // 引用挂在带正文的那条回答上；万一某轮只调了工具没留正文，
   // 就顺延给下一条有正文的回答，别把引用丢了
   let pendingSources: ChatSource[] = []
 
+  const flushAssistant = (content: string, sources?: ChatSource[]) => {
+    const merged = sources?.length ? sources : pendingSources
+    const trace = steps.length ? steps : undefined
+    if (!content && !trace && !merged.length) {
+      steps = []
+      pendingSources = []
+      return
+    }
+    result.push({
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content,
+      steps: trace,
+      sources: merged.length ? merged : undefined,
+    })
+    steps = []
+    pendingSources = []
+  }
+
   for (const msg of raw) {
     if (msg.role === 'user') {
-      pendingTools = []
+      if (steps.length) flushAssistant('')
       pendingSources = []
       result.push({
         id: crypto.randomUUID(),
@@ -261,28 +280,21 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
 
     const tools = (msg.tool_calls ?? []).map((item) => item.name).filter(Boolean)
     const sources = msg.meta?.sources ?? []
-    if (tools.length && !(msg.content ?? '').trim()) {
-      pendingTools = [...pendingTools, ...tools]
+    const text = msg.content ?? ''
+    if (tools.length) {
+      if (text.trim()) {
+        steps.push({ kind: 'plan', text: text.trim() })
+      }
+      for (const name of tools) {
+        steps.push({ kind: 'tool', name, label: name, running: false })
+      }
       if (sources.length) pendingSources = sources
       continue
     }
 
-    // 历史消息的工具都已执行完，展示名走后端 label 兜底映射
-    const historyTools = (pendingTools.length ? pendingTools : tools).map(
-      (name) => ({ label: name, running: false }),
-    )
-    const merged = sources.length ? sources : pendingSources
-
-    result.push({
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: msg.content ?? '',
-      tools: historyTools.length ? historyTools : undefined,
-      sources: merged.length ? merged : undefined,
-    })
-    pendingTools = []
-    pendingSources = []
+    flushAssistant(text, sources)
   }
+  if (steps.length) flushAssistant('')
 
   return result
 }

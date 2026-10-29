@@ -77,14 +77,20 @@ export type ChatMemory = {
   next_before_seq?: number | null
 }
 
-/** 工具调用记录：label 为后端下发的展示名，running 标记工具是否仍在执行 */
-export type ToolRun = { label: string; running: boolean }
+/** 过程时间线里的一步：调工具前的计划，或一次工具调用 */
+export type TraceStep =
+  | { kind: 'plan'; text: string }
+  | { kind: 'tool'; name: string; label: string; running: boolean }
 
 export type ChatMessage = {
   id: string
   role: 'user' | 'assistant'
   content: string
-  tools?: ToolRun[]
+  /** 调工具前后的过程行；最终回答仍在 content */
+  steps?: TraceStep[]
+  /** 本轮开始时间，用来显示「已处理 N 秒」 */
+  startedAt?: number
+  endedAt?: number
   /** 知识库引用（回答下方「参考来源」，点开看原文摘录） */
   sources?: ChatSource[]
 }

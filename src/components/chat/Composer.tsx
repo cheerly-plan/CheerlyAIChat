@@ -96,7 +96,7 @@ export function Composer({
               onClick={onToggleKb}
             >
               <KbIcon enabled={kbOn} size={16} />
-              知识库
+              知识检索
             </button>
           ) : null}
         </div>
