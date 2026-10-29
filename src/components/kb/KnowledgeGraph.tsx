@@ -740,7 +740,12 @@ export default function KnowledgeGraph({
       deg.set(edge.source, (deg.get(edge.source) ?? 0) + 1)
       deg.set(edge.target, (deg.get(edge.target) ?? 0) + 1)
     }
-    const degOf = (node: KgNode) => node.degree ?? deg.get(node.id) ?? 0
+    // 检索子图的后端不给 degree（序列化成显式 0 而不是缺字段），不能用 ??：
+    // 那会把 0 当成「真的没连边」，127 个节点全判成孤立点，走了
+    // 「无边图」分支——按提及数铺 100 个点、一条边都不画，搜索完就是一盘散沙。
+    // 0 视同没提供，回落到本地按返回边数出来的度（有边的图两者必然一致：
+    // degree 就是「在返回边集里的连接数」）
+    const degOf = (node: KgNode) => node.degree || deg.get(node.id) || 0
     const linked = nodes.filter((node) => degOf(node) > 0)
     // 有边的图一律藏孤独点：它们没有关系可看，铺开就是一层沙，看起来「很离散」。
     // 检索命中 / 当前选中除外，否则搜到一个没抽到边的实体会从画布上消失。
