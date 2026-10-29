@@ -592,7 +592,10 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
   const [pageCount, setPageCount] = useState(0)
   const [jumpInput, setJumpInput] = useState('')
   const [jumpBusy, setJumpBusy] = useState(false)
-  const [jumpHint, setJumpHint] = useState('')
+  // 跳页收进气泡里：点「跳页」弹出输入框，确定才跳（参照 popconfirm 交互）
+  const [jumpOpen, setJumpOpen] = useState(false)
+  // 跳不到目标页（超页数/无切片）时全局 toast，2.6s 自动消失
+  const [toast, setToast] = useState('')
   // 跳过去的那一片临时高亮，1.6s 后自动褪掉
   const [flashSeq, setFlashSeq] = useState<number | null>(null)
   // 已加载数组 / 布局偏移的最新值：跳页要补加载到目标位置，
@@ -600,6 +603,9 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
   const chunksRef = useRef<KbChunk[]>([])
   const offsetsRef = useRef<number[]>([])
   const flashTimerRef = useRef<number | null>(null)
+  const toastTimerRef = useRef<number | null>(null)
+  const jumpPopRef = useRef<HTMLDivElement | null>(null)
+  const jumpFieldRef = useRef<HTMLInputElement | null>(null)
   // ——— 虚拟滚动（变高）———
   const listRef = useRef<HTMLDivElement | null>(null)
   const [viewportH, setViewportH] = useState(600)
@@ -657,7 +663,8 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
     // 跳页状态跟着文件走：新文件的页码区间还不知道，先清空
     setPageCount(0)
     setJumpInput('')
-    setJumpHint('')
+    setJumpOpen(false)
+    setToast('')
     setFlashSeq(null)
     setSelectedId(next)
     // 编辑态跟着文件走：换文件时收起未保存的编辑框
@@ -953,6 +960,26 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
     place()
   }, [])
 
+  /** toast：跳页的失败/顺延提示，2.6s 自动消失（不打断滚动位置） */
+  const showToast = useCallback((msg: string) => {
+    setToast(msg)
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = window.setTimeout(() => setToast(''), 2600)
+  }, [])
+
+  // 气泡打开即聚焦输入框；点气泡外面收起（popconfirm 的标准行为）
+  useEffect(() => {
+    if (!jumpOpen) return
+    jumpFieldRef.current?.focus()
+    const onDown = (e: MouseEvent) => {
+      if (jumpPopRef.current && !jumpPopRef.current.contains(e.target as Node)) {
+        setJumpOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [jumpOpen])
+
   /** 「跳到第 N 页」：定位该页第一条切片，滚过去并短暂高亮 */
   const jumpToPage = useCallback(async () => {
     const fid = selectedId
@@ -960,37 +987,46 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
     const raw = jumpInput.trim()
     const page = Number(raw)
     if (!raw || !Number.isInteger(page) || page < 1) {
-      setJumpHint('输入页码，例如 12')
+      showToast('输入页码，例如 12')
       return
     }
     setJumpBusy(true)
-    setJumpHint('')
     try {
       const hit = await locateKbChunkPage(fid, page)
       if (selectedIdRef.current !== fid) return
       if (!hit.found || hit.index == null || hit.seq == null) {
-        setJumpHint(
+        showToast(
           hit.pageCount > 0
-            ? `这份文件只有 ${hit.pageCount} 页`
+            ? `没有找到第 ${page} 页，这份文件共 ${hit.pageCount} 页`
             : '这份文件没有页码信息',
         )
         return
       }
       // 该页没有切片（图片页/空白页），后端顺延到后一页，说清楚跳到哪了
       if (hit.page != null && hit.page !== page) {
-        setJumpHint(`第 ${page} 页没有切片，已跳到第 ${hit.page} 页`)
+        showToast(`第 ${page} 页没有切片，已跳到第 ${hit.page} 页`)
       }
       await ensureChunksLoadedTo(hit.index)
       scrollToChunkIndex(hit.index)
       setFlashSeq(hit.seq)
       if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current)
       flashTimerRef.current = window.setTimeout(() => setFlashSeq(null), 1600)
+      // 跳成功才收气泡；没跳成让用户改页码再试
+      setJumpOpen(false)
+      setJumpInput('')
     } catch (e) {
-      setJumpHint(e instanceof Error ? e.message : '跳转失败')
+      showToast(e instanceof Error ? e.message : '跳转失败')
     } finally {
       setJumpBusy(false)
     }
-  }, [ensureChunksLoadedTo, jumpBusy, jumpInput, scrollToChunkIndex, selectedId])
+  }, [
+    ensureChunksLoadedTo,
+    jumpBusy,
+    jumpInput,
+    scrollToChunkIndex,
+    selectedId,
+    showToast,
+  ])
 
   /** 点「第 N 页」打开原件对照：PDF 靠 #page=N 让浏览器阅读器直接翻过去 */
   const openOriginalAtPage = useCallback((file: KbFile, page: number) => {
@@ -1631,39 +1667,63 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                 {extBadge(selectedFile)}
                 {selectedFile.filename}
               </h2>
-              {/* 跳页：只在有页码的文件（PDF 类）出现。回车即跳，
-                  定位到该页第一条切片并高亮；按段切的文件没有页码，整块不渲染 */}
+              {/* 跳页：只在有页码的文件（PDF 类）出现。收进气泡——头部不该
+                  常驻一个输入框；气泡里输入页码，确定才跳，跳不到 toast */}
               {pageCount > 0 ? (
-                <div className="kb-jump">
-                  <input
-                    className="kb-jump-input"
-                    value={jumpInput}
-                    onChange={(e) => {
-                      setJumpInput(e.target.value.replace(/\D/g, '').slice(0, 5))
-                      setJumpHint('')
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') void jumpToPage()
-                    }}
-                    inputMode="numeric"
-                    placeholder="页"
-                    aria-label="跳到第几页"
-                    disabled={jumpBusy}
-                  />
-                  <span className="kb-jump-total">/ {pageCount}</span>
+                <div className="kb-jump" ref={jumpPopRef}>
                   <button
                     type="button"
-                    className="kb-jump-go"
-                    onClick={() => void jumpToPage()}
-                    disabled={jumpBusy || !jumpInput.trim()}
+                    className={`kb-jump-btn${jumpOpen ? ' is-open' : ''}`}
+                    onClick={() => setJumpOpen((o) => !o)}
+                    aria-expanded={jumpOpen}
+                    aria-haspopup="dialog"
                   >
-                    {jumpBusy ? '定位中' : '跳转'}
+                    跳页
                   </button>
+                  {jumpOpen ? (
+                    <div className="kb-jump-pop" role="dialog" aria-label="跳到第几页">
+                      <div className="kb-jump-row">
+                        <input
+                          ref={jumpFieldRef}
+                          className="kb-jump-input"
+                          value={jumpInput}
+                          onChange={(e) =>
+                            setJumpInput(e.target.value.replace(/\D/g, '').slice(0, 5))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') void jumpToPage()
+                            if (e.key === 'Escape') setJumpOpen(false)
+                          }}
+                          inputMode="numeric"
+                          placeholder={`1-${pageCount}`}
+                          aria-label="跳到第几页"
+                          disabled={jumpBusy}
+                        />
+                        <span className="kb-jump-total">/ {pageCount} 页</span>
+                      </div>
+                      <div className="kb-jump-actions">
+                        <button
+                          type="button"
+                          className="kb-jump-cancel"
+                          onClick={() => setJumpOpen(false)}
+                          disabled={jumpBusy}
+                        >
+                          取消
+                        </button>
+                        <button
+                          type="button"
+                          className="kb-jump-ok"
+                          onClick={() => void jumpToPage()}
+                          disabled={jumpBusy || !jumpInput.trim()}
+                        >
+                          {jumpBusy ? '定位中' : '确定'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </header>
-
-            {jumpHint ? <p className="kb-jump-hint">{jumpHint}</p> : null}
 
             {editError ? <p className="kb-error">{editError}</p> : null}
 
@@ -1952,6 +2012,13 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
           onCancel={() => setRebuildTarget(null)}
           onSubmit={(config) => void submitRebuild(config)}
         />
+      ) : null}
+
+      {/* 跳页等操作的轻提示：fixed 不随滚动，2.6s 自动消失 */}
+      {toast ? (
+        <div className="kb-toast" role="status">
+          {toast}
+        </div>
       ) : null}
     </div>
   )
