@@ -356,21 +356,34 @@
 
 /* 选中态标题不变蓝（竖条 + 淡蓝描边已足够，三层叠加看着像报错行） */
 
+/* 一行 = 「格式徽标 | 标题 + 元信息」，两列并排：
+   元信息落在标题那一列的里头，片数/大小因此与文件名首字左对齐，
+   不会退到徽标左边缘形成第二套缩进 */
 .kb-name {
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: 5px;
   font-size: 13px;
   font-weight: 500;
   color: #222;
   min-width: 0;
-  /* 右侧给 hover 操作按钮兜底：按钮浮层会盖住标题右端 */
-  padding-right: 24px;
 }
 
-/* 有重建按钮时右侧浮层两个按钮，相应多留一点 */
-.kb-item.has-act .kb-name {
-  padding-right: 48px;
+/* 标题与元信息同列；右侧给 hover 操作按钮兜底（浮层会盖住右端） */
+.kb-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+  /* 只给按钮浮层留一点余量（≈6px 会落进浮层底下，被它的行底色盖住）：
+     留满整个浮层宽度（48px）会把标题挤早换行，一条长名字白占一行 */
+  padding-right: 20px;
+}
+
+/* 有重建按钮时右侧浮层两个按钮，再多留一档 */
+.kb-item.has-act .kb-body {
+  padding-right: 32px;
 }
 
 /* 文件名最多两行，超出省略（完整名见 title 悬浮提示） */
@@ -383,30 +396,63 @@
   line-height: 1.45;
 }
 
-/* ——— 文件类型徽标 ———
-   只做「这是什么文件」的提示，统一中性灰；红/蓝这类信号色留给异常与操作状态，
-   否则每行都带一块彩色，格式标签反而成了视觉主角 */
+/* ——— 文件类型徽标：按扩展名着色 ———
+   列表里它是唯一的类型标识，靠颜色一眼分 PDF / 文档 / 表格 / 数据，
+   和标题、元信息一起构成三档明度：彩色徽标 → 黑字标题 → 灰字元信息 */
 .kb-ext {
-  padding: 1px 5px;
+  /* 固定宽度 + 居中：三字符（PDF/DOC/XLS/CSV/TXT）与两字符（MD）
+     同宽，否则每行标题与片数的起点差 3~6px，整列看着是锯齿 */
+  width: 30px;
+  padding: 1px 0;
   border-radius: 4px;
   font-size: 10px;
   font-weight: 600;
   line-height: 1.5;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
+  text-align: center;
   flex-shrink: 0;
+  /* 与标题首行的字身对齐（徽标行高比 13px 字小，下沉 1px 才平齐） */
+  margin-top: 1px;
+}
+
+.kb-ext.ext-pdf {
+  background: #fdeaea;
+  color: #cf3f3f;
+}
+
+.kb-ext.ext-doc {
+  background: #e8effd;
+  color: #2f6bdb;
+}
+
+.kb-ext.ext-xls {
+  background: #e6f5ee;
+  color: #158357;
+}
+
+.kb-ext.ext-csv {
+  background: #f1eafd;
+  color: #7a4bd6;
+}
+
+.kb-ext.ext-txt {
   background: #f1f3f6;
-  color: #6b7280;
+  color: #5b6472;
 }
 
 /* 元信息行：两级信息合一行，靠字重和明度分主次，不再每个都一个颜色 */
 .kb-meta {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 5px;
   color: #8a8f98;
   font-size: 11px;
   overflow: hidden;
   white-space: nowrap;
+  /* 只占内容宽：处理中/失败的文案紧跟在大小后面，
+     不会被 margin-left:auto 甩到行尾去撞操作按钮 */
+  align-self: flex-start;
+  max-width: 100%;
 }
 
 /* 文档类型标签删除：分组标题已经说了，每行再挂一个纯属重复，
@@ -434,12 +480,12 @@
   color: #ccd0d8;
 }
 
-/* 行尾状态：就绪不显示（每行一个绿点等于没信息），只有处理中/失败才亮 */
+/* 状态：就绪不显示（每行一个绿点等于没信息），只有处理中/失败才亮，
+   紧跟在「片数 · 大小」后面，不再推到行尾（行尾被 hover 操作按钮占了） */
 .kb-state {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: auto;
   padding-left: 4px;
   font-size: 10.5px;
   flex-shrink: 0;
@@ -587,7 +633,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 5px;
+  /* 已经在 .kb-body 的 column gap 里，留 1px 微调即可 */
+  margin-top: 1px;
 }
 
 .kb-tag {
@@ -1066,6 +1113,8 @@
 
 /* 标题里的类型标签：文件名已去掉后缀，标签是唯一的类型标识，比列表徽标大一档 */
 .kb-chunks-title .kb-ext {
+  /* 标题栏这里按文字自然宽度，不用列表里那个定宽对齐的框 */
+  width: auto;
   margin-right: 7px;
   padding: 2px 7px;
   border-radius: 5px;

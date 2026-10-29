@@ -137,27 +137,27 @@ function chunkPos(chunk: KbChunk): string {
   return chunk.page != null ? `第${chunk.page}页` : `第${chunk.seq + 1}段`
 }
 
-// 扩展名 → 展示名。格式标签统一中性灰，不按类型上色：
-// 它只是「这是什么文件」的提示，红色要留给异常/警告状态
-const EXT_LABEL: Record<string, string> = {
-  pdf: 'PDF',
-  docx: 'DOC',
-  doc: 'DOC',
-  xlsx: 'XLS',
-  xlsm: 'XLS',
-  csv: 'CSV',
-  md: 'MD',
-  markdown: 'MD',
-  txt: 'TXT',
+// 扩展名 → 展示名 + 配色。格式标签要一眼能认出类型（PDF 红 / 文档蓝 /
+// 表格绿 / 数据紫），列表里它是唯一的类型标识，弱化成灰就失去作用了
+const EXT_STYLE: Record<string, { label: string; cls: string }> = {
+  pdf: { label: 'PDF', cls: 'ext-pdf' },
+  docx: { label: 'DOC', cls: 'ext-doc' },
+  doc: { label: 'DOC', cls: 'ext-doc' },
+  xlsx: { label: 'XLS', cls: 'ext-xls' },
+  xlsm: { label: 'XLS', cls: 'ext-xls' },
+  csv: { label: 'CSV', cls: 'ext-csv' },
+  md: { label: 'MD', cls: 'ext-txt' },
+  markdown: { label: 'MD', cls: 'ext-txt' },
+  txt: { label: 'TXT', cls: 'ext-txt' },
 }
 
 function extBadge(file: KbFile) {
   // 类型后缀优先取 mime（后端单独存，filename 已是纯名），mime 缺失时回退从 filename 切
   const raw = file.mime ?? file.filename.slice(file.filename.lastIndexOf('.') + 1)
   const ext = raw.replace(/^\./, '').toLowerCase()
-  const label = EXT_LABEL[ext]
-  if (!label) return null
-  return <span className="kb-ext">{label}</span>
+  const style = EXT_STYLE[ext]
+  if (!style) return null
+  return <span className={`kb-ext ${style.cls}`}>{style.label}</span>
 }
 
 // ——— 切片虚拟滚动（变高卡片）———
@@ -273,36 +273,40 @@ function KbFileRow({
           }
         >
           {extBadge(item)}
-          <span className="kb-name-text">{item.filename}</span>
-        </span>
-        {/* 元信息一级就是结论：片数（决定图谱规模与重建耗时）用近黑加粗，
-            文件大小只作参照，浅灰。文档类型标签删掉——分组标题已经说了 */}
-        <span className="kb-meta">
-          <span className="kb-slices" title="切片数">
-            {item.chunk_count} 片
-          </span>
-          <span className="kb-size">{formatSize(item.size_bytes)}</span>
-          {item.status === 'failed' ? (
-            <span className="kb-state is-failed" title={item.error || '处理失败'}>
-              <WarningIcon />
-              {STATUS_LABEL.failed}
-            </span>
-          ) : item.status === 'ready' ? null : (
-            <span className="kb-state is-busy">
-              <span className="kb-gspinner" aria-hidden="true" />
-              {STATUS_LABEL[item.status]}
-            </span>
-          )}
-        </span>
-        {item.tags && item.tags.length > 0 ? (
-          <span className="kb-tags">
-            {item.tags.map((t) => (
-              <span key={t} className="kb-tag">
-                {t}
+          {/* 标题与元信息放在同一列里：片数/大小左对齐到文件名首字，
+              而不是退到格式标签的左边缘（那样看着像两套缩进） */}
+          <span className="kb-body">
+            <span className="kb-name-text">{item.filename}</span>
+            {/* 元信息一级就是结论：片数（决定图谱规模与重建耗时）用近黑加粗，
+                文件大小只作参照，浅灰。文档类型标签删掉——分组标题已经说了 */}
+            <span className="kb-meta">
+              <span className="kb-slices" title="切片数">
+                {item.chunk_count} 片
               </span>
-            ))}
+              <span className="kb-size">{formatSize(item.size_bytes)}</span>
+              {item.status === 'failed' ? (
+                <span className="kb-state is-failed" title={item.error || '处理失败'}>
+                  <WarningIcon />
+                  {STATUS_LABEL.failed}
+                </span>
+              ) : item.status === 'ready' ? null : (
+                <span className="kb-state is-busy">
+                  <span className="kb-gspinner" aria-hidden="true" />
+                  {STATUS_LABEL[item.status]}
+                </span>
+              )}
+            </span>
+            {item.tags && item.tags.length > 0 ? (
+              <span className="kb-tags">
+                {item.tags.map((t) => (
+                  <span key={t} className="kb-tag">
+                    {t}
+                  </span>
+                ))}
+              </span>
+            ) : null}
           </span>
-        ) : null}
+        </span>
       </div>
       <div className={`kb-item-side${menuOpen ? ' menu-open' : ''}`}>
         {/* 重建：hover 才露出的图标按钮，点了弹构建配置弹窗 */}
