@@ -1088,8 +1088,9 @@
 .kb-chunks-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  /* 靠左排：跳页跟在文件名后面，不推到最右 */
+  justify-content: flex-start;
+  gap: 10px;
   padding-right: 24px;
   flex-shrink: 0;
   height: 30px;
@@ -1100,14 +1101,17 @@
 .kb-jump {
   position: relative;
   flex-shrink: 0;
-  margin-left: auto;
 }
 
+/* 跳页入口：轻量描边按钮，hover/展开变主色 */
 .kb-jump-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   height: 24px;
   padding: 0 9px;
   border: 1px solid #e4e7ee;
-  border-radius: 6px;
+  border-radius: 7px;
   background: #fff;
   color: #5b6472;
   font: inherit;
@@ -1116,11 +1120,27 @@
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.kb-jump-btn:hover,
+.kb-jump-btn:hover {
+  border-color: #bcd0ff;
+  background: #f5f8ff;
+  color: #4d6bfe;
+}
+
+/* 展开态比 hover 再深一档，气泡开着时能看出锚点在哪 */
 .kb-jump-btn.is-open {
   border-color: #b9c8ff;
-  background: #f0f3ff;
+  background: #eef3ff;
   color: #4d6bfe;
+  box-shadow: 0 0 0 3px rgba(77, 107, 254, 0.08);
+}
+
+.kb-jump-btn:focus-visible {
+  outline: 2px solid #c9d4ff;
+  outline-offset: 1px;
+}
+
+.kb-jump-btn svg {
+  flex-shrink: 0;
 }
 
 /* popconfirm 式气泡：白底、投影、上缘小箭头，锚在按钮下方右侧 */
@@ -1199,8 +1219,9 @@
 .kb-jump-total {
   flex-shrink: 0;
   color: #9aa0a6;
-  font-size: 11px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
+  margin-left: auto;
 }
 
 .kb-jump-actions {
@@ -1286,7 +1307,8 @@
 .kb-chunks-title {
   margin: 0;
   min-width: 0;
-  flex: 1;
+  /* 按内容宽度占位（flex:1 会把跳页按钮顶到最右），太长才收缩出省略号 */
+  flex: 0 1 auto;
   font-size: 14px;
   font-weight: 600;
   color: #222;

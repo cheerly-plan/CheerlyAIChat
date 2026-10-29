@@ -149,6 +149,26 @@ function chunkPos(chunk: KbChunk, isPdf = false): string {
   return page != null ? span : `第${chunk.seq + 1}段`
 }
 
+/** 跳页入口的图标：12px，跟旁边的标题字号配 */
+function JumpIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="12"
+      height="12"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 12h14" />
+      <path d="M13 6l6 6-6 6" />
+    </svg>
+  )
+}
+
 /** 位置标注里的数字单独一段：两侧留白大一点，扫读时页码更跳出来 */
 function PageLabel({ label }: { label: string }) {
   // 形如 第12页 / 第134–135页 / 表3 / 第12页图表 / 第5段
@@ -1678,11 +1698,13 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                     aria-expanded={jumpOpen}
                     aria-haspopup="dialog"
                   >
-                    跳页
+                    <JumpIcon />
+                    跳转
                   </button>
                   {jumpOpen ? (
                     <div className="kb-jump-pop" role="dialog" aria-label="跳到第几页">
-                      <div className="kb-jump-row">
+                      <div className="kb-jump-row kb-jump-total">
+                        立即跳转到第
                         <input
                           ref={jumpFieldRef}
                           className="kb-jump-input"
@@ -1699,7 +1721,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                           aria-label="跳到第几页"
                           disabled={jumpBusy}
                         />
-                        <span className="kb-jump-total">/ {pageCount} 页</span>
+                         页
                       </div>
                       <div className="kb-jump-actions">
                         <button
