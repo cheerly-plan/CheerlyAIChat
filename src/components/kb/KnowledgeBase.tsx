@@ -25,8 +25,8 @@ import {
   WarningIcon,
 } from '../chat/icons'
 import { ConfirmDialog } from '../common/ConfirmDialog'
-import { KgBuildDialog } from './KgBuildDialog'
 import KbGraphPanel from './KbGraphPanel'
+import { KgBuildDialog } from './KgBuildDialog'
 import { RenameDialog } from './RenameDialog'
 import { TagDialog } from './TagDialog'
 import './kb.css'
@@ -182,10 +182,7 @@ type KbFileRowProps = {
   item: KbFile
   isSelected: boolean
   canManage: boolean
-  /** 图谱正在构建时重建按钮不可用 */
-  graphBuilding: boolean
   onToggle: (item: KbFile) => void
-  onRebuild: (item: KbFile) => void
   onDownload: (item: KbFile) => void
   onTagEdit: (item: KbFile) => void
   onRename: (item: KbFile) => void
@@ -196,9 +193,7 @@ function KbFileRow({
   item,
   isSelected,
   canManage,
-  graphBuilding,
   onToggle,
-  onRebuild,
   onDownload,
   onTagEdit,
   onRename,
@@ -237,15 +232,9 @@ function KbFileRow({
   const hasTagEdit = canManage
   const hasRename = canManage && item.status === 'ready'
   const hasDelete = canManage
-  // 重建是图谱动作，文件还没处理完就没得建
-  const hasRebuild = canManage && item.status === 'ready' && !graphBuilding
 
   return (
-    <li
-      className={`kb-item kb-${item.status}${isSelected ? ' kb-selected' : ''}${
-        hasRebuild ? ' has-act' : ''
-      }`}
-    >
+    <li className={`kb-item kb-${item.status}${isSelected ? ' kb-selected' : ''}`}>
       {/* 选中态：左侧 3px 主色竖条 + 极浅蓝底，克制一点，
           不再整块深蓝把整行压住（那样看着像弹窗遮罩而不是选中） */}
       {isSelected ? <span className="kb-item-bar" aria-hidden="true" /> : null}
@@ -308,19 +297,9 @@ function KbFileRow({
           </span>
         </span>
       </div>
+      {/* 只剩「更多」一个按钮：图谱的重建属于图谱 tab（那边有配置弹窗，
+          也能看清当前是哪种图），文件 tab 里再放一个重建图标属于重复入口 */}
       <div className={`kb-item-side${menuOpen ? ' menu-open' : ''}`}>
-        {/* 重建：hover 才露出的图标按钮，点了弹构建配置弹窗 */}
-        {hasRebuild ? (
-          <button
-            type="button"
-            className="kb-item-act"
-            onClick={() => onRebuild(item)}
-            aria-label={`重建图谱 · ${item.filename}`}
-            title="重建图谱"
-          >
-            <GraphRefreshIcon />
-          </button>
-        ) : null}
         <button
           type="button"
           ref={moreRef}
@@ -450,7 +429,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
       setDocTypes(data.types)
     })
   }, [canManage])
-  // 非空 = 打开该文件的重建弹窗；提交成功后 graphEpoch +1 强制面板重挂载
+  // 非空 = 打开该文件的重建弹窗（图谱 tab 的「构建/重建」走这里）
   const [rebuildTarget, setRebuildTarget] = useState<KbFile | null>(null)
   const [rebuilding, setRebuilding] = useState(false)
   const [rebuildError, setRebuildError] = useState('')
@@ -804,7 +783,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
   }, [])
 
   /**
-   * 列表行 hover 重建：配置随这次重建一次提交（与面板内弹窗同一套语义），
+   * 图谱 tab 的「构建/重建」：配置随这次构建一次提交（与面板内弹窗同一套语义），
    * 不留「先存配置」的中间态。成功后重拉列表并把 graphEpoch +1，
    * 让右侧面板重挂载拉到新图。
    */
@@ -1129,9 +1108,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                                   item={item}
                                   isSelected={item.file_id === selectedId}
                                   canManage={canManage}
-                                  graphBuilding={item.graph_status === 'building'}
                                   onToggle={toggleSelect}
-                                  onRebuild={setRebuildTarget}
                                   onDownload={(f) => void onDownload(f)}
                                   onTagEdit={startTagEdit}
                                   onRename={(f) => {
@@ -1640,7 +1617,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
         />
       ) : null}
 
-      {/* 列表行 hover 重建的弹窗：挂在页面级，与面板内弹窗同一套语义 */}
+      {/* 图谱 tab 行内「构建/重建」的配置弹窗：挂在页面级 */}
       {rebuildTarget ? (
         <KgBuildDialog
           filename={rebuildTarget.filename}

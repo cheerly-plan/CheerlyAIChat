@@ -384,11 +384,6 @@
   padding-right: 20px;
 }
 
-/* 有重建按钮时右侧浮层两个按钮，按浮层实际宽度留满 */
-.kb-item.has-act .kb-row-body {
-  padding-right: 46px;
-}
-
 /* 文件名只占一行，超出加省略号（完整名见 title 悬浮提示）。
    两行截断会让同一列表里行高忽高忽低，扫视时眼睛一直在跳；
    单行 + 省略号让每条等高，也更好比较片数 */
@@ -569,33 +564,6 @@
 
 /* 选中行的蓝按钮变体一并删掉：它们当初是为配蓝色底做的微调，
    底色没了，按钮保持同一套中性灰/主色即可 */
-
-/* 重建图谱：与「更多」同款圆形图标按钮，只换主色。
-   图标按钮比文字按钮弱，hover 才出现，高危操作不常驻吸注意力 */
-.kb-item-side .kb-item-act {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: #dce4fe;
-  color: #4d6bfe;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.kb-item-side .kb-item-act svg {
-  width: 13px;
-  height: 13px;
-}
-
-.kb-item-side .kb-item-act:hover {
-  background: #c6d4ff;
-  color: #3b56d9;
-}
 
 /* 更多菜单：与会话列表 history-menu 同款紧凑风格，纯文字 */
 .kb-item-menu {
