@@ -1248,6 +1248,65 @@
   color: #b45309;
 }
 
+.msg-source-body {
+  max-height: 280px;
+  overflow: auto;
+  padding: 8px 10px 10px;
+}
+
+.msg-source-body .kb-chunk-p {
+  text-indent: 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.msg-source-body .kb-chunk-table-wrap {
+  overflow-x: auto;
+  margin: 0;
+  border: 1px solid #e6e9ef;
+  border-radius: 8px;
+}
+
+.msg-source-body .kb-chunk-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.msg-source-body .kb-chunk-table th,
+.msg-source-body .kb-chunk-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid #eef0f3;
+  border-right: 1px solid #eef0f3;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.msg-source-body .kb-chunk-table th:last-child,
+.msg-source-body .kb-chunk-table td:last-child {
+  border-right: none;
+}
+
+.msg-source-body .kb-chunk-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f7f8fa;
+  color: #4a5160;
+  font-weight: 600;
+}
+
+.msg-source-body .kb-chunk-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.msg-source-body .kb-chunk-table td.is-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* 章节名：比页码长，给上限并省略；卡片里只放位置，章节放这里 */
 .msg-source-section {
   max-width: 60%;

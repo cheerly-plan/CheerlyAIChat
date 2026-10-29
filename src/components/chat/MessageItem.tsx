@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ChatMessage, ChatSource, TraceStep } from '../../types'
+import { ChunkContent } from '../kb/ChunkContent'
 import { CheckIcon, CopyIcon, EditIcon, RefreshIcon } from './icons'
 import { Markdown } from './Markdown'
 
@@ -337,13 +338,13 @@ function SourceList({ sources }: { sources: ChatSource[] }) {
               key={source.key}
               type="button"
               className={`msg-source${open ? ' is-open' : ''}`}
-              title={[source.filename, source.where, source.section].filter(Boolean).join(' · ')}
+              title={[source.filename, sourceWhere(source), source.section].filter(Boolean).join(' · ')}
               aria-expanded={open}
               onClick={() => setOpenKey(open ? null : source.key)}
             >
               <span className="msg-source-idx">{index + 1}</span>
               <span className="msg-source-name">{source.filename}</span>
-              <span className="msg-source-where">{source.where}</span>
+              <span className="msg-source-where">{sourceWhere(source)}</span>
             </button>
           )
         })}
@@ -366,11 +367,31 @@ function SourceList({ sources }: { sources: ChatSource[] }) {
               </span>
             ) : null}
           </div>
-          <pre className="msg-source-text"><span className="msg-source-text-inner">{active.excerpt}</span></pre>
+          {active.kind === 'table' ? (
+            <div className="msg-source-body">
+              <ChunkContent text={active.excerpt} />
+            </div>
+          ) : (
+            <pre className="msg-source-text">
+              <span className="msg-source-text-inner">{active.excerpt}</span>
+            </pre>
+          )}
         </div>
       ) : null}
     </div>
   )
+}
+
+/** PDF/Word 表格落在页上；旧引用把页码写成了「表43」，这里按页码显示。Excel 仍用表号。 */
+function sourceWhere(source: ChatSource): string {
+  if (source.kind !== 'table') return source.where
+  const name = (source.filename || '').toLowerCase()
+  if (/\.(xlsx|xlsm|xls|csv)$/.test(name)) return source.where
+  const start = source.page_start ?? source.page
+  const end = source.page_end ?? source.page
+  if (start == null) return source.where || '表格'
+  if (end != null && end !== start) return `第${start}–${end}页`
+  return `第${start}页`
 }
 
 /** 切片是否跨页：页码区间不一致即跨页（老数据没有 page_end，视为单页） */
