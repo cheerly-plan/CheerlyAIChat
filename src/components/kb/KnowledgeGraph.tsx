@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import {
   fetchKgEntityChunks,
@@ -113,6 +113,9 @@ type Sim = {
 
 // 画布底部要留出图例/提示的高度，否则节点会被压在图例下面或被画布边缘切掉
 const BOTTOM_PAD = 34
+/** 节点（含下方标签）离画布边的最小空隙，避免贴边被裁字 */
+const EDGE_PAD_X = 52
+const EDGE_PAD_TOP = 36
 
 /**
  * 节点分量：提及次数是显式权重，关系条数代表它在图里的枢纽程度 ——
@@ -120,6 +123,96 @@ const BOTTOM_PAD = 34
  */
 function weightOf(node: KgNode, degree: number): number {
   return (node.mentions || 1) + 2.2 * degree
+}
+
+/**
+ * 无边实体看板：按类型分块网格（small multiples）。
+ *
+ * 没有关系时力导向没有结构可表达，金螺线摊开像噪声、收成一团又像出错。
+ * 企业图谱在这种「只有实体清单」的场景用类型泳道/分块网格：可扫读、可对照图例，
+ * 整块居中，四周留白，不拉伸去填满画布。
+ */
+const GRID_CELL_W = 108
+const GRID_CELL_H = 60
+const GRID_GAP_X = 40
+const GRID_GAP_Y = 36
+const GRID_PAD = 32
+
+function placeTypeGrid(simNodes: SimNode[], width: number, height: number) {
+  const usableH = height - BOTTOM_PAD
+  const innerW = Math.max(GRID_CELL_W, width - GRID_PAD * 2)
+
+  const buckets = new Map<KgEntityType, SimNode[]>()
+  for (const node of simNodes) {
+    const type = TYPE_META[node.type] ? node.type : 'other'
+    const list = buckets.get(type)
+    if (list) list.push(node)
+    else buckets.set(type, [node])
+  }
+  for (const list of buckets.values()) {
+    list.sort((a, b) => b.mentions - a.mentions || a.name.localeCompare(b.name, 'zh'))
+  }
+
+  type Block = {
+    nodes: SimNode[]
+    cols: number
+    w: number
+    h: number
+    x: number
+    y: number
+  }
+  const blocks: Block[] = []
+  const maxCols = Math.max(1, Math.floor(innerW / GRID_CELL_W))
+  for (const key of Object.keys(TYPE_META) as KgEntityType[]) {
+    const list = buckets.get(key)
+    if (!list?.length) continue
+    const cols = Math.min(maxCols, Math.max(1, Math.ceil(Math.sqrt(list.length))))
+    const rows = Math.ceil(list.length / cols)
+    blocks.push({
+      nodes: list,
+      cols,
+      w: cols * GRID_CELL_W,
+      h: rows * GRID_CELL_H,
+      x: 0,
+      y: 0,
+    })
+  }
+
+  let cursorX = 0
+  let cursorY = 0
+  let rowH = 0
+  for (const block of blocks) {
+    if (cursorX > 0 && cursorX + block.w > innerW) {
+      cursorX = 0
+      cursorY += rowH + GRID_GAP_Y
+      rowH = 0
+    }
+    block.x = cursorX
+    block.y = cursorY
+    cursorX += block.w + GRID_GAP_X
+    rowH = Math.max(rowH, block.h)
+  }
+  const totalW = blocks.reduce((w, b) => Math.max(w, b.x + b.w), 0)
+  const totalH = cursorY + rowH
+  const ox = Math.max(GRID_PAD, (width - totalW) / 2)
+  const oy = Math.max(GRID_PAD, (usableH - totalH) / 2)
+  const cx = width / 2
+  const cy = usableH / 2
+  const maxR = Math.max(1, Math.min(width, usableH) / 2)
+
+  for (const block of blocks) {
+    const gx = ox + block.x
+    const gy = oy + block.y
+    block.nodes.forEach((node, i) => {
+      const col = i % block.cols
+      const row = Math.floor(i / block.cols)
+      node.x = gx + (col + 0.5) * GRID_CELL_W
+      node.y = gy + (row + 0.5) * GRID_CELL_H
+      node.vx = 0
+      node.vy = 0
+      node.laneR = Math.min(1.2, Math.hypot(node.x - cx, node.y - cy) / maxR)
+    })
+  }
 }
 
 function buildSim(
@@ -230,15 +323,74 @@ function buildSim(
   // 不能按冷启动全量迭代 —— 那等于整张图重新洗牌，看起来就是「闪一下」
   const reused = nodes.length > 0 && (carry?.size ?? 0) >= Math.floor(nodes.length * 0.5)
   if (reused) sim.alpha = 0.5
-  // 预热按「斥力配对次数」封顶，而不是按步数。每步 naive 是 O(n²)，
-  // 400 个点跑 150 步 ≈ 1200 万次计算，开屏会卡死主线程。
-  // 20 万次 ≈ 60 点 × 110 步，或 400 点只跑几步，首屏先出来，余下交给动画。
+  // 没有边：不走力导向。按类型分块网格排，结构来自类型而不是假关系。
+  if (simLinks.length === 0) {
+    placeTypeGrid(simNodes, width, height)
+    sim.alpha = 0
+    return sim
+  }
+  // 预热按「斥力配对次数」封顶。有边的图要给够步数让弹簧把团收拢，
+  // 否则冻在金螺线上会又稀又散；步数仍按点数缩放，避免 400 点卡死开屏。
   const pairs = Math.max(1, (nodes.length * Math.max(0, nodes.length - 1)) / 2)
   const warmup = reused
     ? Math.min(40, Math.max(4, Math.round(80_000 / pairs)))
-    : Math.min(WARMUP_STEPS, Math.max(8, Math.round(200_000 / pairs)))
+    : Math.min(WARMUP_STEPS, Math.max(90, Math.round(600_000 / pairs)))
   for (let i = 0; i < warmup; i += 1) stepSim(sim)
+  insetOverflowNodes(sim)
+  if (!reused) {
+    // 开屏后不再继续迭代：预热已经定型，再跑几帧离散点会明显跳一下
+    sim.alpha = 0
+    for (const node of sim.nodes) {
+      node.vx = 0
+      node.vy = 0
+    }
+  }
   return sim
+}
+
+/**
+ * 只把越出画布内边距的点沿半径收回来，中间的团不动。
+ * 整图按包围盒缩小会把所有实体挤到中心，看起来像一团。
+ */
+function insetOverflowNodes(sim: Sim) {
+  const cx = sim.width / 2
+  const cy = (sim.height - BOTTOM_PAD) / 2
+  const maxRx = Math.max(1, cx - EDGE_PAD_X)
+  const maxRy = Math.max(1, cy - EDGE_PAD_TOP)
+  for (const node of sim.nodes) {
+    const u = (node.x - cx) / maxRx
+    const v = (node.y - cy) / maxRy
+    const d = Math.hypot(u, v)
+    if (d <= 1) continue
+    node.x = cx + (node.x - cx) / d
+    node.y = cy + (node.y - cy) / d
+    node.vx = 0
+    node.vy = 0
+  }
+}
+
+/** 画布尺寸变了：按比例挪点，不要重新力导向（那会整图跳到另一套布局）。 */
+function scaleSim(sim: Sim, width: number, height: number) {
+  const usableOld = sim.height - BOTTOM_PAD
+  const usableNew = height - BOTTOM_PAD
+  const sx = sim.width > 0 ? width / sim.width : 1
+  const sy = usableOld > 0 ? usableNew / usableOld : 1
+  if (!Number.isFinite(sx) || !Number.isFinite(sy) || sx <= 0 || sy <= 0) {
+    sim.width = width
+    sim.height = height
+    return
+  }
+  for (const node of sim.nodes) {
+    node.x *= sx
+    node.y *= sy
+    node.vx = 0
+    node.vy = 0
+  }
+  sim.width = width
+  sim.height = height
+  sim.rx *= sx
+  sim.ry *= sy
+  if (sim.links.length > 0) insetOverflowNodes(sim)
 }
 
 /** 一对节点的斥力。完全重合时用下标错开，避免随机数让每次布局都不一样。 */
@@ -387,6 +539,8 @@ type Props = {
   onSelect?: (node: KgNode | null) => void
   /** 配色口径：按实体类型（默认）或按社区（簇视图） */
   colorMode?: 'type' | 'community'
+  /** 簇视图下聚焦的社区 id；null = 全部簇。不按枢纽 100 点裁，按社区取点 */
+  focusCommunity?: number | null
   emptyTitle: string
   emptyHint: string
   emptyAction?: { label: string; onClick: () => void }
@@ -408,6 +562,7 @@ export default function KnowledgeGraph({
   selectedId = null,
   onSelect,
   colorMode = 'type',
+  focusCommunity = null,
   emptyTitle,
   emptyHint,
   emptyAction,
@@ -427,6 +582,14 @@ export default function KnowledgeGraph({
   // 上一次渲染用的源数据（注意不是显示集）：只有源数据变了才值得重置视图
   const lastDataRef = useRef<{ nodes: KgNode[]; edges: KgEdge[] } | null>(null)
   const nodeElsRef = useRef(new Map<string, SVGGElement>())
+  /**
+   * 上一帧写进 DOM 的坐标。
+   *
+   * 画布上几百个点时，每帧无脑重写所有 transform/line 属性是最重的一环
+   * （600 点 + 900 边 ≈ 每帧 5600 次属性写）。收敛后绝大多数点一帧只动
+   * 零点几像素，肉眼无差别，直接跳过能省掉绝大部分开销。
+   */
+  const paintedRef = useRef(new Map<string, { x: number; y: number }>())
   // 建图 effect 不依赖 colorMode（切配色不该重排力导向），用 ref 读最新值
   const colorModeRef = useRef(colorMode)
   useEffect(() => {
@@ -472,31 +635,96 @@ export default function KnowledgeGraph({
   /**
    * 实际渲染的节点/边。
    *
-   * prune 关闭 = 全量。prune 开启 = 枢纽图：
-   *   孤独点（degree 0）没有边，画出来只是一个孤零零的名字，没有信息量；
-   *   有连接的节点按「提及 + 度数」挑前 HUB_CAP 个，文件多了图也不会铺满；
-   *   选中节点的一跳邻居按权重补进来（最多 NEIGHBOR_CAP 个）—— 这就是
-   *   「点击下钻」，点谁展开谁的周边，取消选中收回去，交互没有多出任何按钮。
+   * prune 关闭 = 全量。prune 开启分两种口径：
+   *   按类型 = 枢纽图：有连接的节点按「提及 + 度数」挑前 HUB_CAP 个；
+   *   按簇 = 按社区取点，不能复用枢纽 100：枢纽切出来的是另一套子集，
+   *     簇列表/着色会变成「这 100 个点里谁算哪簇」，真正的业务板块看不见。
+   *   点节点仍下钻一跳邻居（最多 NEIGHBOR_CAP）。
    * 全集都被裁空（所有实体都没抽到关系）时仍截前 HUB_CAP，避免开天窗的同时卡死开屏。
    */
   const display = useMemo(() => {
-    if (!prune) return { nodes, edges }
     const deg = new Map<string, number>()
     for (const edge of edges) {
       deg.set(edge.source, (deg.get(edge.source) ?? 0) + 1)
       deg.set(edge.target, (deg.get(edge.target) ?? 0) + 1)
     }
     const degOf = (node: KgNode) => node.degree ?? deg.get(node.id) ?? 0
-    const keep = new Set<string>()
-    const linked = nodes
-      .filter((node) => degOf(node) > 0)
-      .sort(
+    const linked = nodes.filter((node) => degOf(node) > 0)
+    // 有边的图一律藏孤独点：它们没有关系可看，铺开就是一层沙，看起来「很离散」。
+    // 检索命中 / 当前选中除外，否则搜到一个没抽到边的实体会从画布上消失。
+    const pinned = new Set(hitIds)
+    if (activeNodeId) pinned.add(activeNodeId)
+
+    if (linked.length === 0) {
+      const rankedIso = [...nodes].sort(
+        (a, b) =>
+          (b.mentions || 0) - (a.mentions || 0) || a.name.localeCompare(b.name, 'zh'),
+      )
+      return {
+        nodes: rankedIso.length > HUB_CAP ? rankedIso.slice(0, HUB_CAP) : rankedIso,
+        edges: [] as KgEdge[],
+      }
+    }
+
+    const rankNodes = (list: KgNode[]) =>
+      [...list].sort(
         (a, b) =>
           weightOf(b, degOf(b)) - weightOf(a, degOf(a)) || a.id.localeCompare(b.id),
       )
-    for (const node of linked.slice(0, HUB_CAP)) keep.add(node.id)
-    if (activeNodeId) {
-      keep.add(activeNodeId)
+
+    const keep = new Set<string>(pinned)
+    const commOf = (node: KgNode) => node.community ?? 0
+    const clusterMode = prune && colorMode === 'community'
+
+    if (clusterMode) {
+      const groups = new Map<number, KgNode[]>()
+      for (const node of linked) {
+        const cid = commOf(node)
+        if (cid <= 0) continue
+        const list = groups.get(cid)
+        if (list) list.push(node)
+        else groups.set(cid, [node])
+      }
+      const rankedGroups = [...groups.entries()].sort(
+        (a, b) => b[1].length - a[1].length || a[0] - b[0],
+      )
+      const total = rankedGroups.reduce((sum, [, list]) => sum + list.length, 0)
+      if (total <= HUB_CAP) {
+        for (const node of linked) {
+          if (commOf(node) > 0) keep.add(node.id)
+        }
+      } else {
+        const minPer = 8
+        let remaining = HUB_CAP
+        for (let i = 0; i < rankedGroups.length && remaining > 0; i += 1) {
+          const list = rankNodes(rankedGroups[i][1])
+          const prop = Math.max(minPer, Math.round((HUB_CAP * list.length) / total))
+          const take = Math.min(list.length, remaining, prop)
+          for (const node of list.slice(0, take)) keep.add(node.id)
+          remaining -= take
+        }
+      }
+      // 选中某一簇：成员必须进画布（否则只是在枢纽子集上着色），其余点留下做压暗对比。
+      if (focusCommunity != null && focusCommunity > 0) {
+        const members = rankNodes(nodes.filter((n) => commOf(n) === focusCommunity))
+        for (const node of members) keep.add(node.id)
+        const extraCap = HUB_CAP + 24
+        if (keep.size > extraCap) {
+          const memberIds = new Set(members.map((n) => n.id))
+          for (const id of [...keep]) {
+            if (keep.size <= extraCap) break
+            if (memberIds.has(id) || pinned.has(id)) continue
+            keep.delete(id)
+          }
+        }
+      }
+    } else {
+      const ranked = rankNodes(linked)
+      const cap = prune ? HUB_CAP : ranked.length
+      for (const node of ranked.slice(0, cap)) keep.add(node.id)
+    }
+
+    if (prune && activeNodeId) {
       const extras: string[] = []
       const seen = new Set<string>()
       for (const edge of edges) {
@@ -523,18 +751,11 @@ export default function KnowledgeGraph({
       }
       for (const id of extras) keep.add(id)
     }
-    if (keep.size === 0) {
-      // 全是孤独点：仍截前 HUB_CAP，避免 400 个无边节点卡死开屏
-      if (nodes.length > HUB_CAP) {
-        return { nodes: nodes.slice(0, HUB_CAP), edges: [] }
-      }
-      return { nodes, edges }
-    }
     return {
       nodes: nodes.filter((node) => keep.has(node.id)),
       edges: edges.filter((edge) => keep.has(edge.source) && keep.has(edge.target)),
     }
-  }, [prune, nodes, edges, activeNodeId])
+  }, [prune, nodes, edges, activeNodeId, hitIds, colorMode, focusCommunity])
   const displayNodes = display.nodes
   const displayEdges = display.edges
 
@@ -596,14 +817,22 @@ export default function KnowledgeGraph({
     if (!el) return
     const observer = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect
-      if (rect && rect.width > 0) setSize({ w: rect.width, h: rect.height })
+      if (!rect || rect.width <= 0) return
+      const w = rect.width
+      const h = rect.height
+      // 亚像素抖动不要触发重排：clientWidth 和 contentRect 常差 0.5px
+      setSize((prev) =>
+        Math.abs(prev.w - w) < 2 && Math.abs(prev.h - h) < 2 ? prev : { w, h },
+      )
     })
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
 
-  // 数据或尺寸变化：重建 DOM 与模拟
-  useEffect(() => {
+  // 数据或尺寸变化：重建 DOM 与模拟。
+  // 用 layout effect：必须在浏览器绘制前把坐标写上，否则 100 个点会先堆在
+  // (0,0) 再弹开，看起来就是加载时闪一下。
+  useLayoutEffect(() => {
     const nodeLayer = nodeRef.current
     const linkLayer = linkRef.current
     const labelLayer = labelRef.current
@@ -614,10 +843,47 @@ export default function KnowledgeGraph({
     if (!nodeLayer || !linkLayer || !w || !h) return
 
     const prevSize = lastSizeRef.current
-    const sameSize = prevSize?.w === w && prevSize?.h === h
+    const sameSize =
+      Boolean(prevSize) &&
+      Math.abs((prevSize?.w ?? 0) - w) < 2 &&
+      Math.abs((prevSize?.h ?? 0) - h) < 2
     const sameData =
       lastDataRef.current?.nodes === nodes && lastDataRef.current?.edges === edges
-    const carry = sameSize ? lastLayoutRef.current : null
+    const live = simRef.current
+    // 源数据没变也会换显示集：选中簇要把成员钉进画布，下钻要补邻居。
+    // 只认 sameData 会直接 return，成员永远不进 DOM。
+    const liveIds = live ? new Set(live.nodes.map((n) => n.id)) : null
+    const sameDisplay = Boolean(
+      liveIds &&
+        liveIds.size === displayNodes.length &&
+        displayNodes.every((node) => liveIds.has(node.id)),
+    )
+    // 只有画布尺寸变：按比例缩放现有点，避免切文件/标题出统计后整图重排跳一下
+    if (
+      sameData &&
+      sameDisplay &&
+      live &&
+      prevSize &&
+      !sameSize
+    ) {
+      if (live.links.length === 0) {
+        placeTypeGrid(live.nodes, w, h)
+        live.width = w
+        live.height = h
+      } else {
+        scaleSim(live, w, h)
+      }
+      lastSizeRef.current = { w, h }
+      const scaled = new Map<string, { x: number; y: number; laneR: number }>()
+      for (const node of live.nodes) {
+        scaled.set(node.id, { x: node.x, y: node.y, laneR: node.laneR })
+      }
+      lastLayoutRef.current = scaled
+      paint()
+      return
+    }
+    if (sameData && sameSize && live && sameDisplay) return
+    const carry = lastLayoutRef.current
 
     const sim = buildSim(
       displayNodes,
@@ -631,7 +897,8 @@ export default function KnowledgeGraph({
     nodeLayer.replaceChildren()
     linkLayer.replaceChildren()
     labelLayer?.replaceChildren()
-    viewRef.current = { k: 1, x: 0, y: 0 }
+    // 只换显示集（选簇/下钻）时别把缩放平移清掉，否则图会跳回原点
+    if (!sameData) viewRef.current = { k: 1, x: 0, y: 0 }
 
     // 边太多时索性不建标签，避免 DOM 过重
     const showLinkLabel = sim.links.length <= 60
@@ -686,13 +953,25 @@ export default function KnowledgeGraph({
       // 离开时若有选中实体，把关系名还原到选中节点，而不是全藏
       g.addEventListener('pointerenter', () => showLinkLabelsOf(node.id))
       g.addEventListener('pointerleave', () => showLinkLabelsOf(focusIdRef.current))
+      // 进 DOM 前就落到预热后的位置，避免先出现在左上角再瞬移
+      g.setAttribute('transform', `translate(${node.x.toFixed(2)} ${node.y.toFixed(2)})`)
       nodeLayer.appendChild(g)
       nodeElsRef.current.set(node.id, g)
     }
 
     for (const link of sim.links) {
+      const a = sim.nodes[link.source]
+      const b = sim.nodes[link.target]
       const line = document.createElementNS(SVG_NS, 'line')
       line.setAttribute('class', 'kg-link')
+      if (a && b) {
+        line.setAttribute('x1', a.x.toFixed(2))
+        line.setAttribute('y1', a.y.toFixed(2))
+        line.setAttribute('x2', b.x.toFixed(2))
+        line.setAttribute('y2', b.y.toFixed(2))
+        line.dataset.source = a.id
+        line.dataset.target = b.id
+      }
       linkLayer.appendChild(line)
       link.el = line
       if (labelLayer && showLinkLabel) {
@@ -700,6 +979,10 @@ export default function KnowledgeGraph({
         label.setAttribute('class', 'kg-link-label')
         label.setAttribute('text-anchor', 'middle')
         label.textContent = link.relation
+        if (a && b) {
+          label.setAttribute('x', ((a.x + b.x) / 2).toFixed(2))
+          label.setAttribute('y', ((a.y + b.y) / 2).toFixed(2))
+        }
         labelLayer.appendChild(label)
         link.labelEl = label
       }
@@ -722,16 +1005,23 @@ export default function KnowledgeGraph({
       // 只在源数据变化时重置视图、不清选中 —— setPicked(null) 会把刚点的
       // 下钻立刻收回去，正是「点节点闪一下又回到原来的图」的原因；
       // 选中节点被数据淘汰时 activeNodeId 的 nodeById.has 守卫会自动落空
-      if (!sameData) setView({ k: 1, x: 0, y: 0 })
+      if (!sameData) {
+        setView((cur) =>
+          cur.k === 1 && cur.x === 0 && cur.y === 0 ? cur : { k: 1, x: 0, y: 0 },
+        )
+      }
       // 新节点没有 class，补刷一遍高亮：检索切到子图、容器尺寸变化重建都会走到这里
       highlightRef.current()
-      kick()
+      // 冷启动 alpha 已收成 0，不再 kick，否则开屏后离散点还会跳一帧。
+      // 下钻复用布局时 alpha=0.5，让新邻居靠动画归位。
+      if ((simRef.current?.alpha ?? 0) > 0.1) kick()
     })
     return () => {
       cancelAnimationFrame(warm)
       cancelAnimationFrame(rafRef.current)
       runningRef.current = false
-      simRef.current = null
+      // 不把 simRef 置空：纯尺寸变化要复用当前布局做缩放。
+      // 数据变了下一轮会立刻 buildSim 覆盖。
     }
     // nodes/edges 只用来判断「源数据是否变了」，故意不进依赖：
     // display 集由它们派生，源数据一变这里必然会重跑，放进依赖只会重复触发
@@ -817,8 +1107,13 @@ export default function KnowledgeGraph({
     linkLayer.querySelectorAll<SVGLineElement>('.kg-link').forEach((el) => {
       const s = el.getAttribute('data-source') ?? ''
       const t = el.getAttribute('data-target') ?? ''
-      const related = focus ? s === focus || t === focus : hit.has(s) && hit.has(t)
-      el.classList.toggle('is-dim', Boolean(focus) && dimOthers && !related)
+      const related = focus
+        ? s === focus || t === focus
+        : hit.size > 0 && hit.has(s) && hit.has(t)
+      el.classList.toggle(
+        'is-dim',
+        dimOthers && (hit.size > 0 || Boolean(focus)) && !related,
+      )
       el.classList.toggle('is-hot', Boolean(related))
     })
 
@@ -891,9 +1186,12 @@ export default function KnowledgeGraph({
         dragNode = sim?.nodes.find((n) => n.id === downId) ?? null
         if (dragNode) {
           dragNode.fixed = true
-          // 收敛后再拖，需要补一点能量，否则邻域纹丝不动
-          if (sim) sim.alpha = Math.max(sim.alpha, 0.3)
-          kick()
+          // 无边看板没有弹簧可动，kick 会把类型网格冲散
+          if (sim && sim.links.length > 0) {
+            // 收敛后再拖，需要补一点能量，否则邻域纹丝不动
+            sim.alpha = Math.max(sim.alpha, 0.3)
+            kick()
+          }
         }
       } else {
         panning = true
@@ -926,14 +1224,14 @@ export default function KnowledgeGraph({
       if (dragNode) {
         dragNode.fixed = false
         const sim = simRef.current
-        if (sim) {
+        if (sim && sim.links.length > 0) {
           // 拖到哪就认哪：把它的目标圈改成当前位置，否则松手会被径向收缩拽回原来的圈
           const u = (dragNode.x - sim.width / 2) / sim.rx
           const v = (dragNode.y - (sim.height - BOTTOM_PAD) / 2) / sim.ry
           dragNode.laneR = Math.min(1.2, Math.hypot(u, v))
           sim.alpha = Math.max(sim.alpha, 0.12)
+          kick()
         }
-        kick()
       }
       if (!moved && downId) {
         const node = nodeById.get(downId) ?? null
@@ -1058,7 +1356,11 @@ export default function KnowledgeGraph({
             <div className="kg-legend">
               {colorMode === 'community'
                 ? (graph?.communities ?? [])
-                    .filter((c) => !c.isolated)
+                    .filter(
+                      (c) =>
+                        !c.isolated &&
+                        displayNodes.some((n) => (n.community ?? 0) === c.id),
+                    )
                     .slice(0, 6)
                     .map((c) => (
                       <span key={c.id} className="kg-legend-item" title={c.members.join('、')}>
@@ -1096,9 +1398,13 @@ export default function KnowledgeGraph({
               </button>
             </div>
             <p className="kg-tip">
-              {prune && displayNodes.length < nodes.length
-                ? `显示 ${displayNodes.length} / ${nodes.length} 个实体 · 点节点展开邻域 · 滚轮缩放`
-                : '拖节点调位置 · 滚轮缩放 · 点节点看关系与原文'}
+              {displayEdges.length === 0
+                ? '尚未抽到关系，按类型分块浏览 · 点实体看原文 · 滚轮缩放'
+                : colorMode === 'community' && focusCommunity != null
+                  ? '高亮当前簇 · 其余压暗 · 点节点看关系与原文'
+                  : prune && displayNodes.length < nodes.length
+                    ? `显示 ${displayNodes.length} / ${nodes.length} 个实体 · 点节点展开邻域 · 滚轮缩放`
+                    : '拖节点调位置 · 滚轮缩放 · 点节点看关系与原文'}
             </p>
           </>
         ) : null}

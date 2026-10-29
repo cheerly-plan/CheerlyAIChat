@@ -413,7 +413,7 @@ export default function KbGraphPanel({
    * 所以 id 之外再按 norm_name、名称对一次。
    */
   // 簇视图（P4）：配色口径 + 当前聚焦的社区。
-  // 聚焦复用检索那套高亮（hitIds），非成员自动压暗，不额外加渲染分支
+  // 选中簇用检索那套高亮（hitIds）把成员提亮、其余压暗，整图还在，才能看出这一簇。
   const [colorMode, setColorMode] = useState<'type' | 'community'>('type')
   const [focusCluster, setFocusCluster] = useState<number | null>(null)
   // 着色选择：一个级联下拉（左列 按类型/按簇，右列 簇）。自绘避免原生 select 割裂
@@ -707,11 +707,13 @@ export default function KbGraphPanel({
           error={error}
           hitIds={clusterHitIds ?? hitIds}
           colorMode={colorMode}
-          // 过滤后的子图里全是命中和它们的邻居，再压暗就把扩展出来的关系藏掉了
+          focusCommunity={colorMode === 'community' ? focusCluster : null}
+          // 过滤后的子图里全是命中和它们的邻居，再压暗就把扩展出来的关系藏掉了。
+          // 选中簇：成员高亮、其余压暗，对比着才看得出这一簇。
           dimOthers={!filtered || focusCluster !== null}
           // 枢纽分层：全库/合并始终开启；单文件图超过 HUB_CAP 也开启——
           // 有的文件能抽出 400+ 实体，全量力导向会卡死开屏。检索子图本身
-          // 就是过滤结果，再裁会把邻域藏掉。
+          // 就是过滤结果，再裁会把邻域藏掉。按簇时 prune 仍开，但画布按社区取点。
           prune={!filtered && (!fileId || (viewGraph?.nodes.length ?? 0) > KG_HUB_CAP)}
           emptyTitle={canvasState.title}
           emptyHint={canvasState.hint}
