@@ -302,9 +302,11 @@
   transition: border-color 0.15s, background-color 0.15s;
 }
 
+/* hover 统一口径（文件 tab 与图谱 tab 同一套，见 .kb-gitem:hover）：
+   极浅灰底 + 描边深半档，不加投影——两个 tab 的行长得一样，反馈就该一样 */
 .kb-item:hover {
   background: #f5f7fa;
-  border-color: #e6eaf0;
+  border-color: #e2e6ef;
 }
 
 /* 选中项悬停再深一档（会话列表没有这一档，这里补上，免得悬停时反而变灰） */
@@ -2452,25 +2454,30 @@
   gap: 3px;
 }
 
-/* 行 = 一张小卡片：白底 + 圆角 + 极淡描边，hover 才浮起来。
-   面板底色是 #fbfcfe，白卡片正好能浮出来，层次就有了 */
+/* 行 = 一张小卡片：白底 + 圆角 + 极淡描边，hover 浅灰底。
+   圆角/描边与文件 tab 的 .kb-item 对齐（10px / #eef0f3），
+   两个 tab 来回切时行长得像同一套组件 */
 .kb-gitem {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 9px;
-  border: 1px solid #f0f1f5;
-  border-radius: 8px;
+  border: 1px solid #eef0f3;
+  border-radius: 10px;
   background: #fff;
   transition:
     background 0.15s,
-    border-color 0.15s,
-    box-shadow 0.15s;
+    border-color 0.15s;
 }
 
-.kb-gitem:hover {
+/* hover：与文件 tab 的 .kb-item:hover 完全一致（浅灰底 + 描边深半档）。
+   原来这里是「描边 + 投影」的浮起效果，两个 tab 一个变底色一个投影，
+   来回切时手感是两套。带上 .is-muted 变体：未构建行自带浅底，
+   同权重的 .is-muted 在后面会把底盖回去 */
+.kb-gitem:hover,
+.kb-gitem.is-muted:hover {
+  background: #f5f7fa;
   border-color: #e2e6ef;
-  box-shadow: 0 1px 4px rgba(17, 24, 39, 0.06);
 }
 
 /* 选中（勾选入合并范围 / 单独查看）：只留主色淡描边，不铺底色。
