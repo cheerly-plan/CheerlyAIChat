@@ -377,23 +377,24 @@
   gap: 3px;
   min-width: 0;
   flex: 1;
-  /* 只给按钮浮层留一点余量（≈6px 会落进浮层底下，被它的行底色盖住）：
-     留满整个浮层宽度（48px）会把标题挤早换行，一条长名字白占一行 */
+  /* 标题只占一行，右侧留够浮层宽度（46px）不会多占行高，
+     hover 时按钮也不会压到省略号 */
   padding-right: 20px;
 }
 
-/* 有重建按钮时右侧浮层两个按钮，再多留一档 */
+/* 有重建按钮时右侧浮层两个按钮，按浮层实际宽度留满 */
 .kb-item.has-act .kb-row-body {
-  padding-right: 32px;
+  padding-right: 46px;
 }
 
-/* 文件名最多两行，超出省略（完整名见 title 悬浮提示） */
+/* 文件名只占一行，超出加省略号（完整名见 title 悬浮提示）。
+   两行截断会让同一列表里行高忽高忽低，扫视时眼睛一直在跳；
+   单行 + 省略号让每条等高，也更好比较片数 */
 .kb-name-text {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  display: block;
   overflow: hidden;
-  word-break: break-all;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   line-height: 1.45;
 }
 
