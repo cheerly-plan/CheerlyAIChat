@@ -275,7 +275,7 @@ function KbFileRow({
           {extBadge(item)}
           {/* 标题与元信息放在同一列里：片数/大小左对齐到文件名首字，
               而不是退到格式标签的左边缘（那样看着像两套缩进） */}
-          <span className="kb-body">
+          <span className="kb-row-body">
             <span className="kb-name-text">{item.filename}</span>
             {/* 元信息一级就是结论：片数（决定图谱规模与重建耗时）用近黑加粗，
                 文件大小只作参照，浅灰。文档类型标签删掉——分组标题已经说了 */}

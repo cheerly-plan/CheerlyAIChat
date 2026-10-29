@@ -369,8 +369,9 @@
   min-width: 0;
 }
 
-/* 标题与元信息同列；右侧给 hover 操作按钮兜底（浮层会盖住右端） */
-.kb-body {
+/* 标题与元信息同列；右侧给 hover 操作按钮兜底（浮层会盖住右端）。
+   注意别叫 .kb-body——那是页面根容器（左面板 + 图谱区）的类名 */
+.kb-row-body {
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -382,7 +383,7 @@
 }
 
 /* 有重建按钮时右侧浮层两个按钮，再多留一档 */
-.kb-item.has-act .kb-body {
+.kb-item.has-act .kb-row-body {
   padding-right: 32px;
 }
 
@@ -633,7 +634,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  /* 已经在 .kb-body 的 column gap 里，留 1px 微调即可 */
+  /* 已经在 .kb-row-body 的 column gap 里，留 1px 微调即可 */
   margin-top: 1px;
 }
 
