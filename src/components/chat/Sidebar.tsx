@@ -198,9 +198,9 @@ function HistoryItem({
       return
     }
     const rect = moreRef.current.getBoundingClientRect()
-    const width = 180
-    const height = 144
-    const left = Math.min(Math.max(8, rect.right - width), window.innerWidth - width - 8)
+    const width = 132
+    const height = 132
+    const left = Math.min(rect.left, window.innerWidth - width - 8)
     const openUp = rect.bottom + height > window.innerHeight - 8
     const top = openUp ? Math.max(8, rect.top - height - 4) : rect.bottom + 4
     setMenuPos({ top, left })

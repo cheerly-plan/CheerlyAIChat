@@ -398,6 +398,8 @@ export type KbFile = {
   status: 'uploaded' | 'parsing' | 'embedding' | 'ready' | 'failed'
   error: string
   chunk_count: number
+  // 文件类型后缀（如 .pdf），文件名本身已是纯名；下载/徽标按它识别类型
+  mime?: string
   // 图谱进度：'' 未构建 / building / ready / stale（切片修订后待重建）/ failed / skipped
   graph_status?: string
   graph_entity_count?: number
@@ -499,7 +501,8 @@ export async function downloadKbFile(file: KbFile): Promise<void> {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = file.filename
+  // 文件名是纯名，后缀由 mime 单独存；下载补回后缀，否则本地打不开
+  link.download = file.mime ? `${file.filename}${file.mime}` : file.filename
   link.click()
   URL.revokeObjectURL(url)
 }
@@ -660,23 +663,6 @@ export async function fetchKgDocTypes(): Promise<{ types: KgDocType[]; default: 
   return (await response.json()) as { types: KgDocType[]; default: string }
 }
 
-/** 保存文件的抽取配置（管理员）：只改配置，不自动重抽（重抽很贵，由人决定） */
-export async function setKgDocType(
-  fileId: string,
-  docType: string,
-  level = 'full',
-): Promise<void> {
-  const response = await authedFetch(`/v1/kg/files/${fileId}/doc-type`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ doc_type: docType, level }),
-  })
-  if (!response.ok) {
-    const detail = await response.json().catch(() => ({}))
-    throw new Error(detail?.detail || `保存抽取配置失败 ${response.status}`)
-  }
-}
-
 export type KgSeed = {
   id: string
   name: string
@@ -760,51 +746,17 @@ export async function fetchKgEntityChunks(
   return data.chunks ?? []
 }
 
-export async function rebuildKgGraph(fileId: string): Promise<void> {
+export async function rebuildKgGraph(
+  fileId: string,
+  options?: { docType?: string; level?: string },
+): Promise<void> {
   const response = await authedFetch(`/v1/kg/files/${fileId}/rebuild`, {
     method: 'POST',
-    headers: authHeaders(),
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    // 不传 options 就不带 body：后端沿用该文件已保存的配置（过期刷新不改配置）
+    body: options ? JSON.stringify({ doc_type: options.docType ?? '', level: options.level ?? '' }) : undefined,
   })
   if (!response.ok) {
     throw new Error(`重建图谱失败 ${response.status}`)
-  }
-}
-
-/** 触发实体对齐（管理员）：后台跑，进度看 align_status */
-export async function alignKgGraph(fileId: string): Promise<void> {
-  const response = await authedFetch(`/v1/kg/files/${fileId}/align`, {
-    method: 'POST',
-    headers: authHeaders(),
-  })
-  if (!response.ok) {
-    const detail = await response.json().catch(() => ({}))
-    throw new Error(detail?.detail || `实体对齐失败 ${response.status}`)
-  }
-}
-
-export type KgAlias = {
-  alias_name: string
-  alias_norm: string
-  canonical_name: string
-  entity_id: string
-  type: KgEntityType
-  method: string
-  score: number
-}
-
-/** 该文件里被合并掉的写法（"国电集团" → "中国国电集团公司"） */
-export async function fetchKgAliases(fileId: string): Promise<{
-  aliases: KgAlias[]
-  align_status: string
-  alias_count: number
-}> {
-  const response = await authedFetch(`/v1/kg/files/${fileId}/aliases`, {
-    headers: authHeaders(),
-  })
-  if (!response.ok) return { aliases: [], align_status: '', alias_count: 0 }
-  return (await response.json()) as {
-    aliases: KgAlias[]
-    align_status: string
-    alias_count: number
   }
 }

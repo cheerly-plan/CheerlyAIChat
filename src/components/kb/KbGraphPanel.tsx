@@ -3,10 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   fetchKgGraph,
   rebuildKgGraph,
-  alignKgGraph,
-  fetchKgAliases,
   fetchKgDocTypes,
-  setKgDocType,
   searchKg,
   type KbFile,
   type KgDocType,
@@ -14,7 +11,8 @@ import {
   type KgSearchResult,
 } from '../../api'
 import KnowledgeGraph from './KnowledgeGraph'
-import { SearchIcon } from '../chat/icons'
+import { KgBuildDialog } from './KgBuildDialog'
+import { SearchIcon, ChevronDownIcon, CheckIcon, CloseIcon, RefreshIcon } from '../chat/icons'
 
 type Props = {
   /** 选中文件时看该文件的图谱；为空时看全库或合并范围 */
@@ -58,20 +56,14 @@ export default function KbGraphPanel({
   const [result, setResult] = useState<KgSearchResult | null>(null)
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
-  const [rebuilding, setRebuilding] = useState(false)
-  const [aligning, setAligning] = useState(false)
 
-  // 抽取配置（文档类型 + 粒度）：换类型只是换 prompt 里的配置块，
-  // 抽取器始终是同一个。选完即保存，但要重建才生效（重抽很贵，不替用户决定）
+  // 抽取配置（文档类型 + 粒度）：构建/重建时在弹窗里选，提交时落库并触发重抽
   const [docTypes, setDocTypes] = useState<KgDocType[]>([])
   const [defaultDocType, setDefaultDocType] = useState('general')
-  const [savingProfile, setSavingProfile] = useState(false)
-  const [profileHint, setProfileHint] = useState('')
-  // 刚保存的值：比等 load 回来更跟手，也避免网络抖动时下拉回弹到旧值
-  const [savedProfile, setSavedProfile] = useState<{
-    docType: string
-    level: string
-  } | null>(null)
+  // 建图配置弹窗开关：点「构建图谱」/「重建」都先弹这个，确认配置再提交
+  const [buildDialogOpen, setBuildDialogOpen] = useState(false)
+  const [buildingNow, setBuildingNow] = useState(false)
+  const [buildError, setBuildError] = useState('')
 
   const requestIdRef = useRef(0)
   const searchIdRef = useRef(0)
@@ -136,58 +128,24 @@ export default function KbGraphPanel({
     }
   }, [canManage])
 
-  const activeDocType = savedProfile?.docType || graph?.doc_type || defaultDocType
-  const activeLevel = savedProfile?.level || graph?.extract_level || 'full'
+  // 弹窗表单初值：已有图谱按其用的配置预填，首次构建用全局默认
+  const activeDocType = graph?.doc_type || defaultDocType
+  const activeLevel = (graph?.extract_level || 'full') as 'full' | 'light'
+
+  /** 是否已有可看的图谱：节点非空即「有图」，决定隐藏检索栏还是隐藏构建入口 */
+  const hasGraph = Boolean(graph && graph.nodes.length > 0)
+
+  // 画布左上 provenance 浮层：当前图用的配置（中文名 + 粒度），淡色只作提示
+  const docTypeLabel =
+    activeDocType === 'general' || !activeDocType
+      ? '通用'
+      : docTypes.find((t) => t.key === activeDocType)?.label || activeDocType
+  const levelLabel = activeLevel === 'full' ? '完整' : '轻量'
 
   /**
-   * 保存抽取配置：选完即存，但不自动重抽。
-   *
-   * 后端会把已有图谱标成 stale（图确实基于旧配置），这里重拉一次把
-   * 状态同步过来，提示用户点「重新生成」才真正生效。
+   * 实体对齐已并入建图流程：重建图谱时自动对齐，无需手动触发。
+   * 画布上的对齐结果（已合并 N 个写法）由下方浮层展示，不再有手动对齐按钮。
    */
-  const applyProfile = async (nextType: string, nextLevel: string) => {
-    if (!fileId || savingProfile) return
-    if (nextType === activeDocType && nextLevel === activeLevel) return
-    setSavingProfile(true)
-    setError('')
-    setProfileHint('')
-    try {
-      await setKgDocType(fileId, nextType, nextLevel)
-      setSavedProfile({ docType: nextType, level: nextLevel })
-      setProfileHint('已保存，重建后生效')
-      await load({ quiet: true })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '保存抽取配置失败')
-    } finally {
-      setSavingProfile(false)
-    }
-  }
-
-  /**
-   * 实体对齐：把同一实体的简称/全称并成一个点（后台任务，几十秒）。
-   *
-   * 对齐跑在服务端的图谱线程池里，接口立刻返回；这里轮询 aliases 接口的
-   * align_status，等它从 aligning 落定再重拉图——否则用户点完按钮看到的
-   * 还是旧图，会以为没生效。
-   */
-  const runAlign = async () => {
-    if (!fileId || aligning) return
-    setAligning(true)
-    setError('')
-    try {
-      await alignKgGraph(fileId)
-      for (let i = 0; i < 90; i += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 2000))
-        const state = await fetchKgAliases(fileId)
-        if (state.align_status !== 'aligning') break
-      }
-      await load({ quiet: true })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '实体对齐失败')
-    } finally {
-      setAligning(false)
-    }
-  }
 
   // 图谱构建中：单文件视图看自己的 graph_status，全库/合并视图看父组件给的 building
   const isBuilding = building || graph?.graph_status === 'building'
@@ -271,6 +229,24 @@ export default function KbGraphPanel({
     inputRef.current?.focus()
   }
 
+  // 输入即检索：query 变化后防抖 400ms 自动发起，省掉「检索」按钮。
+  // 首次挂载跳过（初始 query 为空，不该发请求）；空词走 runSearch('') 回到全图。
+  const runSearchRef = useRef(runSearch)
+  useEffect(() => {
+    runSearchRef.current = runSearch
+  })
+  const firstQueryRef = useRef(true)
+  useEffect(() => {
+    if (firstQueryRef.current) {
+      firstQueryRef.current = false
+      return
+    }
+    const timer = setTimeout(() => {
+      void runSearchRef.current(query)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [query])
+
   /**
    * 收起命中依据 = 退出这次检索。
    *
@@ -283,19 +259,60 @@ export default function KbGraphPanel({
     resetResult()
   }
 
-  const onRebuild = async () => {
-    if (!fileId || rebuilding) return
-    setRebuilding(true)
+  /**
+   * 打开建图配置弹窗：构建（首次）与重建（已有图）共用，标题/按钮文案
+   * 由 hasGraph 区分。打开前清掉上一次的提交错误，表单初值由父级状态决定。
+   */
+  const openBuildDialog = () => {
+    setBuildError('')
+    setBuildDialogOpen(true)
+  }
+
+  /**
+   * 弹窗提交：配置作为本次重建的参数，随请求一起提交（一次请求）。
+   *
+   * 不再有「先存配置、等重建才生效」的中间态——配置只跟着这次构建走，
+   * 后端落库并重抽，库里存的配置和眼前的图始终对得上。
+   * 首次构建（还没图）与重建走同一条 rebuild 接口（后端都会按切片重抽）。
+   */
+  const submitBuild = async (config: { docType: string; level: 'full' | 'light' }) => {
+    if (!fileId || buildingNow) return
+    setBuildingNow(true)
+    setBuildError('')
+    try {
+      // 弹窗用空串表示「通用（不限定）」，原样传给后端（后端空串也回落到 general）
+      await rebuildKgGraph(fileId, {
+        docType: config.docType || '',
+        level: config.level,
+      })
+      // 后端已把人状态改成 building，立刻重拉一次就能看到「构建中」
+      await load()
+      setBuildDialogOpen(false)
+    } catch (e) {
+      // 弹窗不关：保住刚选的配置，用户改完可以直接重试
+      setBuildError(e instanceof Error ? e.message : '提交构建失败')
+    } finally {
+      setBuildingNow(false)
+    }
+  }
+
+  /**
+   * 过期重抽：切片修订后图谱 stale，按**上次的配置**重抽一遍。
+   *
+   * 不带 body（沿用已存配置）——过期只是文本变了，不该顺手把人选好的
+   * 文档类型/粒度清掉。想换配置走 hover 的「重建」弹窗。
+   */
+  const onReapply = async () => {
+    if (!fileId || buildingNow) return
+    setBuildingNow(true)
+    setError('')
     try {
       await rebuildKgGraph(fileId)
-      // 重建 = 按新配置重抽，提示语到此为止（stale 也会随之清掉）
-      setProfileHint('')
-      // 后端已把人状态改成 building，立刻重拉一次就能看到「构建中」
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : '重建失败')
     } finally {
-      setRebuilding(false)
+      setBuildingNow(false)
     }
   }
 
@@ -328,7 +345,7 @@ export default function KbGraphPanel({
         hint: '抽取时出错了（模型超时或返回格式异常）。切片不受影响，仍可正常检索与对话。',
         action:
           fileId && canManage
-            ? { label: '重新构建', onClick: () => void onRebuild() }
+            ? { label: '重新构建', onClick: openBuildDialog }
             : undefined,
       }
     }
@@ -355,7 +372,7 @@ export default function KbGraphPanel({
         : '在左侧「图谱」tab 勾选图谱已生成的文件（可多选，合并查看）；还没生成图谱的文件点它的状态徽标进来构建。',
       action:
         fileId && canManage
-          ? { label: '构建图谱', onClick: () => void onRebuild() }
+          ? { label: '构建图谱', onClick: openBuildDialog }
           : undefined,
     }
   })()
@@ -389,6 +406,22 @@ export default function KbGraphPanel({
   // 聚焦复用检索那套高亮（hitIds），非成员自动压暗，不额外加渲染分支
   const [colorMode, setColorMode] = useState<'type' | 'community'>('type')
   const [focusCluster, setFocusCluster] = useState<number | null>(null)
+  // 着色选择：一个级联下拉（左列 按类型/按簇，右列 簇）。自绘避免原生 select 割裂
+  const [shadeOpen, setShadeOpen] = useState(false)
+  // 级联面板左列当前激活的项：决定右列显示什么
+  const [activeBranch, setActiveBranch] = useState<'type' | 'community'>('type')
+  const shadeRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!shadeOpen) return
+    function onDown(event: MouseEvent) {
+      if (shadeRef.current && !shadeRef.current.contains(event.target as Node)) {
+        setShadeOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [shadeOpen])
 
   const clusters = useMemo(
     () => (viewGraph?.communities ?? []).filter((c) => !c.isolated),
@@ -422,7 +455,145 @@ export default function KbGraphPanel({
 
   return (
     <div className="kb-kg">
+      {/* 还没有图谱时不显示检索栏：没有实体可检索，空留一排控件反而误导。
+          有图才出现着色/搜索/跳数，配合画布右上角 hover 的「重建」按钮 */}
+      {hasGraph ? (
       <div className="kb-kg-bar">
+        {/* 着色选择：最左，做成检索按钮同款样式。左列 按类型/按簇，右列展开各簇 */}
+        {clusters.length > 0 ? (
+          <div className="kb-kg-shade" ref={shadeRef}>
+            <button
+              type="button"
+              className={`kb-kg-shade-trigger${shadeOpen ? ' is-open' : ''}`}
+              aria-haspopup="listbox"
+              aria-expanded={shadeOpen}
+              onClick={() => {
+                setActiveBranch(colorMode)
+                setShadeOpen((open) => !open)
+              }}
+              title="切换图谱着色方式"
+            >
+              {colorMode === 'type'
+                ? '按类型'
+                : focusCluster != null
+                  ? `按簇 · ${clusters.find((c) => c.id === focusCluster)?.label ?? ''}`
+                  : '按簇'}
+              <ChevronDownIcon />
+            </button>
+            {focusCluster != null ? (
+              <button
+                type="button"
+                className="kb-kg-shade-clear"
+                onClick={() => {
+                  setColorMode('type')
+                  setFocusCluster(null)
+                }}
+                aria-label="清除着色选中，回到按类型"
+                title="清除选中"
+              >
+                <CloseIcon />
+              </button>
+            ) : null}
+            {shadeOpen ? (
+              <div className="kb-kg-shade-panel">
+                <ul className="kb-kg-shade-menu" role="listbox" aria-label="着色方式">
+                  <li>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={colorMode === 'type'}
+                      className={`${activeBranch === 'type' ? 'is-active' : ''}${
+                        colorMode === 'type' ? ' is-on' : ''
+                      }`}
+                      onMouseEnter={() => setActiveBranch('type')}
+                      onClick={() => {
+                        setColorMode('type')
+                        setFocusCluster(null)
+                        setShadeOpen(false)
+                      }}
+                    >
+                      按类型
+                      {colorMode === 'type' ? <CheckIcon /> : null}
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={colorMode === 'community'}
+                      className={`${activeBranch === 'community' ? ' is-active' : ''}${
+                        colorMode === 'community' ? ' is-on' : ''
+                      }`}
+                      onMouseEnter={() => setActiveBranch('community')}
+                      onClick={() => {
+                        setColorMode('community')
+                        setActiveBranch('community')
+                      }}
+                    >
+                      <span className="kb-kg-shade-branch">
+                        按簇
+                        {colorMode === 'community' ? <CheckIcon /> : null}
+                      </span>
+                    </button>
+                  </li>
+                </ul>
+                {activeBranch === 'community' ? (
+                  <ul
+                    className="kb-kg-shade-menu kb-kg-shade-sub"
+                    role="listbox"
+                    aria-label="选择簇"
+                  >
+                    <li>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={colorMode === 'community' && focusCluster === null}
+                        onClick={() => {
+                          setColorMode('community')
+                          setFocusCluster(null)
+                          setShadeOpen(false)
+                        }}
+                      >
+                        全部簇
+                      </button>
+                    </li>
+                    {clusters.slice(0, 10).map((cluster) => (
+                      <li key={cluster.id}>
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={
+                            colorMode === 'community' && focusCluster === cluster.id
+                          }
+                          className={
+                            colorMode === 'community' && focusCluster === cluster.id
+                              ? 'is-on'
+                              : ''
+                          }
+                          onClick={() => {
+                            setColorMode('community')
+                            setFocusCluster(cluster.id)
+                            setShadeOpen(false)
+                          }}
+                        >
+                          <span className="kb-kg-shade-cluster">
+                            {cluster.label}
+                            <i>{cluster.size}</i>
+                          </span>
+                          {colorMode === 'community' && focusCluster === cluster.id ? (
+                            <CheckIcon />
+                          ) : null}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* 搜索框：占满中间，输入即检索（防抖） */}
         <label className="kb-kg-search">
           <SearchIcon />
           <input
@@ -464,133 +635,7 @@ export default function KbGraphPanel({
             </button>
           ))}
         </div>
-
-        <button
-          type="button"
-          className="kb-kg-go"
-          onClick={() => void runSearch()}
-          disabled={searching}
-        >
-          {searching ? '检索中…' : '检索'}
-        </button>
       </div>
-
-      {clusters.length > 0 ? (
-        <div className="kb-kg-clusters">
-          <span className="kb-kg-clusters-label">着色</span>
-          <button
-            type="button"
-            className={colorMode === 'type' ? 'is-on' : ''}
-            aria-pressed={colorMode === 'type'}
-            onClick={() => {
-              setColorMode('type')
-              setFocusCluster(null)
-            }}
-          >
-            按类型
-          </button>
-          <button
-            type="button"
-            className={colorMode === 'community' ? 'is-on' : ''}
-            aria-pressed={colorMode === 'community'}
-            onClick={() => setColorMode('community')}
-            title="按社区分组着色：连得紧的实体是一簇"
-          >
-            按簇
-          </button>
-          {colorMode === 'community' ? (
-            <div className="kb-kg-cluster-list">
-              {clusters.slice(0, 10).map((cluster) => (
-                <button
-                  key={cluster.id}
-                  type="button"
-                  className={`kb-kg-cluster${focusCluster === cluster.id ? ' is-on' : ''}`}
-                  aria-pressed={focusCluster === cluster.id}
-                  title={`${cluster.label} 等 ${cluster.size} 个：${cluster.members.join('、')}`}
-                  onClick={() =>
-                    setFocusCluster((prev) => (prev === cluster.id ? null : cluster.id))
-                  }
-                >
-                  {cluster.label}
-                  <i>{cluster.size}</i>
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {fileId && canManage && docTypes.length > 0 ? (
-        <div className="kb-kg-profile">
-          <span className="kb-kg-profile-label">抽取配置</span>
-          <select
-            className="kb-kg-profile-select"
-            value={activeDocType}
-            disabled={savingProfile || isBuilding}
-            onChange={(e) => void applyProfile(e.target.value, activeLevel)}
-            title={
-              docTypes.find((t) => t.key === activeDocType)?.entity_scope.length
-                ? `重点实体：${docTypes
-                    .find((t) => t.key === activeDocType)!
-                    .entity_scope.slice(0, 6)
-                    .join('、')}`
-                : '不限定实体白名单：按通用规则抽取'
-            }
-            aria-label="文档类型"
-          >
-            {docTypes.map((item) => (
-              <option key={item.key} value={item.key}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-
-          <div className="kb-kg-depth" role="group" aria-label="抽取粒度">
-            {(
-              [
-                { key: 'full', label: '完整' },
-                { key: 'light', label: '轻量' },
-              ] as const
-            ).map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                className={activeLevel === item.key ? 'is-on' : ''}
-                aria-pressed={activeLevel === item.key}
-                disabled={savingProfile || isBuilding}
-                onClick={() => void applyProfile(activeDocType, item.key)}
-                title={
-                  item.key === 'full'
-                    ? '尽量抽全实体与关系'
-                    : '只留主干（主体、主产品、核心指标），跳过零散供应商与次要指标'
-                }
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          <span className="kb-kg-profile-hint">
-            {savingProfile ? '保存中…' : profileHint}
-          </span>
-        </div>
-      ) : null}
-
-      {fileId && graph?.graph_status === 'ready' && (canManage || (graph?.alias_count ?? 0) > 0) ? (
-        <div className="kb-kg-align">
-          <span className="kb-kg-align-text">
-            {aligning
-              ? '正在对齐同一实体的多种写法…'
-              : (graph?.alias_count ?? 0) > 0
-                ? `已合并 ${graph?.alias_count} 个写法（简称/全称并成一个点）`
-                : '把简称与全称并成一个实体'}
-          </span>
-          {canManage ? (
-            <button type="button" onClick={() => void runAlign()} disabled={aligning}>
-              {aligning ? '对齐中…' : (graph?.alias_count ?? 0) > 0 ? '重新对齐' : '对齐实体'}
-            </button>
-          ) : null}
-        </div>
       ) : null}
 
       {seeds.length > 0 ? (
@@ -619,17 +664,17 @@ export default function KbGraphPanel({
       ) : null}
       {file?.graph_status === 'stale' ? (
         // 切片人工修订后图谱就基于旧文本了：保留旧图供参考。
-        // 重建按钮只给管理员；普通用户只看说明
+        // 重建按钮只给管理员；普通用户只看说明。这里按上次配置重抽，不弹配置窗
         <p className="kb-kg-stale">
           {canManage ? (
             <>
               图谱已过期（切片修订或抽取配置变更），当前显示的是旧图。
               <button
                 type="button"
-                onClick={() => void onRebuild()}
-                disabled={rebuilding}
+                onClick={() => void onReapply()}
+                disabled={buildingNow}
               >
-                {rebuilding ? '重建中…' : '重新生成'}
+                {buildingNow ? '重建中…' : '重新生成'}
               </button>
             </>
           ) : (
@@ -639,6 +684,31 @@ export default function KbGraphPanel({
       ) : null}
 
       <div className="kb-kg-canvas">
+        {/* 已有图谱：左上角淡色 provenance（当前图用的配置），不占布局高度 */}
+        {hasGraph ? (
+          <div className="kb-kg-provenance">
+            当前图：{docTypeLabel} · {levelLabel}
+          </div>
+        ) : null}
+        {/* 实体对齐已并入建图流程；这里只展示对齐结果，不再有手动对齐入口 */}
+        {hasGraph && (graph?.alias_count ?? 0) > 0 ? (
+          <div className="kb-kg-align">
+            已合并 {graph!.alias_count} 个写法
+          </div>
+        ) : null}
+        {/* 已有图谱：hover 画布时右上角浮出「重建」按钮，点击同样进配置弹窗 */}
+        {hasGraph && fileId && canManage ? (
+          <button
+            type="button"
+            className="kb-kg-rebuild"
+            onClick={openBuildDialog}
+            disabled={isBuilding}
+            title="按新的文档类型与抽取粒度重建这份图谱"
+          >
+            <RefreshIcon />
+            重建
+          </button>
+        ) : null}
         <KnowledgeGraph
           graph={viewGraph}
           loading={loading}
@@ -681,6 +751,21 @@ export default function KbGraphPanel({
             </ul>
           </div>
         </div>
+      ) : null}
+
+      {buildDialogOpen ? (
+        <KgBuildDialog
+          filename={file?.filename ?? ''}
+          docTypes={docTypes.filter((t) => !t.is_general)}
+          // 弹窗用空串表示「通用」，把后端的 general 归一过去，选中态才对得上
+          initialDocType={activeDocType === 'general' ? '' : activeDocType}
+          initialLevel={activeLevel}
+          hasGraph={hasGraph}
+          submitting={buildingNow}
+          error={buildError}
+          onCancel={() => setBuildDialogOpen(false)}
+          onSubmit={(config) => void submitBuild(config)}
+        />
       ) : null}
     </div>
   )

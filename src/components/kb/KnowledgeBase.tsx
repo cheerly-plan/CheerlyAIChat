@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import {
   deleteKbFile,
@@ -15,11 +15,8 @@ import {
 } from '../../api'
 import {
   BackIcon,
-  DownloadIcon,
-  EditIcon,
+  MoreIcon,
   PanelIcon,
-  TagIcon,
-  TrashIcon,
   UploadIcon,
 } from '../chat/icons'
 import { ConfirmDialog } from '../common/ConfirmDialog'
@@ -89,20 +86,13 @@ const EXT_STYLE: Record<string, { label: string; cls: string }> = {
   txt: { label: 'TXT', cls: 'ext-txt' },
 }
 
-function extBadge(filename: string) {
-  const ext = filename.slice(filename.lastIndexOf('.') + 1).toLowerCase()
+function extBadge(file: KbFile) {
+  // 类型后缀优先取 mime（后端单独存，filename 已是纯名），mime 缺失时回退从 filename 切
+  const raw = file.mime ?? file.filename.slice(file.filename.lastIndexOf('.') + 1)
+  const ext = raw.replace(/^\./, '').toLowerCase()
   const style = EXT_STYLE[ext]
   if (!style) return null
   return <span className={`kb-ext ${style.cls}`}>{style.label}</span>
-}
-
-// 标题里的文件名去掉扩展名：类型已经由前面的彩色徽标表达，再留「.pdf」是重复信息。
-// 只在识别出扩展名时剥掉，未知类型原样返回，避免把名字里的小数点误当后缀。
-function titleName(filename: string): string {
-  const dot = filename.lastIndexOf('.')
-  if (dot <= 0) return filename
-  const ext = filename.slice(dot + 1).toLowerCase()
-  return EXT_STYLE[ext] ? filename.slice(0, dot) : filename
 }
 
 // ——— 切片虚拟滚动（变高卡片）———
@@ -119,6 +109,176 @@ function formatSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
   if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`
   return `${bytes} B`
+}
+
+// 文件列表行的「更多」菜单：一个三点按钮，点击弹出下载/编辑标签/重命名/删除。
+// 菜单按权限与状态动态显隐，与会话列表「更多」同一套交互（左对齐 + 点外部关闭）。
+type KbFileRowProps = {
+  item: KbFile
+  isSelected: boolean
+  canManage: boolean
+  onToggle: (item: KbFile) => void
+  onDownload: (item: KbFile) => void
+  onTagEdit: (item: KbFile) => void
+  onRename: (item: KbFile) => void
+  onDelete: (item: KbFile) => void
+}
+
+function KbFileRow({
+  item,
+  isSelected,
+  canManage,
+  onToggle,
+  onDownload,
+  onTagEdit,
+  onRename,
+  onDelete,
+}: KbFileRowProps) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const moreRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 })
+
+  useLayoutEffect(() => {
+    if (!menuOpen || !moreRef.current) return
+    const rect = moreRef.current.getBoundingClientRect()
+    const width = 132
+    const left = Math.min(rect.left, window.innerWidth - width - 8)
+    setMenuPos({ top: rect.bottom + 4, left })
+  }, [menuOpen])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function onDown(event: MouseEvent) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node) &&
+        moreRef.current &&
+        !moreRef.current.contains(event.target as Node)
+      ) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [menuOpen])
+
+  const hasDownload = item.status !== 'uploaded'
+  const hasTagEdit = canManage
+  const hasRename = canManage && item.status === 'ready'
+  const hasDelete = canManage
+
+  return (
+    <li
+      className={`kb-item kb-${item.status}${isSelected ? ' kb-selected' : ''}`}
+    >
+      <div
+        className="kb-item-main"
+        role="button"
+        tabIndex={0}
+        aria-pressed={isSelected}
+        title={item.status === 'ready' ? '点击查看切片' : '处理完成后可查看切片'}
+        onClick={() => onToggle(item)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onToggle(item)
+          }
+        }}
+      >
+        <span className="kb-name" title={item.filename}>
+          <span className="kb-name-text">{item.filename}</span>
+        </span>
+        <span className="kb-meta">
+          <span className="kb-dot" aria-hidden="true" />
+          {STATUS_LABEL[item.status]} · {formatSize(item.size_bytes)}
+          {item.status === 'ready' ? ` · ${item.chunk_count} 片` : ''}
+          {item.status === 'failed' && item.error ? ` · ${item.error}` : ''}
+        </span>
+        {item.tags && item.tags.length > 0 ? (
+          <span className="kb-tags">
+            {item.tags.map((t) => (
+              <span key={t} className="kb-tag">
+                {t}
+              </span>
+            ))}
+          </span>
+        ) : null}
+      </div>
+      <div className={`kb-item-side${menuOpen ? ' menu-open' : ''}`}>
+        <button
+          type="button"
+          ref={moreRef}
+          className="kb-item-more"
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-label={`更多操作 · ${item.filename}`}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          title="更多"
+        >
+          <MoreIcon />
+        </button>
+      </div>
+      {menuOpen ? (
+        <div
+          ref={menuRef}
+          className="kb-item-menu"
+          style={{ top: menuPos.top, left: menuPos.left }}
+          role="menu"
+        >
+          {hasDownload ? (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onDownload(item)
+                setMenuOpen(false)
+              }}
+            >
+              下载
+            </button>
+          ) : null}
+          {hasTagEdit ? (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onTagEdit(item)
+                setMenuOpen(false)
+              }}
+            >
+              编辑标签
+            </button>
+          ) : null}
+          {hasRename ? (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onRename(item)
+                setMenuOpen(false)
+              }}
+            >
+              重命名
+            </button>
+          ) : null}
+          {hasDelete ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="danger"
+              onClick={() => {
+                onDelete(item)
+                setMenuOpen(false)
+              }}
+            >
+              删除
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
+  )
 }
 
 type Props = {
@@ -726,108 +886,23 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                   <p className="kb-empty">没有匹配「{query}」的文件。</p>
                 ) : (
               <ul className="kb-list">
-                {visibleFiles.map((item) => {
-                  const isSelected = item.file_id === selectedId
-                  return (
-                    <li
-                      key={item.file_id}
-                      className={`kb-item kb-${item.status}${
-                        isSelected ? ' kb-selected' : ''
-                      }`}
-                    >
-                      <div
-                        className="kb-item-main"
-                        role="button"
-                        tabIndex={0}
-                        aria-pressed={isSelected}
-                        title={
-                          item.status === 'ready'
-                            ? '点击查看切片'
-                            : '处理完成后可查看切片'
-                        }
-                        onClick={() => toggleSelect(item)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            toggleSelect(item)
-                          }
-                        }}
-                      >
-                        <span className="kb-name" title={item.filename}>
-                          <span className="kb-name-text">{item.filename}</span>
-                        </span>
-                        <span className="kb-meta">
-                          <span className="kb-dot" aria-hidden="true" />
-                          {STATUS_LABEL[item.status]} · {formatSize(item.size_bytes)}
-                          {item.status === 'ready' ? ` · ${item.chunk_count} 片` : ''}
-                          {item.status === 'failed' && item.error
-                            ? ` · ${item.error}`
-                            : ''}
-                        </span>
-                        {item.tags && item.tags.length > 0 ? (
-                          <span className="kb-tags">
-                            {item.tags.map((t) => (
-                              <span key={t} className="kb-tag">
-                                {t}
-                              </span>
-                            ))}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="kb-item-side">
-                        {item.status !== 'uploaded' ? (
-                          <button
-                            type="button"
-                            className="kb-download"
-                            onClick={() => void onDownload(item)}
-                            aria-label={`下载 ${item.filename}`}
-                            title="下载原文件"
-                          >
-                            <DownloadIcon />
-                          </button>
-                        ) : null}
-                        {canManage ? (
-                          <button
-                            type="button"
-                            className="kb-tag-btn"
-                            onClick={() => startTagEdit(item)}
-                            aria-label={`编辑 ${item.filename} 的标签`}
-                            title="编辑标签"
-                          >
-                            <TagIcon />
-                          </button>
-                        ) : null}
-                        {/* 后端只允许 ready 改名（重嵌依赖切片就绪），其他状态不显示入口 */}
-                        {canManage && item.status === 'ready' ? (
-                          <button
-                            type="button"
-                            className="kb-tag-btn"
-                            onClick={() => {
-                              setRenameError('')
-                              setRenamingFile(item)
-                            }}
-                            aria-label={`重命名 ${item.filename}`}
-                            title="重命名"
-                          >
-                            <EditIcon />
-                          </button>
-                        ) : null}
-                        {canManage ? (
-                          <button
-                            type="button"
-                            className="kb-delete"
-                            onClick={() => setPendingDelete(item)}
-                            aria-label={`删除 ${item.filename}`}
-                            title="删除"
-                          >
-                            <TrashIcon />
-                          </button>
-                        ) : null}
-                      </div>
-                    </li>
-                  )
-                })}
-                  </ul>
+                {visibleFiles.map((item) => (
+                  <KbFileRow
+                    key={item.file_id}
+                    item={item}
+                    isSelected={item.file_id === selectedId}
+                    canManage={canManage}
+                    onToggle={toggleSelect}
+                    onDownload={(f) => void onDownload(f)}
+                    onTagEdit={startTagEdit}
+                    onRename={(f) => {
+                      setRenameError('')
+                      setRenamingFile(f)
+                    }}
+                    onDelete={setPendingDelete}
+                  />
+                ))}
+              </ul>
                 )}
               </>
             ) : (
@@ -865,7 +940,11 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                               </span>
                             </span>
                             <span className={`kb-gbadge ${badge.cls}`}>
-                              {badge.label}
+                              {badge.cls === 'st-busy' ? (
+                                <span className="kb-gspinner" aria-hidden="true" />
+                              ) : (
+                                badge.label
+                              )}
                             </span>
                           </li>
                         )
@@ -927,8 +1006,8 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
           <section className="kb-chunks" aria-label="文件图谱">
             <header className="kb-chunks-head">
               <h2 className="kb-chunks-title" title={buildFile.filename}>
-                {extBadge(buildFile.filename)}
-                {titleName(buildFile.filename)}
+                {extBadge(buildFile)}
+                {buildFile.filename}
                 <span className="kb-graph-sub">文件图谱</span>
               </h2>
             </header>
@@ -945,8 +1024,8 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
           <section className="kb-chunks" aria-label="文件内容">
             <header className="kb-chunks-head">
               <h2 className="kb-chunks-title" title={selectedFile.filename}>
-                {extBadge(selectedFile.filename)}
-                {titleName(selectedFile.filename)}
+                {extBadge(selectedFile)}
+                {selectedFile.filename}
               </h2>
             </header>
 
@@ -1113,8 +1192,8 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
               <h2 className="kb-chunks-title">
                 {checkedIds.length === 1 && checkedFile ? (
                   <>
-                    {extBadge(checkedFile.filename)}
-                    {titleName(checkedFile.filename)}
+                    {extBadge(checkedFile)}
+                    {checkedFile.filename}
                     <span className="kb-graph-sub">文件图谱</span>
                   </>
                 ) : checkedIds.length > 1 ? (

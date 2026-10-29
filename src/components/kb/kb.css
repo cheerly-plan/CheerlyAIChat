@@ -441,12 +441,13 @@
 }
 
 .kb-item:hover .kb-item-side,
-.kb-item-side:focus-within {
+.kb-item-side:focus-within,
+.kb-item-side.menu-open {
   opacity: 1;
 }
 
-/* 下载/标签/删除三个按钮同一规格：比卡片 hover 灰深一档，图标才立得住 */
-.kb-item-side button {
+/* 「更多」三点按钮：单按钮，点开菜单 */
+.kb-item-side .kb-item-more {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -461,34 +462,59 @@
   transition: background 0.15s, color 0.15s;
 }
 
-.kb-item-side button svg {
-  width: 14px;
-  height: 14px;
+.kb-item-side .kb-item-more svg {
+  width: 15px;
+  height: 15px;
 }
 
-/* 选中卡片悬停时底色是 #d6e0ff：按钮跟着再深一档，不在蓝块上留灰底 */
-.kb-item.kb-selected .kb-item-side button {
+.kb-item.kb-selected .kb-item-side .kb-item-more {
   background: #cdd9ff;
   color: #5b6ea8;
 }
 
-/* 悬停分两档：只有删除是危险操作才染红，下载/标签保持中性灰 */
-.kb-item-side button:hover {
+.kb-item-side .kb-item-more:hover {
   background: #cdd1d8;
   color: #374151;
 }
 
-/* 选中卡片上按钮底色是蓝：hover 在蓝底上再深一档，不能跳回灰 */
-.kb-item.kb-selected .kb-item-side button:hover {
+.kb-item.kb-selected .kb-item-side .kb-item-more:hover {
   background: #bccdff;
   color: #2f4a8f;
 }
 
-/* 删除保持红色危险态；第二条带 button 类型的选择器用来压过上面的选中态规则 */
-.kb-item-side .kb-delete:hover,
-.kb-item.kb-selected .kb-item-side button.kb-delete:hover {
-  background: #fcebeb;
-  color: #a32d2d;
+/* 更多菜单：与会话列表 history-menu 同款紧凑风格，纯文字 */
+.kb-item-menu {
+  position: fixed;
+  z-index: 30;
+  min-width: 132px;
+  padding: 4px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.kb-item-menu button {
+  display: block;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #262626;
+  font: inherit;
+  font-size: 13px;
+  line-height: 32px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kb-item-menu button:hover {
+  background: #f3f4f6;
+}
+
+.kb-item-menu button.danger {
+  color: #e5484d;
 }
 
 /* 标签 chips：与图谱徽标同款蓝，纯展示（点卡片仍是看切片） */
@@ -722,6 +748,212 @@
 }
 
 .rename-dialog .session-dialog-actions .primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+
+/* ——— 建图配置弹窗（构建/重建图谱前确认文档类型 + 抽取粒度）——— */
+/* 骨架复用 .session-dialog，这里补内容区；双类选择器压过 chat.css 宽度 */
+.session-dialog.kb-build-dialog {
+  width: min(480px, calc(100vw - 48px));
+}
+
+.kb-build-file {
+  margin: -6px 0 16px;
+  overflow: hidden;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-build-field {
+  margin-top: 16px;
+}
+
+.kb-build-field:first-of-type {
+  margin-top: 0;
+}
+
+.kb-build-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* 自绘下拉触发框：和原生 select 说再见，与弹窗同一套圆角/阴影语言 */
+.kb-build-select-wrap {
+  position: relative;
+}
+
+.kb-build-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.kb-build-select:hover,
+.kb-build-select-wrap.is-open .kb-build-select {
+  border-color: #3b7bff;
+}
+
+.kb-build-select svg {
+  width: 16px;
+  height: 16px;
+  color: #9aa1ac;
+  flex-shrink: 0;
+}
+
+.kb-build-select-wrap.is-open .kb-build-select svg {
+  transform: rotate(180deg);
+}
+
+/* 下拉浮层：absolute 不裁剪，超长时飘在弹窗下方遮罩上 */
+.kb-build-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  border: 1px solid #ececf1;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+  list-style: none;
+}
+
+.kb-build-menu li {
+  margin: 0;
+}
+
+.kb-build-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kb-build-option:hover,
+.kb-build-option.is-active {
+  background: #f2f6ff;
+}
+
+.kb-build-option.is-on {
+  color: #1d4ed8;
+}
+
+.kb-build-option svg {
+  width: 15px;
+  height: 15px;
+  color: #3b7bff;
+  flex-shrink: 0;
+}
+
+.kb-build-note {
+  margin: 6px 0 0;
+  color: #9aa1ac;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* 抽取粒度：两个并排卡片按钮 */
+.kb-build-levels {
+  display: flex;
+  gap: 10px;
+}
+
+.kb-build-levels button {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.kb-build-levels button:hover {
+  border-color: #8fa8e8;
+}
+
+.kb-build-levels button.is-on {
+  border-color: #3b7bff;
+  background: #f2f6ff;
+}
+
+.kb-build-levels b {
+  display: block;
+  margin-bottom: 3px;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.kb-build-levels button.is-on b {
+  color: #1d4ed8;
+}
+
+.kb-build-levels i {
+  display: block;
+  color: #9aa1ac;
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.5;
+}
+
+.kb-build-hint {
+  margin: 16px 0 0;
+  color: #8a8f98;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.kb-build-error {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fdecec;
+  color: #a32d2d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.kb-build-dialog .session-dialog-actions {
+  margin-top: 20px;
+}
+
+.kb-build-dialog .session-dialog-actions .primary:disabled {
   opacity: 0.6;
   cursor: default;
 }
@@ -1030,27 +1262,180 @@
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
-.kb-kg-go {
+/* 着色选择：最左的实心蓝按钮，展开级联面板（左列 按类型/按簇，右列簇） */
+.kb-kg-shade {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.kb-kg-shade-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   height: 34px;
-  flex-shrink: 0;
-  padding: 0 16px;
+  min-width: 96px;
+  padding: 0 14px;
   border: 0;
   border-radius: 9px;
   background: #4d6bfe;
   color: #fff;
   font: inherit;
   font-size: 13px;
+  line-height: 1;
   cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  white-space: nowrap;
+  transition: background 0.15s;
 }
 
-.kb-kg-go:hover:not(:disabled) {
+.kb-kg-shade-trigger:hover,
+.kb-kg-shade-trigger.is-open {
   background: #3f5ce8;
 }
 
-.kb-kg-go:disabled {
-  opacity: 0.45;
-  cursor: default;
+.kb-kg-shade-trigger svg {
+  width: 12px;
+  height: 12px;
+  color: #fff;
+  transition: transform 0.15s;
+}
+
+.kb-kg-shade-trigger.is-open svg {
+  transform: rotate(180deg);
+}
+
+/* 清除着色选中：按簇聚焦时出现的 ✕，一键回到按类型 */
+.kb-kg-shade-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-left: 6px;
+  padding: 0;
+  border: 1px solid #e6e9f0;
+  border-radius: 9px;
+  background: #fff;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.kb-kg-shade-clear:hover {
+  background: #f4f6fb;
+  color: #374151;
+  border-color: #d8dde8;
+}
+
+.kb-kg-shade-clear svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* 级联面板：左列 按类型/按簇，右列（选按簇时）展开各簇 */
+.kb-kg-shade-panel {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  border: 1px solid #e6e9f0;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+  overflow: hidden;
+}
+
+.kb-kg-shade-menu {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  min-width: 108px;
+}
+
+.kb-kg-shade-sub {
+  min-width: 140px;
+  min-height: 72px;
+  max-height: 360px;
+  overflow-y: auto;
+  border-left: 1px solid #eef0f5;
+  background: #fbfcfe;
+}
+
+.kb-kg-shade-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #374151;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kb-kg-shade-menu button:hover,
+.kb-kg-shade-menu button.is-active {
+  background: #f4f6fb;
+}
+
+.kb-kg-shade-menu button.is-on {
+  color: #3247c8;
+  font-weight: 500;
+  background: #eef1fb;
+}
+
+.kb-kg-shade-menu button.is-on:hover {
+  background: #e6eafb;
+}
+
+.kb-kg-shade-menu button svg {
+  width: 14px;
+  height: 14px;
+  color: #4d6bfe;
+  flex-shrink: 0;
+}
+
+/* 左列「按簇」项：名字 + 右箭头，暗示还有第二级 */
+.kb-kg-shade-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.kb-kg-shade-branch::after {
+  content: '›';
+  color: #9aa1ad;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* 簇下拉里的选项：簇名 + 数量 */
+.kb-kg-shade-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-kg-shade-cluster i {
+  color: #9aa2b4;
+  font-style: normal;
+  font-size: 10px;
 }
 
 /* 命中实体 */
@@ -1110,6 +1495,84 @@
   border-radius: 12px;
   overflow: hidden;
   background: #fcfdff;
+}
+
+/* 画布左上：当前图用的抽取配置（淡色 provenance，纯提示不占布局高度） */
+.kb-kg-provenance {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 4;
+  max-width: 60%;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #9aa1ac;
+  font-size: 12px;
+  line-height: 1.6;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
+/* 画布左上 provenance 下方：实体对齐结果（已合并 N 个写法），纯文字说明 */
+.kb-kg-align {
+  position: absolute;
+  top: 38px;
+  left: 12px;
+  z-index: 4;
+  padding: 2px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #9aa1ac;
+  font-size: 12px;
+  line-height: 1.6;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
+/* 已有图谱：hover 画布时右上角浮出「重建」按钮，平时收起不挡图 */
+.kb-kg-rebuild {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #4b5563;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.15s, transform 0.15s, border-color 0.15s, color 0.15s;
+  backdrop-filter: blur(4px);
+}
+
+.kb-kg-canvas:hover .kb-kg-rebuild,
+.kb-kg-rebuild:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.kb-kg-rebuild:hover {
+  border-color: #8fa8e8;
+  color: #1d4ed8;
+}
+
+.kb-kg-rebuild:disabled {
+  opacity: 0;
+  cursor: default;
+}
+
+.kb-kg-rebuild svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* ——— 画布本体 ——— */
@@ -1270,162 +1733,6 @@
   color: #a4abba;
   font-style: normal;
   font-size: 9.5px;
-}
-
-/* 着色切换 + 簇列表：夹在检索栏和画布之间的一条细带，不抢画布高度 */
-.kb-kg-clusters {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 2px 7px;
-  font-size: 11.5px;
-  color: #8b93a3;
-}
-
-/* 抽取配置：文档类型 + 粒度。选择即保存，重建才生效，所以一行放得下 */
-.kb-kg-profile {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 2px 7px;
-  font-size: 11.5px;
-  color: #8b93a3;
-}
-
-.kb-kg-profile-label {
-  flex: none;
-  color: #a4abba;
-}
-
-.kb-kg-profile-select {
-  flex: none;
-  max-width: 190px;
-  padding: 3px 8px;
-  border: 1px solid #e2e6ef;
-  border-radius: 7px;
-  background: #fff;
-  color: #4a5261;
-  font: inherit;
-  font-size: 11.5px;
-  cursor: pointer;
-}
-
-.kb-kg-profile-select:disabled {
-  cursor: default;
-  opacity: 0.6;
-}
-
-.kb-kg-profile .kb-kg-depth {
-  padding: 1px;
-}
-
-.kb-kg-profile .kb-kg-depth button {
-  padding: 3px 8px;
-  font-size: 11.5px;
-}
-
-.kb-kg-profile-hint {
-  flex: none;
-  color: #3b5bdb;
-}
-
-/* 实体对齐：一行说明 + 一个按钮，不占画布高度 */
-.kb-kg-align {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 0 2px 7px;
-  font-size: 11.5px;
-  color: #8b93a3;
-}
-
-.kb-kg-align-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kb-kg-align button {
-  flex: none;
-  padding: 2px 10px;
-  border: 1px solid #e2e6ef;
-  border-radius: 999px;
-  background: #fff;
-  color: #5f6779;
-  font-size: 11.5px;
-  line-height: 18px;
-  cursor: pointer;
-}
-
-.kb-kg-align button:hover:not(:disabled) {
-  border-color: #4d6bfe;
-  color: #3247c8;
-}
-
-.kb-kg-align button:disabled {
-  cursor: default;
-  opacity: 0.6;
-}
-
-.kb-kg-clusters-label {
-  color: #a4abba;
-}
-
-.kb-kg-clusters > button {
-  padding: 2px 9px;
-  border: 1px solid #e2e6ef;
-  border-radius: 999px;
-  background: #fff;
-  color: #5f6779;
-  font-size: 11.5px;
-  line-height: 18px;
-  cursor: pointer;
-}
-
-.kb-kg-clusters > button.is-on {
-  border-color: #4d6bfe;
-  background: #eef2ff;
-  color: #3247c8;
-}
-
-.kb-kg-cluster-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-left: 2px;
-}
-
-.kb-kg-cluster {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 210px;
-  padding: 2px 8px;
-  border: 1px solid #e8ebf3;
-  border-radius: 7px;
-  background: #f8f9fc;
-  color: #59617a;
-  font-size: 11px;
-  line-height: 17px;
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kb-kg-cluster i {
-  color: #9aa2b4;
-  font-style: normal;
-  font-size: 10px;
-}
-
-.kb-kg-cluster.is-on {
-  border-color: #4d6bfe;
-  background: #eef2ff;
-  color: #2f43bd;
 }
 
 .kg-zoom {
@@ -1956,10 +2263,6 @@
     display: none;
   }
 
-  .kb-kg-go {
-    padding: 0 12px;
-  }
-
   .kb-legend,
   .kg-legend {
     max-width: calc(100% - 56px);
@@ -2113,6 +2416,24 @@
 .kb-gbadge.st-busy,
 .kb-gbadge.st-none {
   color: #9aa1ad;
+}
+
+/* 构建中的转圈指示：与会话列表 loading 同款，不占文字 */
+.kb-gspinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  vertical-align: -2px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: kb-gspinner-spin 0.8s linear infinite;
+}
+
+@keyframes kb-gspinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .kb-gbadge.st-stale {
