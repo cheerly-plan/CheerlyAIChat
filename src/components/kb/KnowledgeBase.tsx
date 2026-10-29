@@ -29,8 +29,7 @@ import {
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import KbGraphPanel from './KbGraphPanel'
 import { KgBuildDialog } from './KgBuildDialog'
-import { RenameDialog } from './RenameDialog'
-import { TagDialog } from './TagDialog'
+import { FileEditDialog } from './FileEditDialog'
 import './kb.css'
 
 const STATUS_LABEL: Record<KbFile['status'], string> = {
@@ -214,8 +213,8 @@ type KbFileRowProps = {
   canManage: boolean
   onToggle: (item: KbFile) => void
   onDownload: (item: KbFile) => void
-  onTagEdit: (item: KbFile) => void
-  onRename: (item: KbFile) => void
+  /** 文件名 + 标签合并成一个编辑入口 */
+  onEdit: (item: KbFile) => void
   onDelete: (item: KbFile) => void
 }
 
@@ -225,8 +224,7 @@ function KbFileRow({
   canManage,
   onToggle,
   onDownload,
-  onTagEdit,
-  onRename,
+  onEdit,
   onDelete,
 }: KbFileRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -259,8 +257,8 @@ function KbFileRow({
   }, [menuOpen])
 
   const hasDownload = item.status !== 'uploaded'
-  const hasTagEdit = canManage
-  const hasRename = canManage && item.status === 'ready'
+  // 编辑（改名 + 标签）合成一项：两者都是「这份文件是什么」的元信息
+  const hasEdit = canManage
   const hasDelete = canManage
 
   return (
@@ -362,28 +360,16 @@ function KbFileRow({
               下载
             </button>
           ) : null}
-          {hasTagEdit ? (
+          {hasEdit ? (
             <button
               type="button"
               role="menuitem"
               onClick={() => {
-                onTagEdit(item)
+                onEdit(item)
                 setMenuOpen(false)
               }}
             >
-              编辑标签
-            </button>
-          ) : null}
-          {hasRename ? (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onRename(item)
-                setMenuOpen(false)
-              }}
-            >
-              重命名
+              编辑
             </button>
           ) : null}
           {hasDelete ? (
@@ -425,11 +411,11 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
   const [error, setError] = useState('')
   // 文件名/标签筛选：客户端过滤（文件量级小，不值得每次打接口）
   const [query, setQuery] = useState('')
-  // 标签编辑弹窗：非空即打开该文件的标签弹窗（一次只编辑一个文件）
-  const [taggingFile, setTaggingFile] = useState<KbFile | null>(null)
-  const [savingTags, setSavingTags] = useState(false)
-  // 标签保存失败：显示在弹窗内（页面顶部的 error 会被蒙层盖住）
-  const [tagError, setTagError] = useState('')
+  // 编辑弹窗（文件名 + 标签）：非空即打开该文件的编辑弹窗（一次只编一个）
+  const [editingFile, setEditingFile] = useState<KbFile | null>(null)
+  const [savingFileEdit, setSavingFileEdit] = useState(false)
+  // 保存失败：显示在弹窗内（页面顶部的 error 会被蒙层盖住）
+  const [fileEditError, setFileEditError] = useState('')
   // 待删除文件：非空即弹出确认框（与删除会话同一套弹窗）
   const [pendingDelete, setPendingDelete] = useState<KbFile | null>(null)
   // 「文件」tab 点文件看切片用（与图谱视图无关：图谱完全由勾选驱动）
@@ -1051,56 +1037,55 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
     }
   }
 
-  // ——— 标签管理（管理员）：弹窗里增删，保存时全量覆盖 ———
+  // ——— 编辑（管理员）：文件名 + 标签一个弹窗改完，一次保存 ———
+  // 两个后端接口还是分开的：按实际改动分别调用，只改标签不会碰文件名
+  // （改名会触发后台重嵌，没必要为了加个标签白跑一遍）
 
-  const startTagEdit = (item: KbFile) => {
-    setTagError('')
-    setTaggingFile(item)
+  const startFileEdit = (item: KbFile) => {
+    setFileEditError('')
+    setEditingFile(item)
   }
 
-  const saveTags = async (tags: string[]) => {
-    if (!taggingFile || savingTags) return
-    const fileId = taggingFile.file_id
-    setSavingTags(true)
-    setTagError('')
+  const sameTags = (a: string[], b: string[]) =>
+    a.length === b.length && a.every((tag, i) => tag === b[i])
+
+  const saveEdit = async (payload: { filename: string; tags: string[] }) => {
+    if (!editingFile || savingFileEdit) return
+    const fileId = editingFile.file_id
+    // 取最新的那条：上次保存可能已经改了名（改完名标签失败后重试时）
+    const current = files.find((f) => f.file_id === fileId) ?? editingFile
+    const nextName = payload.filename.trim()
+    setSavingFileEdit(true)
+    setFileEditError('')
+    let renamed = false
     try {
-      await setKbFileTags(fileId, tags)
-      setFiles((cur) =>
-        cur.map((f) => (f.file_id === fileId ? { ...f, tags } : f)),
-      )
-      setTaggingFile(null)
+      if (nextName && nextName !== current.filename) {
+        await renameKbFile(fileId, nextName)
+        renamed = true
+        // selectedFile 由 files 派生，改列表右侧标题/下载名即跟着变
+        setFiles((cur) =>
+          cur.map((f) => (f.file_id === fileId ? { ...f, filename: nextName } : f)),
+        )
+        setEditingFile((prev) =>
+          prev && prev.file_id === fileId ? { ...prev, filename: nextName } : prev,
+        )
+      }
+      if (!sameTags(payload.tags, current.tags ?? [])) {
+        await setKbFileTags(fileId, payload.tags)
+        setFiles((cur) =>
+          cur.map((f) =>
+            f.file_id === fileId ? { ...f, tags: payload.tags } : f,
+          ),
+        )
+      }
+      setEditingFile(null)
     } catch (e) {
-      // 弹窗不关：保住刚编好的标签，用户改完可以直接重试
-      setTagError(e instanceof Error ? e.message : '保存标签失败')
+      // 弹窗不关：保住刚编好的内容，用户改完可以直接重试。名字已经存下
+      // 去了就说清楚，免得用户以为整单都没生效
+      const message = e instanceof Error ? e.message : '保存失败'
+      setFileEditError(renamed ? `名称已保存，标签未保存：${message}` : message)
     } finally {
-      setSavingTags(false)
-    }
-  }
-
-  // ——— 重命名（管理员）：弹窗改名，后端同步磁盘并按需重嵌 ———
-
-  const [renamingFile, setRenamingFile] = useState<KbFile | null>(null)
-  const [savingRename, setSavingRename] = useState(false)
-  // 改名失败显示在弹窗内（页面顶部 error 会被蒙层盖住）
-  const [renameError, setRenameError] = useState('')
-
-  const saveRename = async (filename: string) => {
-    if (!renamingFile || savingRename) return
-    const fileId = renamingFile.file_id
-    setSavingRename(true)
-    setRenameError('')
-    try {
-      await renameKbFile(fileId, filename)
-      // selectedFile 由 files 派生，改列表右侧标题/下载名即跟着变
-      setFiles((cur) =>
-        cur.map((f) => (f.file_id === fileId ? { ...f, filename } : f)),
-      )
-      setRenamingFile(null)
-    } catch (e) {
-      // 弹窗不关：保住刚输入的名字，用户改完可以直接重试
-      setRenameError(e instanceof Error ? e.message : '重命名失败')
-    } finally {
-      setSavingRename(false)
+      setSavingFileEdit(false)
     }
   }
 
@@ -1270,11 +1255,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                                   canManage={canManage}
                                   onToggle={toggleSelect}
                                   onDownload={(f) => void onDownload(f)}
-                                  onTagEdit={startTagEdit}
-                                  onRename={(f) => {
-                                    setRenameError('')
-                                    setRenamingFile(f)
-                                  }}
+                                  onEdit={startFileEdit}
                                   onDelete={setPendingDelete}
                                 />
                               ))}
@@ -1783,25 +1764,19 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
         )}
       </div>
 
-      {taggingFile ? (
-        <TagDialog
-          filename={taggingFile.filename}
-          initialTags={taggingFile.tags ?? []}
+      {editingFile ? (
+        <FileEditDialog
+          // 换文件才重挂载：保存过程中改了名，弹窗里的草稿不该被冲掉
+          key={editingFile.file_id}
+          filename={editingFile.filename}
+          suffix={editingFile.mime}
+          canRename={editingFile.status === 'ready'}
+          initialTags={editingFile.tags ?? []}
           suggestions={allTags}
-          saving={savingTags}
-          error={tagError}
-          onCancel={() => setTaggingFile(null)}
-          onSave={(tags) => void saveTags(tags)}
-        />
-      ) : null}
-
-      {renamingFile ? (
-        <RenameDialog
-          filename={renamingFile.filename}
-          saving={savingRename}
-          error={renameError}
-          onCancel={() => setRenamingFile(null)}
-          onSave={(name) => void saveRename(name)}
+          saving={savingFileEdit}
+          error={fileEditError}
+          onCancel={() => setEditingFile(null)}
+          onSave={(payload) => void saveEdit(payload)}
         />
       ) : null}
 

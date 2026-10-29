@@ -625,22 +625,7 @@
   white-space: nowrap;
 }
 
-/* ——— 标签编辑弹窗（骨架复用 .session-dialog，这里只补内容区）——— */
-/* 双类选择器压过 chat.css 里的 .session-dialog 宽度，避免加载顺序影响 */
-.session-dialog.tag-dialog {
-  width: min(460px, calc(100vw - 48px));
-}
-
-.tag-dialog-file {
-  margin: -6px 0 14px;
-  overflow: hidden;
-  color: #6b7280;
-  font-size: 12px;
-  line-height: 1.5;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+/* ——— 标签 chips 输入区（文件编辑弹窗里的一段）——— */
 /* chips 与输入框同框换行：点框内任意空白都聚焦到输入。
    滚动放外层、内边距放里层，滚动条贴住边框 */
 .tag-dialog-field {
@@ -789,55 +774,93 @@
   color: #1d4ed8;
 }
 
-/* 弹窗底部按钮离内容远一点（骨架里靠 <p> 的 margin 撑开，这里没有 p） */
-.tag-dialog .session-dialog-actions {
-  margin-top: 20px;
+/* ——— 文件编辑弹窗：文件名 + 标签两块，共用一套输入与底部按钮 ——— */
+/* 双类选择器压过 chat.css 里的 .session-dialog 宽度，避免加载顺序影响 */
+.session-dialog.file-edit-dialog {
+  width: min(480px, calc(100vw - 48px));
 }
 
-.tag-dialog .session-dialog-actions .primary:disabled {
-  opacity: 0.6;
-  cursor: default;
+/* 两块之间用一条发丝线分开：同一次提交，但确实是两件事 */
+.file-edit-section + .file-edit-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f1f3f6;
 }
 
-/* 重命名弹窗：单输入框，复用标签弹窗的骨架与底部按钮规则 */
-.rename-dialog-field input {
-  width: 100%;
-  min-height: 44px;
-  padding: 8px 10px;
+.file-edit-label {
+  display: block;
+  margin-bottom: 7px;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 名字输入框：后缀作为固定尾巴贴在右边，一眼看出扩展名改不了 */
+.file-edit-name {
+  display: flex;
+  align-items: center;
+  padding-right: 10px;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   background: #fff;
-  font: inherit;
-  font-size: 13px;
+  cursor: text;
   transition: border-color 0.15s;
 }
 
-.rename-dialog-field input:hover,
-.rename-dialog-field input:focus {
+.file-edit-name:hover,
+.file-edit-name:focus-within {
   border-color: #3b7bff;
+}
+
+/* 处理中的文件不许改名：整个框置灰、光标退回默认 */
+.file-edit-name.is-locked,
+.file-edit-name.is-locked:hover {
+  border-color: #eef0f3;
+  background: #f7f8fa;
+  cursor: default;
+}
+
+.file-edit-name input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
   outline: none;
 }
 
-.rename-dialog-hint,
-.rename-dialog-error {
-  margin: 10px 0 0;
+.file-edit-name input:disabled {
+  color: #9aa1ac;
+  -webkit-text-fill-color: #9aa1ac;
+}
+
+.file-edit-suffix {
+  flex-shrink: 0;
+  color: #9aa1ac;
+  font-size: 13px;
+  user-select: none;
+}
+
+.file-edit-hint {
+  margin: 7px 0 0;
+  color: #9aa1ac;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
-.rename-dialog-hint {
-  color: #8a8f98;
-}
-
-.rename-dialog-error {
+.file-edit-hint.is-error {
   color: #d64545;
 }
 
-.rename-dialog .session-dialog-actions {
+.file-edit-dialog .session-dialog-actions {
   margin-top: 20px;
 }
 
-.rename-dialog .session-dialog-actions .primary:disabled {
+.file-edit-dialog .session-dialog-actions .primary:disabled {
   opacity: 0.6;
   cursor: default;
 }
