@@ -1296,26 +1296,26 @@
   color: inherit;
 }
 
-/* 「第 N 页」：PDF 可点，新标签打开原件对应页。平时看着就是普通灰字，
-   hover 才显出下划线和主色，不把卡片变成一排链接 */
+/* 「第 N 页」：PDF 可点，新标签打开原件对应页。常驻蓝色下划线——
+   这一列里它是唯一的可点项，不下划线就没人知道能点 */
 .kb-chunk-page {
   padding: 0;
   border: none;
   background: none;
-  color: #5b6472;
+  color: #4d6bfe;
   font: inherit;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   text-decoration: underline;
-  text-decoration-color: transparent;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1px;
   text-underline-offset: 2px;
   cursor: pointer;
-  transition: color 0.15s, text-decoration-color 0.15s;
+  transition: color 0.15s;
 }
 
 .kb-chunk-page:hover {
-  color: #4d6bfe;
-  text-decoration-color: currentColor;
+  color: #2f4fdb;
 }
 
 /* 跳页落点：淡蓝底 + 主色光圈，1.6s 后由 JS 摘掉 is-flash */
