@@ -1293,10 +1293,22 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                     <span className="kb-graph-sub">实体关系总览</span>
                   </>
                 )}
-                {checkedIds.length !== 1 && graphStats ? (
-                  <span className="kb-graph-stat">
-                    {graphStats.entities} 实体 · {graphStats.relations} 关系 ·{' '}
-                    {graphStats.files} 文件
+                {/* 概览拆成独立小标签：挤在一行文字里既看不出重点，
+                    又容易被当成标题的一部分。单文件视图 files 恒为 1，
+                    「文件」这颗标签只在真的跨文件时出现 */}
+                {graphStats ? (
+                  <span className="kb-graph-stats">
+                    <span className="kb-graph-tag">
+                      <b>{graphStats.entities}</b> 实体
+                    </span>
+                    <span className="kb-graph-tag">
+                      <b>{graphStats.relations}</b> 关系
+                    </span>
+                    {graphStats.files > 1 ? (
+                      <span className="kb-graph-tag">
+                        <b>{graphStats.files}</b> 文件
+                      </span>
+                    ) : null}
                   </span>
                 ) : null}
               </h2>

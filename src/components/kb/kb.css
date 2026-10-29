@@ -1149,17 +1149,31 @@
   font-weight: 400;
 }
 
-/* 统计跟着标题走：跟在「实体关系总览」后面，比副标题再淡一档 */
-.kb-graph-stat {
-  color: #b3b8c2;
-  font-size: 11px;
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
+/* 概览统计：跟着标题走的一组小标签（实体 / 关系 / 文件） */
+.kb-graph-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  vertical-align: 2px;
 }
 
-.kb-graph-stat::before {
-  content: '·';
-  margin: 0 6px;
+.kb-graph-tag {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #f2f4f7;
+  color: #8b919e;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.kb-graph-tag b {
+  margin-right: 2px;
+  color: #4b5563;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .kb-kg {
