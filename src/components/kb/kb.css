@@ -1497,68 +1497,6 @@
   background: #fcfdff;
 }
 
-/* 画布左上：实体对齐结果（已合并 N 个写法），纯文字说明。
-   抽取配置已挪到左侧列表文件名下方，画布只留对齐结果 */
-.kb-kg-align {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 4;
-  padding: 2px 10px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.86);
-  color: #9aa1ac;
-  font-size: 12px;
-  line-height: 1.6;
-  pointer-events: none;
-  backdrop-filter: blur(4px);
-}
-
-/* 已有图谱：hover 画布时右上角浮出「重建」按钮，平时收起不挡图 */
-.kb-kg-rebuild {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 5;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 30px;
-  padding: 0 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 15px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #4b5563;
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  opacity: 0;
-  transform: translateY(-2px);
-  transition: opacity 0.15s, transform 0.15s, border-color 0.15s, color 0.15s;
-  backdrop-filter: blur(4px);
-}
-
-.kb-kg-canvas:hover .kb-kg-rebuild,
-.kb-kg-rebuild:focus-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.kb-kg-rebuild:hover {
-  border-color: #8fa8e8;
-  color: #1d4ed8;
-}
-
-.kb-kg-rebuild:disabled {
-  opacity: 0;
-  cursor: default;
-}
-
-.kb-kg-rebuild svg {
-  width: 14px;
-  height: 14px;
-}
-
 /* ——— 画布本体 ——— */
 
 .kg-shell {
@@ -2482,13 +2420,11 @@
 
 .kb-gact:hover {
   color: #3b56d9;
-  text-decoration: underline;
 }
 
 .kb-gact:disabled {
   color: #b6bccb;
   cursor: default;
-  text-decoration: none;
 }
 
 /* ——— 切片人工修订（改切片即审核）——— */

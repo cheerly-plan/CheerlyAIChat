@@ -12,7 +12,7 @@ import {
 } from '../../api'
 import KnowledgeGraph from './KnowledgeGraph'
 import { KgBuildDialog } from './KgBuildDialog'
-import { SearchIcon, ChevronDownIcon, CheckIcon, CloseIcon, RefreshIcon } from '../chat/icons'
+import { SearchIcon, ChevronDownIcon, CheckIcon, CloseIcon } from '../chat/icons'
 
 type Props = {
   /** 选中文件时看该文件的图谱；为空时看全库或合并范围 */
@@ -677,25 +677,6 @@ export default function KbGraphPanel({
       ) : null}
 
       <div className="kb-kg-canvas">
-        {/* 实体对齐已并入建图流程；这里只展示对齐结果，不再有手动对齐入口 */}
-        {hasGraph && (graph?.alias_count ?? 0) > 0 ? (
-          <div className="kb-kg-align">
-            已合并 {graph!.alias_count} 个写法
-          </div>
-        ) : null}
-        {/* 已有图谱：hover 画布时右上角浮出「重建」按钮，点击同样进配置弹窗 */}
-        {hasGraph && fileId && canManage ? (
-          <button
-            type="button"
-            className="kb-kg-rebuild"
-            onClick={openBuildDialog}
-            disabled={isBuilding}
-            title="按新的文档类型与抽取粒度重建这份图谱"
-          >
-            <RefreshIcon />
-            重建
-          </button>
-        ) : null}
         <KnowledgeGraph
           graph={viewGraph}
           loading={loading}
