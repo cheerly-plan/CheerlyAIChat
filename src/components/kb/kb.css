@@ -331,14 +331,13 @@
 /* 失败卡片不再单独描红边：整列已是灰/蓝色块，一圈描边会显得被框住；
    失败状态由红点 + 红色状态文案（「失败 · 解析超时」）表达，信息没丢 */
 
-/* ——— 选中态：左侧 3px 主色竖条 + 极浅蓝底 ———
-   之前是整块 #d6e0ff 深蓝，压得整行像个弹窗遮罩；现在底色只到 #f0f5ff，
-   靠竖条给出确切的「在哪儿」的指向，选中行仍能从白卡片里浮出来。 */
+/* ——— 选中态：只有左侧 3px 主色竖条 + 淡蓝描边 ———
+   底色那版（先是整块 #d6e0ff，后来压到 #f0f5ff）最终也去掉了：
+   卡片本身就有白底和描边，再叠一层底色会让它像「禁用/报错」而不像选中，
+   而且选中 + hover 两级底色叠在一起很难调。现在选中纯靠竖条指向。 */
 
 .kb-item.kb-selected {
   border-color: #cfe0ff;
-  background: #f0f5ff;
-  box-shadow: none;
 }
 
 /* 竖条贴在卡片左内缘，上下留 8px，看着是一条把手而不是一道边框 */
@@ -352,12 +351,10 @@
   background: #4d6bfe;
 }
 
-.kb-item.kb-selected:hover {
-  background: #e8f0ff;
-}
+/* 选中行 hover 走与普通行同一档灰底：行本身已无蓝底，
+   再留「蓝 hover」分支等于把两重底色叠回去，最容易脏 */
 
-/* 选中态只由「竖条 + 浅蓝底」表达，标题保持黑色不变色：
-   竖条+底+蓝字三层叠在一起太重，看着像报错行 */
+/* 选中态标题不变蓝（竖条 + 淡蓝描边已足够，三层叠加看着像报错行） */
 
 .kb-name {
   display: flex;
@@ -515,20 +512,13 @@
   height: 15px;
 }
 
-.kb-item.kb-selected .kb-item-side .kb-item-more {
-  background: #cdd9ff;
-  color: #5b6ea8;
-}
-
 .kb-item-side .kb-item-more:hover {
   background: #cdd1d8;
   color: #374151;
 }
 
-.kb-item.kb-selected .kb-item-side .kb-item-more:hover {
-  background: #bccdff;
-  color: #2f4a8f;
-}
+/* 选中行的蓝按钮变体一并删掉：它们当初是为配蓝色底做的微调，
+   底色没了，按钮保持同一套中性灰/主色即可 */
 
 /* 重建图谱：与「更多」同款圆形图标按钮，只换主色。
    图标按钮比文字按钮弱，hover 才出现，高危操作不常驻吸注意力 */
@@ -555,10 +545,6 @@
 .kb-item-side .kb-item-act:hover {
   background: #c6d4ff;
   color: #3b56d9;
-}
-
-.kb-item.kb-selected .kb-item-side .kb-item-act {
-  background: #d3e0ff;
 }
 
 /* 更多菜单：与会话列表 history-menu 同款紧凑风格，纯文字 */
@@ -2436,10 +2422,11 @@
   box-shadow: 0 1px 4px rgba(17, 24, 39, 0.06);
 }
 
-/* 选中（勾选入合并范围 / 单独查看）：主色浅底 + 淡蓝描边 */
+/* 选中（勾选入合并范围 / 单独查看）：只留主色淡描边，不铺底色。
+   底色和白卡片叠在一起很像「禁用/异常」——勾选本身已经是可见状态，
+   描边够指认「这家在图里」，再多一层底就重了 */
 .kb-gitem.is-picked {
-  background: #f5f7ff;
-  border-color: #d3dcff;
+  border-color: #c9d4ff;
 }
 
 /* 图谱未生成/失败的行整体降存在感，把注意力让给「构建」按钮 */
