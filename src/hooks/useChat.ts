@@ -198,9 +198,10 @@ export function useChat(initialUser?: UserInfo | null) {
       const target = sessionsRef.current.find((item) => item.session_id === sessionId)
       if (!target || target.title !== DEFAULT_SESSION_TITLE) return
       try {
-        const { title } = await fetchSessionTitle(sessionId)
-        if (title !== DEFAULT_SESSION_TITLE) {
-          applyGeneratedTitle(sessionId, title)
+        const result = await fetchSessionTitle(sessionId)
+        if (!result) return
+        if (result.title !== DEFAULT_SESSION_TITLE) {
+          applyGeneratedTitle(sessionId, result.title)
           return
         }
       } catch {

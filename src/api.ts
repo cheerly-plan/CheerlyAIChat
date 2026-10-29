@@ -193,9 +193,10 @@ export async function deleteSession(sessionId: string): Promise<void> {
 
 export async function fetchSessionTitle(
   sessionId: string,
-): Promise<SessionTitle> {
+): Promise<SessionTitle | null> {
   const params = new URLSearchParams({ session_id: sessionId })
   const response = await authedFetch(`/v1/session/title?${params}`, { headers: authHeaders() })
+  if (response.status === 404) return null
   if (!response.ok) {
     throw new Error(`获取会话标题失败 ${response.status}`)
   }
