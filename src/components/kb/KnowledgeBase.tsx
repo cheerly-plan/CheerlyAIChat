@@ -678,6 +678,14 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
     }
   }
 
+  // 当前图用的抽取配置（中文名 + 粒度）：展示在列表文件名下方，
+  // 取代原来画布左上的 provenance 浮层——配置是「这份文件」的属性，跟着文件走更自然
+  const docTypeLabelOf = (key?: string) => {
+    if (!key || key === 'general') return '通用'
+    return docTypes.find((t) => t.key === key)?.label || key
+  }
+  const levelLabelOf = (level?: string) => (level === 'light' ? '轻量' : '完整')
+
   // ——— 切片人工修订：保存即单片重嵌入 ———
 
   const startEdit = (chunk: KbChunk) => {
@@ -1024,6 +1032,13 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                                 </span>
                                 <span className="kb-gcount">
                                   {item.graph_entity_count ?? 0} 实体
+                                  <span
+                                    className="kb-gprofile"
+                                    title="这份图谱用的抽取配置"
+                                  >
+                                    {docTypeLabelOf(item.doc_type)} ·{' '}
+                                    {levelLabelOf(item.extract_level)}
+                                  </span>
                                 </span>
                               </span>
                             </label>

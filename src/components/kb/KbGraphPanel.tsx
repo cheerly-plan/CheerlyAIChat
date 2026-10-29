@@ -135,16 +135,9 @@ export default function KbGraphPanel({
   /** 是否已有可看的图谱：节点非空即「有图」，决定隐藏检索栏还是隐藏构建入口 */
   const hasGraph = Boolean(graph && graph.nodes.length > 0)
 
-  // 画布左上 provenance 浮层：当前图用的配置（中文名 + 粒度），淡色只作提示
-  const docTypeLabel =
-    activeDocType === 'general' || !activeDocType
-      ? '通用'
-      : docTypes.find((t) => t.key === activeDocType)?.label || activeDocType
-  const levelLabel = activeLevel === 'full' ? '完整' : '轻量'
-
   /**
    * 实体对齐已并入建图流程：重建图谱时自动对齐，无需手动触发。
-   * 画布上的对齐结果（已合并 N 个写法）由下方浮层展示，不再有手动对齐按钮。
+   * 当前图用的抽取配置已挪到左侧列表文件名下方展示，画布只留对齐结果。
    */
 
   // 图谱构建中：单文件视图看自己的 graph_status，全库/合并视图看父组件给的 building
@@ -684,12 +677,6 @@ export default function KbGraphPanel({
       ) : null}
 
       <div className="kb-kg-canvas">
-        {/* 已有图谱：左上角淡色 provenance（当前图用的配置），不占布局高度 */}
-        {hasGraph ? (
-          <div className="kb-kg-provenance">
-            当前图：{docTypeLabel} · {levelLabel}
-          </div>
-        ) : null}
         {/* 实体对齐已并入建图流程；这里只展示对齐结果，不再有手动对齐入口 */}
         {hasGraph && (graph?.alias_count ?? 0) > 0 ? (
           <div className="kb-kg-align">
