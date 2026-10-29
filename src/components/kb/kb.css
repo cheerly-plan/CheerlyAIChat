@@ -1072,6 +1072,77 @@
   height: 30px;
 }
 
+/* ——— 跳页：只在有页码的文件（PDF 类）出现在标题右侧 ——— */
+
+.kb-jump {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.kb-jump-input {
+  width: 46px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid #e4e7ee;
+  border-radius: 6px;
+  background: #fff;
+  color: #26292f;
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.kb-jump-input::placeholder {
+  color: #b4b9c4;
+}
+
+.kb-jump-input:focus {
+  outline: none;
+  border-color: #b9c8ff;
+  box-shadow: 0 0 0 3px rgba(77, 107, 254, 0.1);
+}
+
+.kb-jump-total {
+  color: #9aa0a6;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kb-jump-go {
+  height: 24px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: #f0f3ff;
+  color: #4d6bfe;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.kb-jump-go:hover:not(:disabled) {
+  background: #e2e9ff;
+}
+
+.kb-jump-go:disabled {
+  background: #f3f4f7;
+  color: #b6bccb;
+  cursor: default;
+}
+
+/* 跳页提示（「第 12 页没有切片，已跳到第 13 页」）：暖色，不当错误处理 */
+.kb-jump-hint {
+  margin: 6px 0 0;
+  padding: 0 2px;
+  color: #a9661c;
+  font-size: 11.5px;
+}
+
 .kb-chunks-title {
   margin: 0;
   min-width: 0;
@@ -1219,6 +1290,39 @@
 .kb-chunk-pos {
   color: #9aa0a6;
   font-size: 11px;
+}
+
+.kb-chunk-pos-text {
+  color: inherit;
+}
+
+/* 「第 N 页」：PDF 可点，新标签打开原件对应页。平时看着就是普通灰字，
+   hover 才显出下划线和主色，不把卡片变成一排链接 */
+.kb-chunk-page {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #5b6472;
+  font: inherit;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: color 0.15s, text-decoration-color 0.15s;
+}
+
+.kb-chunk-page:hover {
+  color: #4d6bfe;
+  text-decoration-color: currentColor;
+}
+
+/* 跳页落点：淡蓝底 + 主色光圈，1.6s 后由 JS 摘掉 is-flash */
+.kb-chunk.is-flash {
+  border-color: #bcd0ff;
+  background: #f4f8ff;
+  box-shadow: 0 0 0 3px rgba(77, 107, 254, 0.12);
 }
 
 .kb-chunk-text {

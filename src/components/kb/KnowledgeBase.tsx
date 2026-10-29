@@ -7,6 +7,8 @@ import {
   fetchKbChunks,
   fetchKbFiles,
   fetchKgDocTypes,
+  locateKbChunkPage,
+  openKbFileAtPage,
   rebuildKgGraph,
   renameKbFile,
   setKbFileTags,
@@ -135,6 +137,34 @@ function chunkPos(chunk: KbChunk): string {
     return chunk.page != null ? `第${chunk.page}页图表` : '图表'
   }
   return chunk.page != null ? `第${chunk.page}页` : `第${chunk.seq + 1}段`
+}
+
+/** 页码标注：PDF 类文件可点，点开原件对应页；其它类型/无页码只作文字 */
+function ChunkPageTag({
+  chunk,
+  file,
+  onOpen,
+}: {
+  chunk: KbChunk
+  file: KbFile
+  onOpen: (file: KbFile, page: number) => void
+}) {
+  const page = chunk.page
+  const isPdf = (file.mime ?? '').toLowerCase().includes('pdf')
+  const label = chunkPos(chunk)
+  if (!isPdf || page == null) {
+    return <span className="kb-chunk-pos-text">{label}</span>
+  }
+  return (
+    <button
+      type="button"
+      className="kb-chunk-page"
+      onClick={() => onOpen(file, page)}
+      title={`在新标签打开原件第 ${page} 页`}
+    >
+      {label}
+    </button>
+  )
 }
 
 // 扩展名 → 展示名 + 配色。格式标签要一眼能认出类型（PDF 红 / 文档蓝 /
@@ -448,6 +478,19 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
   const [chunksTotal, setChunksTotal] = useState(0)
   const [chunksLoading, setChunksLoading] = useState(false)
   const [chunksError, setChunksError] = useState('')
+  // 「跳到第 N 页」：pageCount 由切片接口带回，0 表示这份文件没有页码
+  //（md / txt 按段切），此时控件整体不出现
+  const [pageCount, setPageCount] = useState(0)
+  const [jumpInput, setJumpInput] = useState('')
+  const [jumpBusy, setJumpBusy] = useState(false)
+  const [jumpHint, setJumpHint] = useState('')
+  // 跳过去的那一片临时高亮，1.6s 后自动褪掉
+  const [flashSeq, setFlashSeq] = useState<number | null>(null)
+  // 已加载数组 / 布局偏移的最新值：跳页要补加载到目标位置，
+  // 用 ref 读实时长度，不然闭包里的 chunks.length 是发起请求那一刻的旧值
+  const chunksRef = useRef<KbChunk[]>([])
+  const offsetsRef = useRef<number[]>([])
+  const flashTimerRef = useRef<number | null>(null)
   // ——— 虚拟滚动（变高）———
   const listRef = useRef<HTMLDivElement | null>(null)
   const [viewportH, setViewportH] = useState(600)
@@ -496,11 +539,17 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
   // 选定要查看切片的文件：清掉上一次的切片数据，避免闪现旧文件内容
   const selectFile = useCallback((next: string | null) => {
     setChunks([])
+    chunksRef.current = []
     setChunksTotal(0)
     setChunksError('')
     setScrollTop(0)
     setHeights(new Map())
     setChunksLoading(next !== null)
+    // 跳页状态跟着文件走：新文件的页码区间还不知道，先清空
+    setPageCount(0)
+    setJumpInput('')
+    setJumpHint('')
+    setFlashSeq(null)
     setSelectedId(next)
     // 编辑态跟着文件走：换文件时收起未保存的编辑框
     setEditingSeq(null)
@@ -654,13 +703,20 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
     let cancelled = false
     void (async () => {
       try {
-        const { chunks: list, total } = await fetchKbChunks(selectedId, 0, PAGE_SIZE)
+        const {
+          chunks: list,
+          total,
+          pageCount: pc,
+        } = await fetchKbChunks(selectedId, 0, PAGE_SIZE)
         if (cancelled) return
+        chunksRef.current = list
         setChunks(list)
         setChunksTotal(total)
+        setPageCount(pc)
         setChunksError('')
       } catch (e) {
         if (cancelled) return
+        chunksRef.current = []
         setChunks([])
         setChunksTotal(0)
         setChunksError(e instanceof Error ? e.message : '获取切片失败')
@@ -676,18 +732,24 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
   // 加载下一页（滚动接近已加载末尾时触发）
   const loadMore = useCallback(async () => {
     if (!selectedId || loadingMoreRef.current) return
-    if (chunks.length === 0 || chunks.length >= chunksTotal) return
+    const loadedCount = chunksRef.current.length
+    if (loadedCount === 0 || loadedCount >= chunksTotal) return
     loadingMoreRef.current = true
     try {
-      const { chunks: list } = await fetchKbChunks(selectedId, chunks.length, PAGE_SIZE)
+      const { chunks: list } = await fetchKbChunks(selectedId, loadedCount, PAGE_SIZE)
       // 只在用户还停留在发起请求的那个文件时追加（快速切换文件时丢弃过期响应）
-      setChunks((cur) => (selectedIdRef.current === selectedId ? [...cur, ...list] : cur))
+      setChunks((cur) => {
+        if (selectedIdRef.current !== selectedId) return cur
+        const next = [...cur, ...list]
+        chunksRef.current = next
+        return next
+      })
     } catch {
       /* 静默：滚动会再次触发 */
     } finally {
       loadingMoreRef.current = false
     }
-  }, [selectedId, chunks.length, chunksTotal])
+  }, [selectedId, chunksTotal])
 
   // 视口高度跟随容器尺寸
   useEffect(() => {
@@ -729,6 +791,104 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
       loadedBottom: acc,
     }
   }, [chunks, chunksTotal, heights])
+
+  // 跳页滚动要读最新的偏移表（offsets 是渲染产物，闭包里会过期）
+  useEffect(() => {
+    offsetsRef.current = offsets
+  }, [offsets])
+
+  useEffect(
+    () => () => {
+      if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current)
+    },
+    [],
+  )
+
+  /** 把已加载数组补齐到 index：虚拟列表只能对「已加载」的切片算偏移 */
+  const ensureChunksLoadedTo = useCallback(
+    async (index: number) => {
+      const fid = selectedId
+      if (!fid) return
+      let loaded = chunksRef.current
+      // 每次 100 条（接口上限）：1000 片的文件最多 10 次请求，
+      // 比一次性全量拉省内存，也不会把列表卡住
+      while (loaded.length <= index && loaded.length < chunksTotal) {
+        const { chunks: list } = await fetchKbChunks(fid, loaded.length, 100)
+        if (selectedIdRef.current !== fid) return
+        if (list.length === 0) break
+        loaded = [...loaded, ...list]
+        chunksRef.current = loaded
+        setChunks(loaded)
+      }
+    },
+    [selectedId, chunksTotal],
+  )
+
+  /** 滚到第 index 条切片。未加载时偏移用的是估算行高，卡片渲染后
+      真实高度替换估算，位置会漂几像素，所以连校几次 */
+  const scrollToChunkIndex = useCallback((index: number) => {
+    const el = listRef.current
+    if (!el) return
+    let tries = 0
+    const place = () => {
+      const off = offsetsRef.current[index]
+      if (off != null) {
+        const top = Math.max(0, off - 8)
+        if (Math.abs(el.scrollTop - top) > 2) {
+          el.scrollTop = top
+          setScrollTop(el.scrollTop)
+        }
+      }
+      if (++tries < 4) window.setTimeout(place, 80)
+    }
+    place()
+  }, [])
+
+  /** 「跳到第 N 页」：定位该页第一条切片，滚过去并短暂高亮 */
+  const jumpToPage = useCallback(async () => {
+    const fid = selectedId
+    if (!fid || jumpBusy) return
+    const raw = jumpInput.trim()
+    const page = Number(raw)
+    if (!raw || !Number.isInteger(page) || page < 1) {
+      setJumpHint('输入页码，例如 12')
+      return
+    }
+    setJumpBusy(true)
+    setJumpHint('')
+    try {
+      const hit = await locateKbChunkPage(fid, page)
+      if (selectedIdRef.current !== fid) return
+      if (!hit.found || hit.index == null || hit.seq == null) {
+        setJumpHint(
+          hit.pageCount > 0
+            ? `这份文件只有 ${hit.pageCount} 页`
+            : '这份文件没有页码信息',
+        )
+        return
+      }
+      // 该页没有切片（图片页/空白页），后端顺延到后一页，说清楚跳到哪了
+      if (hit.page != null && hit.page !== page) {
+        setJumpHint(`第 ${page} 页没有切片，已跳到第 ${hit.page} 页`)
+      }
+      await ensureChunksLoadedTo(hit.index)
+      scrollToChunkIndex(hit.index)
+      setFlashSeq(hit.seq)
+      if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current)
+      flashTimerRef.current = window.setTimeout(() => setFlashSeq(null), 1600)
+    } catch (e) {
+      setJumpHint(e instanceof Error ? e.message : '跳转失败')
+    } finally {
+      setJumpBusy(false)
+    }
+  }, [ensureChunksLoadedTo, jumpBusy, jumpInput, scrollToChunkIndex, selectedId])
+
+  /** 点「第 N 页」打开原件对照：PDF 靠 #page=N 让浏览器阅读器直接翻过去 */
+  const openOriginalAtPage = useCallback((file: KbFile, page: number) => {
+    void openKbFileAtPage(file, page).catch((e) => {
+      setEditError(e instanceof Error ? e.message : '打开原件失败')
+    })
+  }, [])
 
   // 「文件」tab 点文件 = 看切片；已选中的再点不取消（取消靠删文件或换选别的）
   const toggleSelect = (item: KbFile) => {
@@ -1367,7 +1527,39 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                 {extBadge(selectedFile)}
                 {selectedFile.filename}
               </h2>
+              {/* 跳页：只在有页码的文件（PDF 类）出现。回车即跳，
+                  定位到该页第一条切片并高亮；按段切的文件没有页码，整块不渲染 */}
+              {pageCount > 0 ? (
+                <div className="kb-jump">
+                  <input
+                    className="kb-jump-input"
+                    value={jumpInput}
+                    onChange={(e) => {
+                      setJumpInput(e.target.value.replace(/\D/g, '').slice(0, 5))
+                      setJumpHint('')
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void jumpToPage()
+                    }}
+                    inputMode="numeric"
+                    placeholder="页"
+                    aria-label="跳到第几页"
+                    disabled={jumpBusy}
+                  />
+                  <span className="kb-jump-total">/ {pageCount}</span>
+                  <button
+                    type="button"
+                    className="kb-jump-go"
+                    onClick={() => void jumpToPage()}
+                    disabled={jumpBusy || !jumpInput.trim()}
+                  >
+                    {jumpBusy ? '定位中' : '跳转'}
+                  </button>
+                </div>
+              ) : null}
             </header>
+
+            {jumpHint ? <p className="kb-jump-hint">{jumpHint}</p> : null}
 
             {editError ? <p className="kb-error">{editError}</p> : null}
 
@@ -1422,7 +1614,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                       <li
                         key={chunk.seq}
                         ref={(el) => measureCard(chunk.seq, el)}
-                        className="kb-chunk"
+                        className={`kb-chunk${flashSeq === chunk.seq ? ' is-flash' : ''}`}
                         style={{ top: offsets[startIdx + i] }}
                       >
                         <div className="kb-chunk-meta">
@@ -1430,7 +1622,12 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                             {KIND_LABEL[chunk.kind]}
                           </span>
                           <span className="kb-chunk-pos">
-                            #{chunk.seq + 1} · {chunkPos(chunk)}
+                            #{chunk.seq + 1} ·{' '}
+                            <ChunkPageTag
+                              chunk={chunk}
+                              file={selectedFile}
+                              onOpen={openOriginalAtPage}
+                            />
                           </span>
                           {/* 修订 = 人工审核：改完保存即单片重嵌入（管理员） */}
                           {canManage &&

@@ -493,21 +493,47 @@ export async function renameKbFile(fileId: string, filename: string): Promise<vo
 }
 
 // 下载原始文件：鉴权走请求头，不能用 <a href> 直链，先取 blob 再触发保存
-export async function downloadKbFile(file: KbFile): Promise<void> {
+async function fetchKbFileObjectUrl(file: KbFile): Promise<string> {
   const response = await authedFetch(`/v1/kb/files/${file.file_id}/download`, {
     headers: authHeaders(),
   })
   if (!response.ok) {
-    throw new Error(await errorMessage(response, '下载失败'))
+    throw new Error(await errorMessage(response, '获取原文件失败'))
   }
-  const blob = await response.blob()
-  const url = URL.createObjectURL(blob)
+  return URL.createObjectURL(await response.blob())
+}
+
+export async function downloadKbFile(file: KbFile): Promise<void> {
+  const url = await fetchKbFileObjectUrl(file)
   const link = document.createElement('a')
   link.href = url
   // 文件名是纯名，后缀由 mime 单独存；下载补回后缀，否则本地打不开
   link.download = file.mime ? `${file.filename}${file.mime}` : file.filename
   link.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
+/**
+ * 打开原件并翻到指定页：PDF 靠 `#page=N` 让浏览器内置阅读器直接跳页。
+ * 标签必须先同步开出来——取 blob 是异步的，等回来了再 window.open
+ * 会被当成非用户手势拦掉。
+ */
+export async function openKbFileAtPage(
+  file: KbFile,
+  page: number,
+): Promise<void> {
+  const win = window.open('', '_blank')
+  try {
+    const url = await fetchKbFileObjectUrl(file)
+    const target = `${url}#page=${page}`
+    if (win) win.location.replace(target)
+    else window.open(target, '_blank')
+    // 阅读过程中不能 revoke（翻到未加载的页会重新请求同一 blob）
+    setTimeout(() => URL.revokeObjectURL(url), 300_000)
+  } catch (e) {
+    win?.close()
+    throw e
+  }
 }
 
 export type KbChunk = {
@@ -567,7 +593,7 @@ export async function fetchKbChunks(
   fileId: string,
   offset = 0,
   limit = 50,
-): Promise<{ chunks: KbChunk[]; total: number }> {
+): Promise<{ chunks: KbChunk[]; total: number; pageCount: number }> {
   const response = await authedFetch(
     `/v1/kb/files/${fileId}/chunks?limit=${limit}&offset=${offset}`,
     { headers: authHeaders() },
@@ -578,8 +604,50 @@ export async function fetchKbChunks(
   const data = (await response.json()) as {
     chunks?: KbChunk[]
     total?: number
+    page_count?: number
   }
-  return { chunks: data.chunks ?? [], total: data.total ?? 0 }
+  return {
+    chunks: data.chunks ?? [],
+    total: data.total ?? 0,
+    pageCount: data.page_count ?? 0,
+  }
+}
+
+/**
+ * 按页码定位切片（「跳到第 N 页」）：返回目标切片在文件内的序号 index
+ * 与 seq。该页没有切片时后端顺延到后一页，page 是实际命中的页。
+ */
+export async function locateKbChunkPage(
+  fileId: string,
+  page: number,
+): Promise<{
+  found: boolean
+  seq: number | null
+  page: number | null
+  index: number | null
+  pageCount: number
+}> {
+  const response = await authedFetch(
+    `/v1/kb/files/${fileId}/chunks/locate?page=${page}`,
+    { headers: authHeaders() },
+  )
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '页码定位失败'))
+  }
+  const data = (await response.json()) as {
+    found?: boolean
+    seq?: number | null
+    page?: number | null
+    index?: number | null
+    page_count?: number
+  }
+  return {
+    found: Boolean(data.found),
+    seq: data.seq ?? null,
+    page: data.page ?? null,
+    index: data.index ?? null,
+    pageCount: data.page_count ?? 0,
+  }
 }
 
 // ——— 知识图谱（P2）：看图、检索、重建 ———
