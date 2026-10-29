@@ -230,13 +230,81 @@ function buildSim(
   // 不能按冷启动全量迭代 —— 那等于整张图重新洗牌，看起来就是「闪一下」
   const reused = nodes.length > 0 && (carry?.size ?? 0) >= Math.floor(nodes.length * 0.5)
   if (reused) sim.alpha = 0.5
-  // 先静默迭代到接近收敛，再把剩下的尾巴交给动画：否则开屏两百来帧都在乱动。
-  // 每步是 O(n²)，节点多时少跑几步，免得开屏卡一下
+  // 预热按「斥力配对次数」封顶，而不是按步数。每步 naive 是 O(n²)，
+  // 400 个点跑 150 步 ≈ 1200 万次计算，开屏会卡死主线程。
+  // 20 万次 ≈ 60 点 × 110 步，或 400 点只跑几步，首屏先出来，余下交给动画。
+  const pairs = Math.max(1, (nodes.length * Math.max(0, nodes.length - 1)) / 2)
   const warmup = reused
-    ? 40
-    : Math.min(WARMUP_STEPS, Math.max(60, Math.round(12000 / Math.max(1, nodes.length))))
+    ? Math.min(40, Math.max(4, Math.round(80_000 / pairs)))
+    : Math.min(WARMUP_STEPS, Math.max(8, Math.round(200_000 / pairs)))
   for (let i = 0; i < warmup; i += 1) stepSim(sim)
   return sim
+}
+
+/** 一对节点的斥力。完全重合时用下标错开，避免随机数让每次布局都不一样。 */
+function pushApart(a: SimNode, b: SimNode, i: number, j: number, alpha: number) {
+  let dx = b.x - a.x
+  let dy = b.y - a.y
+  let d2 = dx * dx + dy * dy
+  if (d2 < 0.01) {
+    dx = 0.3 + ((i * 7 + j * 13) % 10) / 40
+    dy = 0.3 + ((i * 5 + j * 11) % 10) / 40
+    d2 = dx * dx + dy * dy
+  }
+  const dist = Math.sqrt(d2)
+  const force = (REPULSION / d2) * alpha
+  const fx = (dx / dist) * force
+  const fy = (dy / dist) * force
+  a.vx -= fx
+  a.vy -= fy
+  b.vx += fx
+  b.vy += fy
+}
+
+/**
+ * 斥力：点数少时暴力两两算更快；超过阈值改走网格，只和邻近格子相互作用。
+ * 斥力随距离平方衰减，96px 格子、±2 圈 ≈ 480px，更远的力已经可以忽略。
+ */
+const NAIVE_REPULSION_LIMIT = 72
+const GRID_CELL = 96
+const GRID_RANGE = 2
+
+function applyRepulsion(nodes: SimNode[], alpha: number) {
+  const n = nodes.length
+  if (n <= NAIVE_REPULSION_LIMIT) {
+    for (let i = 0; i < n; i += 1) {
+      const a = nodes[i]
+      for (let j = i + 1; j < n; j += 1) {
+        pushApart(a, nodes[j], i, j, alpha)
+      }
+    }
+    return
+  }
+  const buckets = new Map<number, number[]>()
+  const cellKey = (cx: number, cy: number) => cx * 1_000_003 + cy
+  for (let i = 0; i < n; i += 1) {
+    const cx = Math.floor(nodes[i].x / GRID_CELL)
+    const cy = Math.floor(nodes[i].y / GRID_CELL)
+    const k = cellKey(cx, cy)
+    const bucket = buckets.get(k)
+    if (bucket) bucket.push(i)
+    else buckets.set(k, [i])
+  }
+  for (let i = 0; i < n; i += 1) {
+    const a = nodes[i]
+    const cx = Math.floor(a.x / GRID_CELL)
+    const cy = Math.floor(a.y / GRID_CELL)
+    for (let gx = -GRID_RANGE; gx <= GRID_RANGE; gx += 1) {
+      for (let gy = -GRID_RANGE; gy <= GRID_RANGE; gy += 1) {
+        const bucket = buckets.get(cellKey(cx + gx, cy + gy))
+        if (!bucket) continue
+        for (const j of bucket) {
+          if (j <= i) continue
+          pushApart(a, nodes[j], i, j, alpha)
+        }
+      }
+    }
+  }
 }
 
 function stepSim(sim: Sim) {
@@ -244,29 +312,7 @@ function stepSim(sim: Sim) {
   const cx = sim.width / 2
   const cy = (sim.height - BOTTOM_PAD) / 2
 
-  for (let i = 0; i < nodes.length; i += 1) {
-    const a = nodes[i]
-    for (let j = i + 1; j < nodes.length; j += 1) {
-      const b = nodes[j]
-      let dx = b.x - a.x
-      let dy = b.y - a.y
-      let d2 = dx * dx + dy * dy
-      if (d2 < 0.01) {
-        // 完全重合时给一个固定的错开方向，别用随机数（否则每次进来位置都变）
-        dx = 0.3 + ((i * 7 + j * 13) % 10) / 40
-        dy = 0.3 + ((i * 5 + j * 11) % 10) / 40
-        d2 = dx * dx + dy * dy
-      }
-      const dist = Math.sqrt(d2)
-      const force = (REPULSION / d2) * alpha
-      const fx = (dx / dist) * force
-      const fy = (dy / dist) * force
-      a.vx -= fx
-      a.vy -= fy
-      b.vx += fx
-      b.vy += fy
-    }
-  }
+  applyRepulsion(nodes, alpha)
 
   for (const link of links) {
     const a = nodes[link.source]
@@ -318,7 +364,8 @@ function stepSim(sim: Sim) {
     node.x = Math.max(pad, Math.min(sim.width - pad, node.x))
     node.y = Math.max(pad, Math.min(sim.height - BOTTOM_PAD, node.y))
   }
-  sim.alpha *= 0.985
+  // 点多时加快冷却：否则从预热残留的 alpha 再跑两百多帧 O(n²)，拖动也会粘
+  sim.alpha *= nodes.length > 80 ? 0.97 : 0.985
 }
 
 type Props = {
@@ -330,10 +377,10 @@ type Props = {
   /** 是否压暗非命中节点；画布已经是检索子图时传 false，否则邻居也被压掉 */
   dimOthers?: boolean
   /**
-   * 枢纽分层（全库/合并大图启用，单文件图和检索子图不启用）：
+   * 枢纽分层（全库/合并始终启用；单文件图超过 KG_HUB_CAP 也启用）：
    * 默认只显示有连接的节点里权重最高的 HUB_CAP 个，孤独点（没有关系）
    * 全部隐藏；点任意节点 = 下钻，它的一跳邻居自动显示出来，
-   * 取消选中回到纯枢纽图。文件越多图越乱的问题靠它兜住。
+   * 取消选中回到纯枢纽图。单文件抽出几百个实体时，全量力导向会卡死开屏。
    */
   prune?: boolean
   selectedId?: string | null
@@ -345,8 +392,11 @@ type Props = {
   emptyAction?: { label: string; onClick: () => void }
 }
 
-/** 枢纽模式下默认渲染的最大节点数：力导向是 O(n²)，六十个点是流畅和可读的平衡点 */
-const HUB_CAP = 60
+/** 枢纽模式下默认渲染的最大节点数：力导向是 O(n²)，一百个点仍流畅，骨干也更不容易漏 */
+export const KG_HUB_CAP = 100
+const HUB_CAP = KG_HUB_CAP
+/** 下钻时额外带上的一跳邻居上限：星型枢纽可能有上百条边，全展开会再次卡死 */
+const NEIGHBOR_CAP = 36
 
 export default function KnowledgeGraph({
   graph,
@@ -425,9 +475,9 @@ export default function KnowledgeGraph({
    * prune 关闭 = 全量。prune 开启 = 枢纽图：
    *   孤独点（degree 0）没有边，画出来只是一个孤零零的名字，没有信息量；
    *   有连接的节点按「提及 + 度数」挑前 HUB_CAP 个，文件多了图也不会铺满；
-   *   选中节点的一跳邻居全部补进来 —— 这就是「点击下钻」，点谁展开谁的
-   *   周边，取消选中收回去，交互没有多出任何按钮。
-   * 全集都被裁空（所有实体都没抽到关系）时退回全量，宁可乱也别开天窗。
+   *   选中节点的一跳邻居按权重补进来（最多 NEIGHBOR_CAP 个）—— 这就是
+   *   「点击下钻」，点谁展开谁的周边，取消选中收回去，交互没有多出任何按钮。
+   * 全集都被裁空（所有实体都没抽到关系）时仍截前 HUB_CAP，避免开天窗的同时卡死开屏。
    */
   const display = useMemo(() => {
     if (!prune) return { nodes, edges }
@@ -447,12 +497,39 @@ export default function KnowledgeGraph({
     for (const node of linked.slice(0, HUB_CAP)) keep.add(node.id)
     if (activeNodeId) {
       keep.add(activeNodeId)
+      const extras: string[] = []
+      const seen = new Set<string>()
       for (const edge of edges) {
-        if (edge.source === activeNodeId) keep.add(edge.target)
-        if (edge.target === activeNodeId) keep.add(edge.source)
+        const other =
+          edge.source === activeNodeId
+            ? edge.target
+            : edge.target === activeNodeId
+              ? edge.source
+              : ''
+        if (!other || keep.has(other) || seen.has(other)) continue
+        seen.add(other)
+        extras.push(other)
       }
+      if (extras.length > NEIGHBOR_CAP) {
+        const byId = new Map(nodes.map((node) => [node.id, node]))
+        extras.sort((a, b) => {
+          const na = byId.get(a)
+          const nb = byId.get(b)
+          const wa = na ? weightOf(na, degOf(na)) : 0
+          const wb = nb ? weightOf(nb, degOf(nb)) : 0
+          return wb - wa || a.localeCompare(b)
+        })
+        extras.length = NEIGHBOR_CAP
+      }
+      for (const id of extras) keep.add(id)
     }
-    if (keep.size === 0) return { nodes, edges }
+    if (keep.size === 0) {
+      // 全是孤独点：仍截前 HUB_CAP，避免 400 个无边节点卡死开屏
+      if (nodes.length > HUB_CAP) {
+        return { nodes: nodes.slice(0, HUB_CAP), edges: [] }
+      }
+      return { nodes, edges }
+    }
     return {
       nodes: nodes.filter((node) => keep.has(node.id)),
       edges: edges.filter((edge) => keep.has(edge.source) && keep.has(edge.target)),
@@ -1020,7 +1097,7 @@ export default function KnowledgeGraph({
             </div>
             <p className="kg-tip">
               {prune && displayNodes.length < nodes.length
-                ? `显示 ${displayNodes.length} / ${nodes.length} 个实体（孤独点已隐藏）· 点节点展开邻域 · 滚轮缩放`
+                ? `显示 ${displayNodes.length} / ${nodes.length} 个实体 · 点节点展开邻域 · 滚轮缩放`
                 : '拖节点调位置 · 滚轮缩放 · 点节点看关系与原文'}
             </p>
           </>

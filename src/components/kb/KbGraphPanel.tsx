@@ -10,7 +10,7 @@ import {
   type KgGraph,
   type KgSearchResult,
 } from '../../api'
-import KnowledgeGraph from './KnowledgeGraph'
+import KnowledgeGraph, { KG_HUB_CAP } from './KnowledgeGraph'
 import { KgBuildDialog } from './KgBuildDialog'
 import { SearchIcon, ChevronDownIcon, CheckIcon, CloseIcon } from '../chat/icons'
 
@@ -142,8 +142,8 @@ export default function KbGraphPanel({
 
   // 图谱构建中：单文件视图看自己的 graph_status，全库/合并视图看父组件给的 building
   const isBuilding = building || graph?.graph_status === 'building'
-  // 构建中只有单文件视图重拉：那份图最多几十个节点，用户也正盯着进度看。
-  // 全库/合并的整图有上百节点、单次几十到几百 KB，构建期间每 3 秒重拉既费带宽，
+  // 构建中只有单文件视图重拉：用户正盯着进度看，画布用枢纽分层兜住点数。
+  // 全库/合并的整图节点多、单次几十到几百 KB，构建期间每 3 秒重拉既费带宽，
   // 又会让力导向每 3 秒重排一次（节点乱跳）。它改由下面 wasBuildingRef
   // 在构建结束那一帧补拉一次，中途保持旧图 + 一行提示
   const pollWhileBuilding = isBuilding && Boolean(fileId)
@@ -709,9 +709,10 @@ export default function KbGraphPanel({
           colorMode={colorMode}
           // 过滤后的子图里全是命中和它们的邻居，再压暗就把扩展出来的关系藏掉了
           dimOthers={!filtered || focusCluster !== null}
-          // 枢纽分层只对「完整图」启用：全库/合并视图文件多了点会铺满画布，
-          // 单文件图和检索子图本来就小，全显更直观
-          prune={!fileId && !filtered}
+          // 枢纽分层：全库/合并始终开启；单文件图超过 HUB_CAP 也开启——
+          // 有的文件能抽出 400+ 实体，全量力导向会卡死开屏。检索子图本身
+          // 就是过滤结果，再裁会把邻域藏掉。
+          prune={!filtered && (!fileId || (viewGraph?.nodes.length ?? 0) > KG_HUB_CAP)}
           emptyTitle={canvasState.title}
           emptyHint={canvasState.hint}
           emptyAction={canvasState.action}
