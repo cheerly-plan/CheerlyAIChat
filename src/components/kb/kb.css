@@ -1538,11 +1538,15 @@
 }
 
 /* 复杂图的边画在这张位图上，垫在 SVG 之下。
-   尺寸（含 DPR）由 KnowledgeGraph 在 layout effect 里同步，
-   这里的 CSS 只负责铺满容器并让点击穿透到 SVG */
+   位图尺寸（含 DPR）由 KnowledgeGraph 在 layout effect 里同步，
+   这里必须显式 width/height:100% 铺满容器——inset:0 对 canvas 这种
+   替换元素不生效，它会按 width 属性的固有尺寸显示，Retina 下
+   （位图 = 2x）整层边会被放大一倍、错位到画布右下角 */
 .kg-links {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   display: block;
   pointer-events: none;
 }
