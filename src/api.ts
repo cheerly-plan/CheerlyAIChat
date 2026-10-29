@@ -403,6 +403,9 @@ export type KbFile = {
   // 图谱进度：'' 未构建 / building / ready / stale（切片修订后待重建）/ failed / skipped
   graph_status?: string
   graph_entity_count?: number
+  // 这份文件上次建图用的抽取配置：列表行 hover 重建时预填进弹窗
+  doc_type?: string
+  extract_level?: string
   tags?: string[]
   created_at: string
 }

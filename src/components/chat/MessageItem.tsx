@@ -63,18 +63,22 @@ export function MessageItem({
           <SourceList sources={sources} />
         ) : null}
         {done || interrupted ? (
-          <MessageActions>
-            {done ? <CopyButton text={message.content} /> : null}
-            {canRegenerate ? (
-              <button
-                type="button"
-                aria-label="重新生成"
-                title="重新生成"
-                disabled={busy}
-                onClick={() => onRegenerate?.(message.id)}
-              >
-                <RefreshIcon />
-              </button>
+          <div className={`msg-footer${interrupted ? ' has-resume' : ''}`}>
+            {done ? (
+              <MessageActions>
+                <CopyButton text={message.content} />
+                {canRegenerate ? (
+                  <button
+                    type="button"
+                    aria-label="重新生成"
+                    title="重新生成"
+                    disabled={busy}
+                    onClick={() => onRegenerate?.(message.id)}
+                  >
+                    <RefreshIcon />
+                  </button>
+                ) : null}
+              </MessageActions>
             ) : null}
             {interrupted ? (
               <button
@@ -86,7 +90,7 @@ export function MessageItem({
                 继续生成
               </button>
             ) : null}
-          </MessageActions>
+          </div>
         ) : null}
       </div>
     </div>

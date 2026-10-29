@@ -6,20 +6,25 @@ import {
   editKbChunk,
   fetchKbChunks,
   fetchKbFiles,
+  fetchKgDocTypes,
+  rebuildKgGraph,
   renameKbFile,
   setKbFileTags,
   uploadKbFile,
   type KbChunk,
   type KbFile,
+  type KgDocType,
   type KgGraph,
 } from '../../api'
 import {
   BackIcon,
   MoreIcon,
   PanelIcon,
+  RefreshIcon,
   UploadIcon,
 } from '../chat/icons'
 import { ConfirmDialog } from '../common/ConfirmDialog'
+import { KgBuildDialog } from './KgBuildDialog'
 import KbGraphPanel from './KbGraphPanel'
 import { RenameDialog } from './RenameDialog'
 import { TagDialog } from './TagDialog'
@@ -325,6 +330,23 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
   useEffect(() => {
     buildFileIdRef.current = buildFileId
   }, [buildFileId])
+
+  // 列表行 hover 重建：弹窗挂在页面级（列表行不在 KbGraphPanel 里），
+  // docTypes 因此在页面里单独拉一次
+  const [docTypes, setDocTypes] = useState<KgDocType[]>([])
+  useEffect(() => {
+    if (!canManage) return
+    void fetchKgDocTypes().then((data) => {
+      setDocTypes(data.types)
+    })
+  }, [canManage])
+  // 非空 = 打开该文件的重建弹窗；提交成功后 graphEpoch +1 强制面板重挂载
+  const [rebuildTarget, setRebuildTarget] = useState<KbFile | null>(null)
+  const [rebuilding, setRebuilding] = useState(false)
+  const [rebuildError, setRebuildError] = useState('')
+  // 列表里重建完，右侧面板的 graph_status 是它自己拉的，不会收到通知；
+  // 拼进 KbGraphPanel 的 key 强制重挂载，否则还停在旧图上
+  const [graphEpoch, setGraphEpoch] = useState(0)
   // 切片人工修订（修订 = 人工审核）：一次只编辑一片
   const [editingSeq, setEditingSeq] = useState<number | null>(null)
   const [editingText, setEditingText] = useState('')
@@ -629,6 +651,32 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
       setBuildFileId(null)
     }
   }, [])
+
+  /**
+   * 列表行 hover 重建：配置随这次重建一次提交（与面板内弹窗同一套语义），
+   * 不留「先存配置」的中间态。成功后重拉列表并把 graphEpoch +1，
+   * 让右侧面板重挂载拉到新图。
+   */
+  const submitRebuild = async (config: { docType: string; level: 'full' | 'light' }) => {
+    if (!rebuildTarget || rebuilding) return
+    setRebuilding(true)
+    setRebuildError('')
+    try {
+      await rebuildKgGraph(rebuildTarget.file_id, {
+        docType: config.docType || '',
+        level: config.level,
+      })
+      setRebuildTarget(null)
+      setGraphEpoch((n) => n + 1)
+      // 立刻重拉列表，状态徽标当场变成「构建中」
+      await refresh()
+    } catch (e) {
+      // 弹窗不关：保住刚选的配置，改完可直接重试
+      setRebuildError(e instanceof Error ? e.message : '提交重建失败')
+    } finally {
+      setRebuilding(false)
+    }
+  }
 
   // ——— 切片人工修订：保存即单片重嵌入 ———
 
@@ -979,6 +1027,19 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                                 </span>
                               </span>
                             </label>
+                            {/* 已完成行：hover 才浮现重建入口（常占位，不重排文件名） */}
+                            {canManage ? (
+                              <button
+                                type="button"
+                                className="kb-grebuild"
+                                onClick={() => setRebuildTarget(item)}
+                                disabled={item.graph_status === 'building'}
+                                title="按新的文档类型与抽取粒度重建这份图谱"
+                              >
+                                <RefreshIcon />
+                                重建
+                              </button>
+                            ) : null}
                             {badge ? (
                               <span
                                 className={`kb-gbadge ${badge.cls}`}
@@ -1012,7 +1073,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
               </h2>
             </header>
             <KbGraphPanel
-              key={buildFile.file_id}
+              key={`${buildFile.file_id}:${graphEpoch}`}
               fileId={buildFile.file_id}
               file={buildFile}
               canManage={canManage}
@@ -1218,7 +1279,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
               </h2>
             </header>
             <KbGraphPanel
-              key={checkedKey}
+              key={`${checkedKey}:${graphEpoch}`}
               fileId={checkedIds.length === 1 ? checkedIds[0] : null}
               file={checkedIds.length === 1 ? checkedFile : null}
               fileIds={checkedIds.length > 1 ? checkedIds : undefined}
@@ -1262,6 +1323,28 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
           description={`「${pendingDelete.filename}」及其全部向量切片将被永久删除，删除后对话将检索不到该文件。`}
           onCancel={() => setPendingDelete(null)}
           onConfirm={() => void onDelete(pendingDelete)}
+        />
+      ) : null}
+
+      {/* 列表行 hover 重建的弹窗：挂在页面级，与面板内弹窗同一套语义 */}
+      {rebuildTarget ? (
+        <KgBuildDialog
+          filename={rebuildTarget.filename}
+          docTypes={docTypes.filter((t) => !t.is_general)}
+          // 预填这份文件上次建图用的配置；空串 = 通用，与 general 等价
+          initialDocType={
+            !rebuildTarget.doc_type || rebuildTarget.doc_type === 'general'
+              ? ''
+              : rebuildTarget.doc_type
+          }
+          initialLevel={
+            rebuildTarget.extract_level === 'light' ? 'light' : 'full'
+          }
+          hasGraph
+          submitting={rebuilding}
+          error={rebuildError}
+          onCancel={() => setRebuildTarget(null)}
+          onSubmit={(config) => void submitRebuild(config)}
         />
       ) : null}
     </div>

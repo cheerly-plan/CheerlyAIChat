@@ -169,13 +169,31 @@ export function MessageList({
               busy={loading}
               canRegenerate={message.id === last?.id && last?.role === 'assistant'}
               canResume={
-                canResume && message.id === last?.id && last?.role === 'assistant'
+                canResume &&
+                !loading &&
+                message.id === last?.id &&
+                last?.role === 'assistant'
               }
               onEditSubmit={onEditSubmit}
               onRegenerate={onRegenerate}
               onResume={onResume}
             />
           ))}
+          {canResume && !loading && last?.role !== 'assistant' ? (
+            <div className="row assistant">
+              <div className="assistant-body">
+                <div className="msg-footer has-resume">
+                  <button
+                    type="button"
+                    className="msg-resume"
+                    onClick={() => onResume?.()}
+                  >
+                    继续生成
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
       {showJump ? (

@@ -201,17 +201,6 @@ export function Chat({ onLogout, initialUser = null }: Props) {
                   onLoadOlder={() => void loadOlder()}
                 />
                 <div className="dock">
-                  {canResume &&
-                  !loading &&
-                  messages[messages.length - 1]?.role !== 'assistant' ? (
-                    <button
-                      type="button"
-                      className="chat-resume-btn"
-                      onClick={() => void resumeRun()}
-                    >
-                      继续生成
-                    </button>
-                  ) : null}
                   {error ? <p className="error">{error}</p> : null}
                   <Composer
                     value={input}

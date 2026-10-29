@@ -1024,9 +1024,26 @@
   cursor: not-allowed;
 }
 
+.msg-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.msg-footer.has-resume {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eef0f3;
+}
+
 .msg-actions {
   display: flex;
   gap: 2px;
+  margin-top: 0;
+}
+
+.user-block .msg-actions {
   margin-top: 4px;
 }
 
@@ -1039,7 +1056,8 @@
 
   .row:hover .msg-actions,
   .msg-actions:focus-within,
-  .msg-actions:has(button.copied) {
+  .msg-actions:has(button.copied),
+  .msg-footer.has-resume .msg-actions {
     opacity: 1;
     pointer-events: auto;
   }
@@ -1076,22 +1094,29 @@
   background: transparent;
 }
 
-.msg-actions:has(.msg-resume) {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.msg-actions button.msg-resume {
-  width: auto;
-  height: 28px;
-  padding: 0 8px;
+.msg-resume {
+  margin-left: auto;
+  flex-shrink: 0;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
   font-size: 13px;
-  color: #4b5563;
+  line-height: 1;
+  cursor: pointer;
 }
 
-.msg-actions button.msg-resume:hover {
-  color: #111827;
-  background: #f3f4f6;
+.msg-resume:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.msg-resume:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .assistant-body {
@@ -1407,7 +1432,7 @@
 }
 
 .dock {
-  padding: 4px 20px 0;
+  padding: 0 20px;
 }
 
 .error {
@@ -1415,23 +1440,6 @@
   margin: 0 auto 8px;
   color: #d92d20;
   font-size: 13px;
-}
-
-/* 末条不是助手消息时的兜底「继续生成」（刷新后半截未落库） */
-.chat-resume-btn {
-  display: block;
-  margin: 0 auto 8px;
-  padding: 4px 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 999px;
-  background: #fff;
-  color: #4b5563;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.chat-resume-btn:hover {
-  background: #f9fafb;
 }
 
 .composer {
@@ -1651,12 +1659,14 @@
 }
 
 .disclaimer {
+  margin: 0 auto;
   max-width: 800px;
-  margin: 10px auto 0;
-  padding: 0 20px 16px;
+  height: 32px;
+  line-height: 32px;
   text-align: center;
   color: #9aa0a6;
   font-size: 12px;
+  text-align: center;
 }
 
 @keyframes blink {
