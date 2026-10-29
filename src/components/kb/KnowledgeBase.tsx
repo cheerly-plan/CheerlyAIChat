@@ -1713,13 +1713,23 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                               {KIND_LABEL[chunk.kind]}
                             </span>
                             <span className="kb-chunk-pos">
-                              <b className="kb-chunk-seq">#{chunk.seq + 1}</b> ·{' '}
+                              <b className="kb-chunk-seq">No.{chunk.seq + 1}</b> |{' '}
                               <ChunkPageTag
                                 chunk={chunk}
                                 file={selectedFile}
                                 onOpen={openOriginalAtPage}
                               />
                               {' · '}
+                              {/* 章节路径并进同一行：头部只占一行，过长省略号 + title */}
+                              {chunk.section ? (
+                                <>
+                                  <span className="kb-chunk-path" title={chunk.section}>
+                                    <span className="kb-chunk-path-icon">§</span>
+                                    {chunk.section}
+                                  </span>
+                                  {' · '}
+                                </>
+                              ) : null}
                               {chunk.text.length} 字
                             </span>
                             {/* 修订 = 人工审核：改完保存即单片重嵌入（管理员） */}
@@ -1735,13 +1745,6 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                               </button>
                             ) : null}
                           </div>
-                          {/* 章节路径：这个切片属于哪一节，不用从正文里猜 */}
-                          {chunk.section ? (
-                            <div className="kb-chunk-path" title={chunk.section}>
-                              <span className="kb-chunk-path-icon">§</span>
-                              {chunk.section}
-                            </div>
-                          ) : null}
                         </div>
                         {editingSeq === chunk.seq ? (
                           <div className="kb-chunk-editor">

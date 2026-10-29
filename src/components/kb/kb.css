@@ -1284,18 +1284,30 @@
   box-shadow: 0 1px 2px rgba(24, 28, 39, 0.04);
 }
 
-/* 头部区（类型 + 编号 + 章节路径）与正文之间一条分隔线：元信息和正文
-   原来糊在一起，扫的时候分不清哪行是标注、哪行是内容 */
+/* 头部区（一行元信息：类型/编号/页码/章节/字数）与正文之间一条分隔线：
+   元信息和正文原来糊在一起，扫的时候分不清哪行是标注、哪行是内容 */
 .kb-chunk-head {
-  padding-bottom: 8px;
-  margin-bottom: 9px;
+  padding-bottom: 7px;
+  margin-bottom: 8px;
   border-bottom: 1px solid #f0f1f5;
 }
 
+/* 元信息一行装下所有标注（类型/编号/页码/章节/字数）：编号可缩，
+   超长章节路径截省略号，编辑按钮固定在行尾不被挤走 */
 .kb-chunk-meta {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.kb-chunk-pos {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #9aa0a6;
+  font-size: 11px;
 }
 
 .kb-chunk-kind {
@@ -1335,20 +1347,14 @@
   color: inherit;
 }
 
-/* 章节路径：这一片属于哪一节。浅灰小字，不抢正文 */
+/* 章节路径：并进元信息行的一段，行内截断，hover 靠 title 看全称 */
 .kb-chunk-path {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  margin-top: 5px;
   color: #8a9099;
-  font-size: 11.5px;
-  line-height: 1.5;
 }
 
 .kb-chunk-path-icon {
   color: #b3b9c2;
-  font-size: 12px;
+  margin-right: 1px;
 }
 
 /* 「第 N 页」：PDF 可点，新标签打开原件对应页。常驻蓝色下划线——
