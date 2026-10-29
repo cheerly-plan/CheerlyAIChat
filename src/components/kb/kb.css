@@ -1270,22 +1270,32 @@
   position: relative;
 }
 
-/* 卡片绝对定位（top 由虚拟滚动按前缀和计算），右侧留 24px 不贴住滚动条 */
+/* 卡片绝对定位（top 由虚拟滚动按前缀和计算），右侧留 24px 不贴住滚动条。
+   边框加深 + 淡阴影：相邻两张卡片必须有清楚的分界，否则翻的时候分不清
+   上一片在哪结束、下一片从哪开始 */
 .kb-chunk {
   position: absolute;
   left: 0;
   right: 24px;
-  padding: 10px 12px;
-  border: 1px solid #eef0f3;
+  padding: 12px 14px;
+  border: 1px solid #e6e9ef;
   border-radius: 10px;
   background: #fff;
+  box-shadow: 0 1px 2px rgba(24, 28, 39, 0.04);
+}
+
+/* 头部区（类型 + 编号 + 章节路径）与正文之间一条分隔线：元信息和正文
+   原来糊在一起，扫的时候分不清哪行是标注、哪行是内容 */
+.kb-chunk-head {
+  padding-bottom: 8px;
+  margin-bottom: 9px;
+  border-bottom: 1px solid #f0f1f5;
 }
 
 .kb-chunk-meta {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
 }
 
 .kb-chunk-kind {
@@ -1315,8 +1325,30 @@
   font-size: 11px;
 }
 
+/* 切片编号是定位锚点（跳页后靠它确认落点），加粗从辅助信息里拎出来 */
+.kb-chunk-seq {
+  color: #5b6472;
+  font-weight: 600;
+}
+
 .kb-chunk-pos-text {
   color: inherit;
+}
+
+/* 章节路径：这一片属于哪一节。浅灰小字，不抢正文 */
+.kb-chunk-path {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 5px;
+  color: #8a9099;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.kb-chunk-path-icon {
+  color: #b3b9c2;
+  font-size: 12px;
 }
 
 /* 「第 N 页」：PDF 可点，新标签打开原件对应页。常驻蓝色下划线——
@@ -1348,15 +1380,78 @@
   box-shadow: 0 0 0 3px rgba(77, 107, 254, 0.12);
 }
 
+/* 正文：按段落拆成 <p> 而不是整块 <pre>，段落之间才有间距。
+   行高放到 1.85、字号提到 14px——12.5px 在长文档里看几屏就累了 */
 .kb-chunk-text {
   margin: 0;
   font-family: inherit;
-  font-size: 12.5px;
-  line-height: 1.7;
-  color: #333;
-  /* 内容完整展示，卡片高度随内容 auto（虚拟滚动按每张卡片实测高度布局） */
-  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.85;
+  color: #2f333c;
   word-break: break-word;
+}
+
+.kb-chunk-p {
+  margin: 0 0 0.7em;
+  text-indent: 2em;
+  /* 段内换行是原文就有的（PDF 抽出来的行），不能被 HTML 折叠掉 */
+  white-space: pre-wrap;
+}
+
+.kb-chunk-p:last-child {
+  margin-bottom: 0;
+}
+
+/* ——— 表格还原 ——— */
+/* 表格切片渲染成真表格：列多的时候横向滚动，卡片不被撑破 */
+.kb-chunk-table-wrap {
+  overflow-x: auto;
+  margin: 2px 0 4px;
+  border: 1px solid #e6e9ef;
+  border-radius: 8px;
+}
+
+.kb-chunk-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.kb-chunk-table th,
+.kb-chunk-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #eef0f3;
+  border-right: 1px solid #eef0f3;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.kb-chunk-table th:last-child,
+.kb-chunk-table td:last-child {
+  border-right: none;
+}
+
+.kb-chunk-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f7f8fa;
+  color: #4a5160;
+  font-weight: 600;
+  white-space: normal;
+}
+
+.kb-chunk-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* 数值右对齐：金额、占比这类列右对齐才比得出量级 */
+.kb-chunk-table td.is-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #26292f;
 }
 
 /* ——— 知识图谱 ——— */

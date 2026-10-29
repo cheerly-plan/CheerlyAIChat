@@ -553,6 +553,10 @@ export type KbChunk = {
   page: number | null
   kind: 'text' | 'table' | 'figure'
   text: string
+  // 所属一级节（「第十节 管理层讨论与分析」）：卡片上作章节路径用
+  section?: string | null
+  // 跨页切片的末页：与 page 不等时展示为「第134–135页」
+  page_end?: number | null
 }
 
 // 人工修订切片：保存即单片重嵌入；图谱已建的话会被后端标成 stale

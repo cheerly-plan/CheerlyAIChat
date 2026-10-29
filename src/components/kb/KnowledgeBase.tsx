@@ -128,14 +128,25 @@ function docTypeLabel(key: string, docTypes: KgDocType[]): string {
 }
 
 // 切片位置标注：与检索引用（_format_hit）同一套语义
-function chunkPos(chunk: KbChunk): string {
+// 跨页切片（同节内聚合出来的）展示成「第134–135页」，点开原件跳起始页
+function chunkPos(chunk: KbChunk, isPdf = false): string {
+  const page = chunk.page
+  const end = chunk.page_end
+  const span =
+    isPdf && end != null && page != null && end > page
+      ? `第${page}–${end}页`
+      : page != null
+        ? `第${page}页`
+        : ''
   if (chunk.kind === 'table') {
-    return chunk.page != null ? `表${chunk.page}` : '表格'
+    if (page == null) return '表格'
+    // PDF 的表格落在具体页上；Excel 的 page 是 sheet 序号，仍叫「表N」
+    return isPdf ? span : `表${page}`
   }
   if (chunk.kind === 'figure') {
-    return chunk.page != null ? `第${chunk.page}页图表` : '图表'
+    return page != null ? `第${page}页图表` : '图表'
   }
-  return chunk.page != null ? `第${chunk.page}页` : `第${chunk.seq + 1}段`
+  return page != null ? span : `第${chunk.seq + 1}段`
 }
 
 /** 页码标注：PDF 类文件可点，点开原件对应页；其它类型/无页码只作文字 */
@@ -150,7 +161,7 @@ function ChunkPageTag({
 }) {
   const page = chunk.page
   const isPdf = (file.mime ?? '').toLowerCase().includes('pdf')
-  const label = chunkPos(chunk)
+  const label = chunkPos(chunk, isPdf)
   if (!isPdf || page == null) {
     return <span className="kb-chunk-pos-text">{label}</span>
   }
@@ -163,6 +174,103 @@ function ChunkPageTag({
     >
       {label}
     </button>
+  )
+}
+
+// ——— 切片正文：Markdown 表格还原成真表格 ———
+// 解析层把 PDF/DOCX/Excel 的表格转成 Markdown 表格存进 text（列关系全靠
+// 竖线撑着），这里再渲染回 <table>。不还原的话表格就是一串竖线文本，
+// 销量、收入、占比三项根本对不上列，等于丢掉了整份文档里密度最高的信息。
+
+type ContentBlock =
+  | { kind: 'text'; text: string }
+  | { kind: 'table'; rows: string[][] }
+
+const TABLE_ROW = /^\s*\|.*\|\s*$/
+const TABLE_SEP = /^\s*\|(\s*:?-{2,}:?\s*\|)+\s*$/
+// 数值单元格右对齐：金额、占比、倍数这些列右对齐才读得出量级
+const NUMERIC_CELL = /^[-+]?[\d,]+(\.\d+)?%?$/
+
+function parseRow(line: string): string[] {
+  // 单元格里的竖线被转义成 \|（后端写的），split 前先换成占位符
+  return line
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .replace(/\\\|/g, '@@PIPE@@')
+    .split('|')
+    .map((cell) => cell.replace(/@@PIPE@@/g, '|').trim())
+}
+
+function splitContent(text: string): ContentBlock[] {
+  const blocks: ContentBlock[] = []
+  let paragraph: string[] = []
+  let rows: string[][] = []
+  const flushText = () => {
+    const joined = paragraph.join('\n').trim()
+    if (joined) blocks.push({ kind: 'text', text: joined })
+    paragraph = []
+  }
+  const flushTable = () => {
+    if (rows.length) blocks.push({ kind: 'table', rows })
+    rows = []
+  }
+  for (const line of text.split('\n')) {
+    if (TABLE_ROW.test(line)) {
+      flushText()
+      if (!TABLE_SEP.test(line)) rows.push(parseRow(line))
+      continue
+    }
+    flushTable()
+    paragraph.push(line)
+  }
+  flushTable()
+  flushText()
+  return blocks
+}
+
+function ChunkContent({ text }: { text: string }) {
+  const blocks = useMemo(() => splitContent(text), [text])
+  return (
+    <>
+      {blocks.map((block, i) =>
+        block.kind === 'table' ? (
+          <div className="kb-chunk-table-wrap" key={i}>
+            <table className="kb-chunk-table">
+              <thead>
+                <tr>
+                  {block.rows[0].map((cell, j) => (
+                    <th key={j}>{cell || ' '}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {block.rows.slice(1).map((row, j) => (
+                  <tr key={j}>
+                    {row.map((cell, k) => (
+                      <td
+                        key={k}
+                        className={NUMERIC_CELL.test(cell) ? 'is-num' : undefined}
+                      >
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="kb-chunk-text" key={i}>
+            {block.text.split(/\n+/).map((para, j) => (
+              <p className="kb-chunk-p" key={j}>
+                {para}
+              </p>
+            ))}
+          </div>
+        ),
+      )}
+    </>
   )
 }
 
@@ -193,7 +301,8 @@ function extBadge(file: KbFile) {
 // 切片内容完整展示（高度随内容 auto），每张卡片实际渲染后把高度记进 heightsRef，
 // 布局用前缀和推算；未渲染的卡片按 DEFAULT_ROW_H 估算，滚动分页逐步修正。
 const PAGE_SIZE = 50
-const CHUNK_GAP = 10
+// 卡片间距：10px 时相邻两张几乎贴在一起，翻切片时分不清边界
+const CHUNK_GAP = 14
 const DEFAULT_ROW_H = 120
 const OVERSCAN = 3
 
@@ -1598,29 +1707,40 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                         className={`kb-chunk${flashSeq === chunk.seq ? ' is-flash' : ''}`}
                         style={{ top: offsets[startIdx + i] }}
                       >
-                        <div className="kb-chunk-meta">
-                          <span className={`kb-chunk-kind kind-${chunk.kind}`}>
-                            {KIND_LABEL[chunk.kind]}
-                          </span>
-                          <span className="kb-chunk-pos">
-                            #{chunk.seq + 1} ·{' '}
-                            <ChunkPageTag
-                              chunk={chunk}
-                              file={selectedFile}
-                              onOpen={openOriginalAtPage}
-                            />
-                          </span>
-                          {/* 修订 = 人工审核：改完保存即单片重嵌入（管理员） */}
-                          {canManage &&
-                          selectedFile.status === 'ready' &&
-                          editingSeq !== chunk.seq ? (
-                            <button
-                              type="button"
-                              className="kb-chunk-edit"
-                              onClick={() => startEdit(chunk)}
-                            >
-                              编辑
-                            </button>
+                        <div className="kb-chunk-head">
+                          <div className="kb-chunk-meta">
+                            <span className={`kb-chunk-kind kind-${chunk.kind}`}>
+                              {KIND_LABEL[chunk.kind]}
+                            </span>
+                            <span className="kb-chunk-pos">
+                              <b className="kb-chunk-seq">#{chunk.seq + 1}</b> ·{' '}
+                              <ChunkPageTag
+                                chunk={chunk}
+                                file={selectedFile}
+                                onOpen={openOriginalAtPage}
+                              />
+                              {' · '}
+                              {chunk.text.length} 字
+                            </span>
+                            {/* 修订 = 人工审核：改完保存即单片重嵌入（管理员） */}
+                            {canManage &&
+                            selectedFile.status === 'ready' &&
+                            editingSeq !== chunk.seq ? (
+                              <button
+                                type="button"
+                                className="kb-chunk-edit"
+                                onClick={() => startEdit(chunk)}
+                              >
+                                编辑
+                              </button>
+                            ) : null}
+                          </div>
+                          {/* 章节路径：这个切片属于哪一节，不用从正文里猜 */}
+                          {chunk.section ? (
+                            <div className="kb-chunk-path" title={chunk.section}>
+                              <span className="kb-chunk-path-icon">§</span>
+                              {chunk.section}
+                            </div>
                           ) : null}
                         </div>
                         {editingSeq === chunk.seq ? (
@@ -1656,7 +1776,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                             </div>
                           </div>
                         ) : (
-                          <pre className="kb-chunk-text">{chunk.text}</pre>
+                          <ChunkContent text={chunk.text} />
                         )}
                       </li>
                     ))
