@@ -1537,7 +1537,18 @@
   background-size: 18px 18px;
 }
 
+/* 复杂图的边画在这张位图上，垫在 SVG 之下。
+   尺寸（含 DPR）由 KnowledgeGraph 在 layout effect 里同步，
+   这里的 CSS 只负责铺满容器并让点击穿透到 SVG */
+.kg-links {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
 .kg-svg {
+  position: relative;
   display: block;
   cursor: grab;
   touch-action: none;

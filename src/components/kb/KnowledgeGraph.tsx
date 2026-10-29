@@ -109,6 +109,8 @@ type Sim = {
   /** 分层用的椭圆半径：画布是横向的，正圆会左右留一大片空 */
   rx: number
   ry: number
+  /** 建这个 sim 时用的是哪条渲染通道：模式变了必须重建，否则旧 DOM 清不干净 */
+  canvasEdges: boolean
 }
 
 // 画布底部要留出图例/提示的高度，否则节点会被压在图例下面或被画布边缘切掉
@@ -222,6 +224,8 @@ function buildSim(
   height: number,
   /** 上一轮布局：id 相同的节点原样继承位置，下钻展开时整图不重新洗牌 */
   carry?: Map<string, { x: number; y: number; laneR: number }>,
+  /** 建这个 sim 时用的渲染通道：记在 sim 上，下次进来好判断有没有换通道 */
+  canvasEdges = false,
 ): Sim {
   const usableH = height - BOTTOM_PAD
   const cx = width / 2
@@ -318,7 +322,16 @@ function buildSim(
     simLinks.push({ id: edge.id, source: s, target: t, relation: edge.relation })
   }
 
-  const sim: Sim = { nodes: simNodes, links: simLinks, alpha: 1, width, height, rx, ry }
+  const sim: Sim = {
+    nodes: simNodes,
+    links: simLinks,
+    alpha: 1,
+    width,
+    height,
+    rx,
+    ry,
+    canvasEdges,
+  }
   // 带旧布局复用（下钻展开 / 轮询刷新）：老节点位置原样保留，只让新邻居归位，
   // 不能按冷启动全量迭代 —— 那等于整张图重新洗牌，看起来就是「闪一下」
   const reused = nodes.length > 0 && (carry?.size ?? 0) >= Math.floor(nodes.length * 0.5)
@@ -552,13 +565,44 @@ const HUB_CAP = KG_HUB_CAP
 /** 下钻时额外带上的一跳邻居上限：星型枢纽可能有上百条边，全展开会再次卡死 */
 const NEIGHBOR_CAP = 36
 /**
- * 画布上最多画多少条边。
+ * 画布上最多画多少条边（只对 canvas 通道生效）。
  *
- * 密图里边数常常是点数的好几倍（七星那份 1057 实体 / 936 关系），
- * 每条边每帧要写 4 个坐标属性——不设上限的话光刷线就能吃掉整个帧预算。
- * 超出部分只是不画，实体还在，点开节点仍能看到它的关系。
+ * 密图里边数常常是点数的好几倍（七星那份 1057 实体 / 936 关系），全画上去
+ * 既糊成一片又要刷上千次属性。超出部分只是不画——实体还在，点开节点仍能看到
+ * 它的全部关系。简单图本来就在这个量级以下，走 SVG 时不做截断。
  */
-const MAX_EDGES = 400
+const MAX_EDGES_CANVAS = 1500
+/**
+ * 边数超过这条线就改用 canvas 画边。
+ *
+ * 简单图继续走 SVG：点少的时候矢量更清晰、可选中、还能吃 CSS 过渡；
+ * 复杂图才换 canvas —— 上千条 <line> 每帧刷属性根本刷不动。
+ */
+const CANVAS_EDGE_THRESHOLD = 120
+
+/* 边的配色与 kb.css 里 .kg-link / .is-dim / .is-hot 保持一致 */
+const LINK_BASE = '#bfc9d9'
+const LINK_HOT = '#4d6bfe'
+const LINK_DIM_ALPHA = 0.25
+const LINK_HOT_ALPHA = 0.85
+const LINK_LABEL_FONT =
+  '9.5px -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif'
+/** 焦点边的关系名最多标这么多条 */
+const LINK_LABEL_CAP = 24
+
+/** 这条边算不算「焦点相关」：有焦点实体时看它是否贴着焦点，否则看两端是否都命中 */
+function isRelatedLink(
+  sim: Sim,
+  link: SimLink,
+  hit: Set<string>,
+  focus: string | null,
+): boolean {
+  const a = sim.nodes[link.source]
+  const b = sim.nodes[link.target]
+  if (!a || !b) return false
+  if (focus) return a.id === focus || b.id === focus
+  return hit.size > 0 && hit.has(a.id) && hit.has(b.id)
+}
 
 /**
  * 两批数据是不是同一张图。
@@ -599,6 +643,8 @@ export default function KnowledgeGraph({
   const wrapRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const detailRef = useRef<HTMLElement>(null)
+  /** 复杂图的边画在这里（SVG 之下）：上千条 <line> 的每帧属性写是卡顿主因 */
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const linkRef = useRef<SVGGElement>(null)
   const labelRef = useRef<SVGGElement>(null)
   const nodeRef = useRef<SVGGElement>(null)
@@ -637,6 +683,16 @@ export default function KnowledgeGraph({
   const highlightRef = useRef<() => void>(() => {})
   /** 当前焦点实体（点选 / 外部指定 / 单条检索命中）。悬停离开时把关系名还原到它 */
   const focusIdRef = useRef<string | null>(null)
+  /** 鼠标悬停的实体：在焦点之上临时接管关系名显示（两条渲染通道共用） */
+  const hoverIdRef = useRef<string | null>(null)
+  /** 高亮口径的最新值：canvas 重绘在 rAF 里发生，不能读渲染快照里的 prop */
+  const hitIdsRef = useRef<string[]>([])
+  const dimOthersRef = useRef(dimOthers)
+  const canvasModeRef = useRef(false)
+  useEffect(() => {
+    hitIdsRef.current = hitIds
+    dimOthersRef.current = dimOthers
+  }, [hitIds, dimOthers])
 
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [view, setView] = useState({ k: 1, x: 0, y: 0 })
@@ -650,6 +706,13 @@ export default function KnowledgeGraph({
 
   const nodes = useMemo(() => graph?.nodes ?? [], [graph])
   const edges = useMemo(() => graph?.edges ?? [], [graph])
+  /**
+   * 边的渲染通道：简单图 SVG，复杂图 canvas。
+   *
+   * 用源边数而不是显示集来判——显示集会随下钻/选簇变化，用它判会导致
+   * 同一次交互里来回切通道，DOM 就得反复重建。
+   */
+  const canvasEdges = edges.length > CANVAS_EDGE_THRESHOLD
   const nodeById = useMemo(() => {
     const map = new Map<string, KgNode>()
     for (const n of nodes) map.set(n.id, n)
@@ -783,23 +846,113 @@ export default function KnowledgeGraph({
     let kept = edges.filter(
       (edge) => keep.has(edge.source) && keep.has(edge.target),
     )
-    // 边比点密得多：一份招股书能抽出一千条关系，全画上去既糊成一片，
-    // 又让每帧要刷三四千次属性。超预算就按权重（关系出现次数）留下要紧的
-    if (kept.length > MAX_EDGES) {
+    // 边比点密得多：一份招股书能抽出一千条关系，超预算就按权重（关系出现
+    // 次数）留下要紧的。简单图（走 SVG）不截断
+    const edgeCap = canvasEdges ? MAX_EDGES_CANVAS : Number.POSITIVE_INFINITY
+    if (kept.length > edgeCap) {
       kept = [...kept]
         .sort(
           (a, b) =>
             (b.weight ?? 1) - (a.weight ?? 1) || a.id.localeCompare(b.id),
         )
-        .slice(0, MAX_EDGES)
+        .slice(0, edgeCap)
     }
     return {
       nodes: nodes.filter((node) => keep.has(node.id)),
       edges: kept,
     }
-  }, [prune, nodes, edges, activeNodeId, hitIds, colorMode, focusCommunity])
+  }, [
+    prune,
+    nodes,
+    edges,
+    activeNodeId,
+    hitIds,
+    colorMode,
+    focusCommunity,
+    canvasEdges,
+  ])
   const displayNodes = display.nodes
   const displayEdges = display.edges
+
+  /**
+   * 复杂图：把边画到 canvas 上（铺在 SVG 之下）。
+   *
+   * 上千条 <line> 每帧要写 4 个坐标属性，光这一项就吃掉整个帧预算；
+   * canvas 里所有普通边合成一个 path、一次 stroke 画完，代价与边数线性相关
+   * 且常数极小。节点仍留在 SVG：要点击、要 hover、要吃 CSS 过渡。
+   * 两种通道的配色/线宽取自同一组常量，来回切换看不出差别。
+   */
+  const drawLinks = useCallback(() => {
+    const sim = simRef.current
+    const canvas = canvasRef.current
+    if (!sim || !canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    // 先清屏——SVG 模式下也要清，否则从复杂图切回简单图会残留上一次画的东西
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    if (!canvasModeRef.current) return
+    const dpr = window.devicePixelRatio || 1
+    const v = viewRef.current
+    // 与 SVG 那层 <g transform="translate(x y) scale(k)"> 完全对齐
+    ctx.setTransform(dpr * v.k, 0, 0, dpr * v.k, dpr * v.x, dpr * v.y)
+    const hit = new Set(hitIdsRef.current)
+    // 悬停优先于选中：鼠标停在哪个点上，就先讲哪个点的关系
+    const focus = hoverIdRef.current ?? focusIdRef.current
+    const hasFocus = Boolean(focus) || hit.size > 0
+    const dimRest = dimOthersRef.current && hasFocus
+
+    ctx.lineCap = 'round'
+    ctx.lineWidth = 1
+    ctx.globalAlpha = dimRest ? LINK_DIM_ALPHA : 1
+    ctx.strokeStyle = LINK_BASE
+    ctx.beginPath()
+    for (const link of sim.links) {
+      if (isRelatedLink(sim, link, hit, focus)) continue
+      const a = sim.nodes[link.source]
+      const b = sim.nodes[link.target]
+      ctx.moveTo(a.x, a.y)
+      ctx.lineTo(b.x, b.y)
+    }
+    ctx.stroke()
+
+    if (!hasFocus) return
+    // 焦点边：蓝色高亮，并顺带把关系名描白边压在线上（只在这时画——
+    // 常显的话密图里几十个标签会糊成一片）
+    ctx.globalAlpha = LINK_HOT_ALPHA
+    ctx.lineWidth = 1.6
+    ctx.strokeStyle = LINK_HOT
+    ctx.beginPath()
+    for (const link of sim.links) {
+      if (!isRelatedLink(sim, link, hit, focus)) continue
+      const a = sim.nodes[link.source]
+      const b = sim.nodes[link.target]
+      ctx.moveTo(a.x, a.y)
+      ctx.lineTo(b.x, b.y)
+    }
+    ctx.stroke()
+
+    ctx.globalAlpha = 1
+    let labelled = 0
+    ctx.font = LINK_LABEL_FONT
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.lineWidth = 3
+    ctx.strokeStyle = 'rgba(252, 253, 255, 0.92)'
+    ctx.fillStyle = '#7b8494'
+    for (const link of sim.links) {
+      if (!isRelatedLink(sim, link, hit, focus)) continue
+      // 星型枢纽可能连着上百条边，全标出来就是一片糊；只标前 24 条
+      if (labelled >= LINK_LABEL_CAP) break
+      labelled += 1
+      const a = sim.nodes[link.source]
+      const b = sim.nodes[link.target]
+      const mx = (a.x + b.x) / 2
+      const my = (a.y + b.y) / 2
+      ctx.strokeText(link.relation, mx, my)
+      ctx.fillText(link.relation, mx, my)
+    }
+  }, [])
 
   const paint = useCallback(() => {
     const sim = simRef.current
@@ -842,7 +995,10 @@ export default function KnowledgeGraph({
         link.labelEl.setAttribute('y', ((a.y + b.y) / 2).toFixed(1))
       }
     }
-  }, [])
+    // 复杂图的边不在 SVG 里，得自己刷一次画布；
+    // 简单图也要走一趟——从复杂图切回来时它负责把残留的画面清掉
+    drawLinks()
+  }, [drawLinks])
 
   /** 重启力导向循环；已在跑就直接返回，避免拖动时越叠越多 */
   const kick = useCallback(() => {
@@ -896,6 +1052,20 @@ export default function KnowledgeGraph({
     const h = wrapRef.current?.clientHeight || size.h
     if (!nodeLayer || !linkLayer || !w || !h) return
 
+    // 画布尺寸先落地：canvas 的位图尺寸要跟 CSS 尺寸 × DPR 对齐，
+    // 否则线会糊或者被拉伸
+    canvasModeRef.current = canvasEdges
+    const canvas = canvasRef.current
+    if (canvas) {
+      const dpr = window.devicePixelRatio || 1
+      const bw = Math.round(w * dpr)
+      const bh = Math.round(h * dpr)
+      if (canvas.width !== bw || canvas.height !== bh) {
+        canvas.width = bw
+        canvas.height = bh
+      }
+    }
+
     const prevSize = lastSizeRef.current
     const sameSize =
       Boolean(prevSize) &&
@@ -903,6 +1073,8 @@ export default function KnowledgeGraph({
       Math.abs((prevSize?.h ?? 0) - h) < 2
     const sameData = sameGraphData(lastDataRef.current, { nodes, edges })
     const live = simRef.current
+    // 上一轮走的是哪条通道：模式变了必须重建，否则旧通道的 DOM 不会清干净
+    const sameMode = live ? live.canvasEdges === canvasEdges : false
     // 源数据没变也会换显示集：选中簇要把成员钉进画布，下钻要补邻居。
     // 只认 sameData 会直接 return，成员永远不进 DOM。
     const liveIds = live ? new Set(live.nodes.map((n) => n.id)) : null
@@ -935,7 +1107,7 @@ export default function KnowledgeGraph({
       paint()
       return
     }
-    if (sameData && sameSize && live && sameDisplay) return
+    if (sameData && sameSize && live && sameDisplay && sameMode) return
     const carry = lastLayoutRef.current
 
     const sim = buildSim(
@@ -944,6 +1116,7 @@ export default function KnowledgeGraph({
       w,
       h,
       carry && carry.size > 0 ? carry : undefined,
+      canvasEdges,
     )
     simRef.current = sim
     nodeElsRef.current = new Map()
@@ -1005,9 +1178,18 @@ export default function KnowledgeGraph({
       g.appendChild(text)
 
       // 悬停节点时只显示它的邻接关系名：全部常显在密图里会同节点标签叠成一团。
-      // 离开时若有选中实体，把关系名还原到选中节点，而不是全藏
-      g.addEventListener('pointerenter', () => showLinkLabelsOf(node.id))
-      g.addEventListener('pointerleave', () => showLinkLabelsOf(focusIdRef.current))
+      // 离开时若有选中实体，把关系名还原到选中节点，而不是全藏。
+      // canvas 通道没有 labelEl，靠 hoverIdRef + 重绘做同一件事
+      g.addEventListener('pointerenter', () => {
+        hoverIdRef.current = node.id
+        showLinkLabelsOf(node.id)
+        drawLinks()
+      })
+      g.addEventListener('pointerleave', () => {
+        hoverIdRef.current = null
+        showLinkLabelsOf(focusIdRef.current)
+        drawLinks()
+      })
       // 进 DOM 前就落到预热后的位置，避免先出现在左上角再瞬移
       g.setAttribute('transform', `translate(${node.x.toFixed(2)} ${node.y.toFixed(2)})`)
       nodeLayer.appendChild(g)
@@ -1017,6 +1199,8 @@ export default function KnowledgeGraph({
     for (const link of sim.links) {
       const a = sim.nodes[link.source]
       const b = sim.nodes[link.target]
+      // 复杂图的边不进 DOM：改由 canvas 一趟描出来（见 drawLinks）
+      if (canvasModeRef.current) continue
       const line = document.createElementNS(SVG_NS, 'line')
       line.setAttribute('class', 'kg-link')
       if (a && b) {
@@ -1081,7 +1265,13 @@ export default function KnowledgeGraph({
     // nodes/edges 只用来判断「源数据是否变了」，故意不进依赖：
     // display 集由它们派生，源数据一变这里必然会重跑，放进依赖只会重复触发
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayNodes, displayEdges, size, paint, kick])
+  }, [displayNodes, displayEdges, size, paint, kick, canvasEdges])
+
+  // 复杂图的边画在 canvas 上，缩放/平移/高亮变化都得自己重刷一次：
+  // SVG 那边由 React 更新 <g transform>，canvas 没有这层绑定
+  useEffect(() => {
+    drawLinks()
+  }, [view, drawLinks])
 
   // 选中实体 → 拉原文证据
   useEffect(() => {
@@ -1135,6 +1325,10 @@ export default function KnowledgeGraph({
     const nodeLayer = nodeRef.current
     const linkLayer = linkRef.current
     if (!nodeLayer || !linkLayer) return
+    // 顺手把口径同步给 canvas 通道：两条通道必须用同一套 hit/focus 判断，
+    // 否则会出现「节点亮了但它的线没亮」
+    hitIdsRef.current = hitIds
+    dimOthersRef.current = dimOthers
     const hit = new Set(hitIds)
     const focus = activeNodeId || (hit.size === 1 ? [...hit][0] : '')
     focusIdRef.current = focus || null
@@ -1183,7 +1377,8 @@ export default function KnowledgeGraph({
         link.labelEl.classList.toggle('is-on', on)
       }
     }
-  }, [hitIds, dimOthers, activeNodeId, edges])
+    if (canvasModeRef.current) drawLinks()
+  }, [hitIds, dimOthers, activeNodeId, edges, drawLinks])
 
   useEffect(() => {
     highlightRef.current = applyHighlight
@@ -1371,6 +1566,9 @@ export default function KnowledgeGraph({
   return (
     <div className="kg-shell">
       <div className="kg-canvas" ref={wrapRef}>
+        {/* 复杂图的边走这一层：上千条线一次 path 描完，不进 SVG 的 DOM。
+            简单图它保持空白（drawLinks 里直接 return），一切照旧 */}
+        <canvas className="kg-links" ref={canvasRef} aria-hidden="true" />
         <svg ref={svgRef} className="kg-svg" width="100%" height="100%" aria-label="知识图谱画布">
           <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
             <g ref={linkRef} />
