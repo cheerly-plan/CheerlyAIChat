@@ -20,7 +20,6 @@ import {
   BackIcon,
   MoreIcon,
   PanelIcon,
-  RefreshIcon,
   UploadIcon,
 } from '../chat/icons'
 import { ConfirmDialog } from '../common/ConfirmDialog'
@@ -977,31 +976,41 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                     <ul className="kb-glist">
                       {/* 可构建（未生成/失败）在上，已完成可勾选在下 */}
                       {graphTodo.map((item) => {
-                        const badge = graphBadge(item.graph_status, canManage)
-                        const isPicked = buildFileId === item.file_id
+                        // 构建入口已经是文件名右侧的「构建」按钮，徽标这里只留
+                        // 纯状态（构建中/构建失败），不再显示可点的操作文字
+                        const badge =
+                          item.graph_status === 'building' ||
+                          item.graph_status === 'failed'
+                            ? graphBadge(item.graph_status, false)
+                            : null
                         return (
-                          <li
-                            key={item.file_id}
-                            className={`kb-gitem is-muted${isPicked ? ' is-picked' : ''}`}
-                            onClick={() => toggleBuildFile(item)}
-                          >
+                          <li key={item.file_id} className="kb-gitem is-muted">
                             <span className="kb-gcheck">
                               <span className="kb-gtext">
-                                <span
-                                  className="kb-gname kb-gname-action"
-                                  title={`${item.filename}（点击构建图谱）`}
-                                >
+                                <span className="kb-gname" title={item.filename}>
                                   {item.filename}
                                 </span>
                               </span>
                             </span>
-                            <span className={`kb-gbadge ${badge.cls}`}>
-                              {badge.cls === 'st-busy' ? (
-                                <span className="kb-gspinner" aria-hidden="true" />
-                              ) : (
-                                badge.label
-                              )}
-                            </span>
+                            {canManage && item.graph_status !== 'building' ? (
+                              <button
+                                type="button"
+                                className="kb-gact"
+                                onClick={() => setRebuildTarget(item)}
+                                title="选择文档类型与抽取粒度后构建图谱"
+                              >
+                                构建
+                              </button>
+                            ) : null}
+                            {badge ? (
+                              <span className={`kb-gbadge ${badge.cls}`}>
+                                {badge.cls === 'st-busy' ? (
+                                  <span className="kb-gspinner" aria-hidden="true" />
+                                ) : (
+                                  badge.label
+                                )}
+                              </span>
+                            ) : null}
                           </li>
                         )
                       })}
@@ -1042,16 +1051,15 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                                 </span>
                               </span>
                             </label>
-                            {/* 已完成行：hover 才浮现重建入口（常占位，不重排文件名） */}
+                            {/* 已完成行：重建入口（默认显示的蓝色文字，无图标无边框） */}
                             {canManage ? (
                               <button
                                 type="button"
-                                className="kb-grebuild"
+                                className="kb-gact"
                                 onClick={() => setRebuildTarget(item)}
                                 disabled={item.graph_status === 'building'}
                                 title="按新的文档类型与抽取粒度重建这份图谱"
                               >
-                                <RefreshIcon />
                                 重建
                               </button>
                             ) : null}
@@ -1355,7 +1363,11 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
           initialLevel={
             rebuildTarget.extract_level === 'light' ? 'light' : 'full'
           }
-          hasGraph
+          // 未构建/失败 → 标题「构建图谱」；已生成/待重建 → 「重建图谱」
+          hasGraph={
+            rebuildTarget.graph_status === 'ready' ||
+            rebuildTarget.graph_status === 'stale'
+          }
           submitting={rebuilding}
           error={rebuildError}
           onCancel={() => setRebuildTarget(null)}
