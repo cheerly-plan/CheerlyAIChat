@@ -97,12 +97,17 @@ function GraphRefreshIcon() {
  * 实体数不是个普通数字——它直接代表这份文档的抽取负荷：1057 个实体意味着
  * 重建要跑很久、显存吃紧、还容易爆实体；10 个实体的小规范几乎瞬间完成。
  * 所以按量级给不同色阶和体量条长度，让人在列表里一眼看出哪几份是重活。
+ *
+ * 条长必须是相对比例（对当前列表里最大的那份取百分比），否则按档位给固定
+ * 长度会让 446 和 348 看起来一样长、比例失真。
  */
-function entityTier(count: number): { cls: string; ratio: number } {
-  if (count >= 1000) return { cls: 'is-huge', ratio: 1 }
-  if (count >= 300) return { cls: 'is-mid', ratio: 0.62 }
-  if (count >= 50) return { cls: 'is-small', ratio: 0.36 }
-  return { cls: 'is-tiny', ratio: 0.18 }
+function entityTier(count: number, max: number): { cls: string; ratio: number } {
+  // 最小的那几份按真比例算只有零点几像素，给个下限留一个能看见的头
+  const ratio = Math.max(count / Math.max(max, 1), 0.07)
+  if (count >= 1000) return { cls: 'is-huge', ratio }
+  if (count >= 300) return { cls: 'is-mid', ratio }
+  if (count >= 50) return { cls: 'is-small', ratio }
+  return { cls: 'is-tiny', ratio }
 }
 
 /** 文档类型标签：招股书一类结构化文档用主色，通用文档用中性灰 */
@@ -614,6 +619,13 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
       ),
     [visibleFiles],
   )
+  // 体量条的满格基准：当前列表里实体最多的那份。筛掉文件后基准跟着变，
+  // 剩下几份之间的比例关系仍然成立
+  const maxEntities = useMemo(
+    () => graphDone.reduce((m, f) => Math.max(m, f.graph_entity_count ?? 0), 1),
+    [graphDone],
+  )
+
   const graphTodo = useMemo(
     () =>
       visibleFiles.filter(
@@ -1187,7 +1199,13 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                                   : null
                               return (
                                 <li key={item.file_id} className="kb-gitem is-muted">
-                                  <span className="kb-gcheck">
+                                  {/* 未构建行也留一个不可勾选的复选框：结构与已构建行
+                                      保持一致，同时说明「建完才能勾进合并视图」 */}
+                                  <span
+                                    className="kb-gcheck is-locked"
+                                    title="图谱构建完成后才能勾选进合并视图"
+                                  >
+                                    <input type="checkbox" disabled checked={false} />
                                     <span className="kb-gtext">
                                       <span className="kb-gname" title={item.filename}>
                                         {item.filename}
@@ -1262,7 +1280,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                               const isPicked =
                                 checked.has(item.file_id) || buildFileId === item.file_id
                               const count = item.graph_entity_count ?? 0
-                              const tier = entityTier(count)
+                              const tier = entityTier(count, maxEntities)
                               return (
                                 <li
                                   key={item.file_id}
@@ -1286,10 +1304,16 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                                           {docTypeLabelOf(item.doc_type)}
                                         </span>
                                         {/* 实体体量：色阶 + 细条一起表达，
-                                            1057 这种量级一眼看出是重活 */}
+                                            1057 这种量级一眼看出是重活。
+                                            条长按列表内最大值取相对比例：
+                                            1057 满条，446 就是 42%，348 是 33% */}
                                         <span
                                           className={`kb-gcount ${tier.cls}`}
-                                          title={`${count} 个实体`}
+                                          title={
+                                            count >= 1000
+                                              ? `${count} 个实体 · 超过 1000，重建耗时较长`
+                                              : `${count} 个实体`
+                                          }
                                         >
                                           <span className="kb-gvol" aria-hidden="true">
                                             <i style={{ width: `${tier.ratio * 100}%` }} />
