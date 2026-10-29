@@ -770,7 +770,6 @@
 }
 
 .kb-build-field {
-  margin-top: 16px;
 }
 
 .kb-build-field:first-of-type {
@@ -879,10 +878,11 @@
 }
 
 .kb-build-note {
-  margin: 6px 0 0;
+  height: 40px;
   color: #9aa1ac;
   font-size: 12px;
   line-height: 1.5;
+  padding: 0 12px;
 }
 
 /* 抽取粒度：两个并排卡片按钮 */
@@ -937,6 +937,7 @@
   color: #8a8f98;
   font-size: 12px;
   line-height: 1.6;
+  padding: 0 12px;
 }
 
 .kb-build-error {
@@ -1289,6 +1290,12 @@
   flex: none;
   display: inline-flex;
   align-items: center;
+  width: 500px;
+}
+@media (max-width: 1200px) {
+  .kb-kg-shade {
+    width: 250px;
+  }
 }
 
 .kb-kg-shade-trigger {
@@ -1375,6 +1382,7 @@
   padding: 4px;
   list-style: none;
   min-width: 108px;
+  min-height: 150px;
 }
 
 .kb-kg-shade-sub {
@@ -2408,7 +2416,7 @@
 /* 文件名下方：这份图谱用的抽取配置（文档类型 · 粒度），淡色小标签 */
 .kb-gprofile {
   display: inline-block;
-  width: 100px;
+  width: 80px;
   margin-right: 6px;
   color: #7b8290;
   font-size: 10.5px;
