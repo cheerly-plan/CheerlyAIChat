@@ -411,7 +411,7 @@ export type KbFile = {
   status: 'uploaded' | 'parsing' | 'embedding' | 'ready' | 'failed'
   error: string
   chunk_count: number
-  // 向量化完成时记下的分类片数，列表标题后面展示
+  // 向量化完成时记下的分类片数，选中文件标题后面展示
   text_count?: number
   table_count?: number
   // 文件类型后缀（如 .pdf），文件名本身已是纯名；下载/徽标按它识别类型
@@ -419,6 +419,9 @@ export type KbFile = {
   // 图谱进度：'' 未构建 / building / ready / stale（切片修订后待重建）/ failed / skipped
   graph_status?: string
   graph_entity_count?: number
+  graph_batch_done?: number
+  graph_batch_total?: number
+  align_status?: string
   // 这份文件上次建图用的抽取配置：列表行 hover 重建时预填进弹窗
   doc_type?: string
   extract_level?: string
@@ -727,6 +730,8 @@ export type KgGraph = {
   filename?: string
   graph_status?: string
   entity_count?: number
+  batch_done?: number
+  batch_total?: number
   /** 社区检测结果（按规模降序，孤立簇在最后） */
   communities?: KgCommunity[]
   /** 实体对齐进度与合并数量（P2） */

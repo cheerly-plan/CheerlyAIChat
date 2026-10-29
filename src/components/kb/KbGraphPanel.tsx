@@ -343,9 +343,22 @@ export default function KbGraphPanel({
       return { title: '', hint: '' }
     }
     if (isBuilding) {
+      const aligning =
+        graph?.align_status === 'aligning' || file?.align_status === 'aligning'
+      const total = graph?.batch_total ?? file?.graph_batch_total ?? 0
+      const done = graph?.batch_done ?? file?.graph_batch_done ?? 0
+      const entities = graph?.entity_count ?? file?.graph_entity_count ?? 0
+      const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : null
+      const hint = aligning
+        ? '抽取完成，正在合并同一实体的不同写法。完成后自动刷新。'
+        : pct != null
+          ? `已完成 ${done}/${total} 批（${pct}%）${
+              entities > 0 ? `，已抽取 ${entities} 个实体` : ''
+            }。完成后自动刷新。`
+          : '正在从切片里抽取实体与关系。完成后自动刷新。'
       return {
-        title: '正在构建图谱',
-        hint: '正在从切片里抽取实体与关系。已抽到的部分会陆续上图，完成后自动刷新。',
+        title: aligning ? '正在对齐实体' : '正在构建图谱',
+        hint,
         action: undefined,
       }
     }
@@ -679,6 +692,27 @@ export default function KbGraphPanel({
       ) : null}
 
       {searchError ? <p className="kb-error">{searchError}</p> : null}
+      {isBuilding && hasGraph ? (
+        <p className="kb-kg-building">
+          <span className="kb-gspinner" aria-hidden="true" />
+          {(() => {
+            const aligning =
+              graph?.align_status === 'aligning' || file?.align_status === 'aligning'
+            const total = graph?.batch_total ?? file?.graph_batch_total ?? 0
+            const done = graph?.batch_done ?? file?.graph_batch_done ?? 0
+            const entities = graph?.entity_count ?? file?.graph_entity_count ?? 0
+            const pct =
+              total > 0 ? Math.min(100, Math.round((done / total) * 100)) : null
+            if (aligning) return '抽取完成，正在对齐实体…'
+            if (pct != null) {
+              return `正在重建图谱 ${pct}%（${done}/${total} 批）${
+                entities > 0 ? ` · 已抽取 ${entities} 个实体` : ''
+              }`
+            }
+            return '正在重建图谱…'
+          })()}
+        </p>
+      ) : null}
       {file?.graph_status === 'stale' ? (
         // 切片人工修订后图谱就基于旧文本了：保留旧图供参考。
         // 重建按钮只给管理员；普通用户只看说明。这里按上次配置重抽，不弹配置窗

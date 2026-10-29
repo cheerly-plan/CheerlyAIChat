@@ -69,6 +69,22 @@ function graphBadge(status: string | null | undefined, canManage: boolean) {
   return GRAPH_BADGE[key] ?? GRAPH_BADGE['']
 }
 
+/** 建图轮询进度：对齐阶段 / 百分比 / 已抽实体数 */
+function graphBuildProgress(file: KbFile): {
+  aligning: boolean
+  pct: number | null
+  entities: number
+} | null {
+  if (file.graph_status !== 'building') return null
+  const total = file.graph_batch_total ?? 0
+  const done = file.graph_batch_done ?? 0
+  return {
+    aligning: file.align_status === 'aligning',
+    pct: total > 0 ? Math.min(100, Math.round((done / total) * 100)) : null,
+    entities: file.graph_entity_count ?? 0,
+  }
+}
+
 /** 重建/构建按钮的图标：12px，比会话里的 RefreshIcon 小一号，list row 才不撑高 */
 function GraphRefreshIcon() {
   return (
@@ -348,13 +364,6 @@ function formatSize(bytes: number): string {
   return `${bytes} B`
 }
 
-/** 向量化完成后的文本/表格片数，跟在文件名后面 */
-function kindCountsLabel(file: KbFile): string | null {
-  if (file.status !== 'ready') return null
-  if (file.text_count == null && file.table_count == null) return null
-  return `文本 ${file.text_count ?? 0} · 表格 ${file.table_count ?? 0}`
-}
-
 // 文件列表行的「更多」菜单：一个三点按钮，点击弹出下载/编辑标签/重命名/删除。
 // 菜单按权限与状态动态显隐，与会话列表「更多」同一套交互（左对齐 + 点外部关闭）。
 type KbFileRowProps = {
@@ -407,7 +416,6 @@ function KbFileRow({
   }, [menuOpen])
 
   const hasDownload = item.status !== 'uploaded'
-  const counts = kindCountsLabel(item)
   // 编辑（改名 + 标签）合成一项：两者都是「这份文件是什么」的元信息
   const hasEdit = canManage
   const hasDelete = canManage
@@ -444,18 +452,13 @@ function KbFileRow({
           {/* 标题与元信息放在同一列里：片数/大小左对齐到文件名首字，
               而不是退到格式标签的左边缘（那样看着像两套缩进） */}
           <span className="kb-row-body">
-            <span className="kb-name-line">
-              <span className="kb-name-text">{item.filename}</span>
-              {counts ? <span className="kb-kind-counts">{counts}</span> : null}
-            </span>
+            <span className="kb-name-text">{item.filename}</span>
             {/* 元信息一级就是结论：片数（决定图谱规模与重建耗时）用近黑加粗，
                 文件大小只作参照，浅灰。文档类型标签删掉——分组标题已经说了 */}
             <span className="kb-meta">
-              {counts ? null : (
-                <span className="kb-slices" title="切片数">
-                  {item.chunk_count} 片
-                </span>
-              )}
+              <span className="kb-slices" title="切片数">
+                {item.chunk_count} 片
+              </span>
               <span className="kb-size">{formatSize(item.size_bytes)}</span>
               {item.status === 'failed' ? (
                 <span className="kb-state is-failed" title={item.error || '处理失败'}>
@@ -1554,10 +1557,15 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                                       {badge.cls === 'st-busy' ? (
                                         <span className="kb-gspinner" aria-hidden="true" />
                                       ) : null}
-                                      {/* 建图中只留转圈；解析/向量化要写出阶段，避免误点构建 */}
-                                      {badge.cls === 'st-busy' && fileReady
-                                        ? null
-                                        : badge.label}
+                                      {(() => {
+                                        if (badge.cls !== 'st-busy' || !fileReady) {
+                                          return badge.label
+                                        }
+                                        const prog = graphBuildProgress(item)
+                                        if (prog?.aligning) return '对齐中…'
+                                        if (prog?.pct != null) return `${prog.pct}%`
+                                        return '构建中…'
+                                      })()}
                                     </span>
                                   ) : null}
                                 </li>
@@ -1693,6 +1701,28 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                 {extBadge(buildFile)}
                 {buildFile.filename}
                 <span className="kb-graph-sub">文件图谱</span>
+                {(() => {
+                  const prog = graphBuildProgress(buildFile)
+                  if (!prog) return null
+                  return (
+                    <span className="kb-graph-stats">
+                      <span className="kb-graph-tag">
+                        {prog.aligning ? (
+                          '对齐中'
+                        ) : (
+                          <>
+                            <b>{prog.pct ?? 0}</b>%
+                          </>
+                        )}
+                      </span>
+                      {prog.entities > 0 ? (
+                        <span className="kb-graph-tag">
+                          <b>{prog.entities}</b> 实体
+                        </span>
+                      ) : null}
+                    </span>
+                  )
+                })()}
               </h2>
             </header>
             <KbGraphPanel
@@ -1710,9 +1740,14 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
               <h2 className="kb-chunks-title" title={selectedFile.filename}>
                 {extBadge(selectedFile)}
                 <span className="kb-chunks-name">{selectedFile.filename}</span>
-                {kindCountsLabel(selectedFile) ? (
-                  <span className="kb-kind-counts">
-                    {kindCountsLabel(selectedFile)}
+                {selectedFile.status === 'ready' ? (
+                  <span className="kb-graph-stats">
+                    <span className="kb-graph-tag">
+                      <b>{selectedFile.text_count ?? 0}</b> 文本
+                    </span>
+                    <span className="kb-graph-tag">
+                      <b>{selectedFile.table_count ?? 0}</b> 表格
+                    </span>
                   </span>
                 ) : null}
               </h2>

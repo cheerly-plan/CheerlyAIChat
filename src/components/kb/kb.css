@@ -387,29 +387,11 @@
 /* 文件名只占一行，超出加省略号（完整名见 title 悬浮提示）。
    两行截断会让同一列表里行高忽高忽低，扫视时眼睛一直在跳；
    单行 + 省略号让每条等高，也更好比较片数 */
-.kb-name-line {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
-}
-
 .kb-name-text {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   line-height: 1.45;
-  min-width: 0;
-  flex: 1;
-}
-
-/* 向量化完成后的文本/表格片数：跟在文件名后面，不进省略号 */
-.kb-kind-counts {
-  flex-shrink: 0;
-  color: #8a8f98;
-  font-size: 11px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
 }
 
 /* ——— 文件类型徽标：按扩展名着色 ———
@@ -1342,10 +1324,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
-}
-
-.kb-chunks-title .kb-kind-counts {
-  font-size: 12px;
 }
 
 /* 左面板收起后，.kb-float（返回+展开）浮在左上角，标题行让出按钮宽度 */
@@ -2964,6 +2942,12 @@
   color: #9aa1ad;
 }
 
+.kb-gbadge.st-busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
 /* 构建中的转圈指示：与会话列表 loading 同款，不占文字 */
 .kb-gspinner {
   display: inline-block;
@@ -3276,6 +3260,24 @@
 }
 
 /* ——— 图谱待重建横幅（切片修订后）——— */
+
+.kb-kg-building {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #e4e8f0;
+  border-radius: 9px;
+  background: #f6f8fc;
+  color: #5b6472;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.kb-kg-building .kb-gspinner {
+  color: #7b8494;
+}
 
 .kb-kg-stale {
   display: flex;
