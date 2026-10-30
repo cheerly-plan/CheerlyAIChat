@@ -2567,6 +2567,8 @@
 
 .kb-kg-evidence li p {
   margin: 0;
+  max-height: 220px;
+  overflow: auto;
   color: #55607a;
   font-size: 11.5px;
   line-height: 1.6;
@@ -2811,12 +2813,12 @@
 }
 
 .kb-glist {
-  margin: 0;
+  margin: 4px 0 0;
   padding: 2px 0;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 6px;
 }
 
 /* 行 = 一张小卡片：白底 + 圆角 + 极淡描边，hover 浅灰底。
@@ -2980,6 +2982,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  gap: 3px;
 }
 
 /* 文档类型标签：招股书一类结构化文档用主色，通用文档中性灰 */

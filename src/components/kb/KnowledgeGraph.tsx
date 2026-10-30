@@ -1738,7 +1738,7 @@ export default function KnowledgeGraph({
               <p className="kg-detail-empty">没有定位到原文片段。</p>
             ) : (
               <ul className="kg-evidence">
-                {evidence.slice(0, 4).map((item) => (
+                {evidence.map((item) => (
                   <li key={`${item.filename}-${item.chunk_seq}`}>
                     <div className="kg-evidence-head">
                       {item.filename}
@@ -1746,7 +1746,7 @@ export default function KnowledgeGraph({
                         ? ` · 第${item.page}页`
                         : ` · 第${item.chunk_seq + 1}段`}
                     </div>
-                    <p>{item.text.length > 170 ? `${item.text.slice(0, 170)}…` : item.text}</p>
+                    <p>{item.text}</p>
                   </li>
                 ))}
               </ul>

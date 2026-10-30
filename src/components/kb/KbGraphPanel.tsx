@@ -774,7 +774,7 @@ export default function KbGraphPanel({
                       {item.page !== null ? ` · 第${item.page}页` : ` · 第${item.chunk_seq + 1}段`}
                     </span>
                   </div>
-                  <p>{item.text.length > 150 ? `${item.text.slice(0, 150)}…` : item.text}</p>
+                  <p>{item.text}</p>
                 </li>
               ))}
             </ul>
