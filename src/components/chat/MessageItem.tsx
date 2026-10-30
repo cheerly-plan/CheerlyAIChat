@@ -326,6 +326,7 @@ function TraceActionIcon() {
 function SourceList({ sources }: { sources: ChatSource[] }) {
   const [openKey, setOpenKey] = useState<string | null>(null)
   const active = sources.find((item) => item.key === openKey) ?? null
+  const activeLoc = active ? sourceLocator(active) : null
 
   return (
     <div className="msg-sources">
@@ -333,18 +334,19 @@ function SourceList({ sources }: { sources: ChatSource[] }) {
       <div className="msg-sources-chips">
         {sources.map((source, index) => {
           const open = source.key === openKey
+          const loc = sourceLocator(source)
           return (
             <button
               key={source.key}
               type="button"
               className={`msg-source${open ? ' is-open' : ''}`}
-              title={[source.filename, sourceWhere(source), source.section].filter(Boolean).join(' · ')}
+              title={[source.filename, loc.where, loc.section].filter(Boolean).join(' · ')}
               aria-expanded={open}
               onClick={() => setOpenKey(open ? null : source.key)}
             >
               <span className="msg-source-idx">{index + 1}</span>
               <span className="msg-source-name">{source.filename}</span>
-              <span className="msg-source-where">{sourceWhere(source)}</span>
+              <span className="msg-source-where">{loc.where}</span>
             </button>
           )
         })}
@@ -352,9 +354,9 @@ function SourceList({ sources }: { sources: ChatSource[] }) {
       {active ? (
         <div className="msg-source-detail">
           <div className="msg-source-head">
-            {active.section ? (
-              <span className="msg-source-section" title={active.section}>
-                {active.section}
+            {activeLoc?.section ? (
+              <span className="msg-source-section" title={activeLoc.section}>
+                {activeLoc.section}
               </span>
             ) : null}
             {active.kind === 'figure' ? (
@@ -380,6 +382,15 @@ function SourceList({ sources }: { sources: ChatSource[] }) {
       ) : null}
     </div>
   )
+}
+
+/** 芯片只放页码；章节进展开区。旧图谱引用曾把「页码 · 章节」写进 where。 */
+function sourceLocator(source: ChatSource): { where: string; section: string | null } {
+  const raw = sourceWhere(source)
+  const cut = raw.indexOf(' · ')
+  const where = cut > 0 ? raw.slice(0, cut) : raw
+  const fromWhere = cut > 0 ? raw.slice(cut + 3).trim() : ''
+  return { where, section: source.section?.trim() || fromWhere || null }
 }
 
 /** PDF/Word 表格落在页上；旧引用把页码写成了「表43」，这里按页码显示。Excel 仍用表号。 */
