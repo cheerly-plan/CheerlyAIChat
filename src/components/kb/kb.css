@@ -1331,6 +1331,12 @@
   padding-left: 72px;
 }
 
+/* 图谱标题并进检索栏后，收起左栏时同样给浮层按钮让位 */
+.kb-body.panel-collapsed .kb-kg-bar,
+.kb-body.panel-collapsed .kb-kg-head {
+  padding-left: 72px;
+}
+
 /* 标题里的类型标签：文件名已去掉后缀，标签是唯一的类型标识，比列表徽标大一档 */
 .kb-chunks-title .kb-ext {
   /* 标题栏这里按文字自然宽度，不用列表里那个定宽对齐的框 */
@@ -1666,16 +1672,38 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 12px;
+  /* 标题已经并进检索栏，不再跟 kb-chunks-head 叠一层间距 */
+  margin-top: 0;
 }
 
-/* ——— 检索栏 ——— */
+/* 图谱标题：单独一行，不再和检索栏挤在一起 */
+.kb-kg-head {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: 30px;
+  padding-right: 24px;
+}
+
+.kb-kg-head .kb-chunks-title {
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+}
+
+.kb-kg-head .kb-graph-stats {
+  margin-left: 0;
+  vertical-align: 0;
+}
+
+/* ——— 检索栏：按类型在最左（占 500px），搜索框铺中间，跳数在最右 ——— */
 
 .kb-kg-bar {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  min-height: 34px;
   padding-right: 24px;
 }
 
@@ -1767,7 +1795,7 @@
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
-/* 着色选择：最左的实心蓝按钮，展开级联面板（左列 按类型/按簇，右列簇） */
+/* 着色选择：检索栏最左，占 500px 把搜索框顶到右边 */
 .kb-kg-shade {
   position: relative;
   flex: none;
@@ -1775,6 +1803,7 @@
   align-items: center;
   width: 500px;
 }
+
 @media (max-width: 1200px) {
   .kb-kg-shade {
     width: 250px;
@@ -2305,6 +2334,7 @@
   border-left: 1px solid #eceef2;
   background: #fff;
   box-shadow: -10px 0 28px rgba(15, 23, 42, 0.1);
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   /* 收起：推到画布外；visibility 让里面的按钮退出 Tab 顺序 */
@@ -2466,6 +2496,7 @@
 }
 
 .kg-evidence li {
+  min-width: 0;
   padding: 8px 10px;
   border-radius: 8px;
   background: #fafbfd;
@@ -2486,13 +2517,30 @@
   word-break: break-word;
 }
 
-/* ——— 检索证据（画布下方横条）——— */
+.kg-evidence .kb-chunk-table-wrap {
+  /* 高度随表格走，竖向交给侧栏自己滚；列多时只在表上横向滑 */
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 0;
+}
+
+.kg-evidence .kb-chunk-p {
+  text-indent: 0;
+  font-size: 11.5px;
+  line-height: 1.65;
+}
+
+.kg-evidence .kb-chunk-table {
+  font-size: 11px;
+}
+
+/* ——— 检索证据：标题旁切段，下面一次只显示一段 ——— */
 
 .kb-kg-evidence {
   flex-shrink: 0;
   margin-right: 24px;
-  /* 底部不留白：横向滚动条就落在面板底边上，而不是悬在卡片下面 */
-  padding: 8px 10px 0;
+  padding: 8px 10px 10px;
   border: 1px solid #eceef2;
   border-radius: 10px;
   background: #fbfcfe;
@@ -2502,12 +2550,71 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   color: #8a8f98;
   font-size: 11px;
   margin-bottom: 6px;
 }
 
-.kb-kg-evidence-head button {
+.kb-kg-evidence-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.kb-kg-evidence-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.kb-kg-evidence-pos {
+  min-width: 3.2em;
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.kb-kg-evidence-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid #e5e8ee;
+  border-radius: 6px;
+  background: #fff;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.kb-kg-evidence-nav svg {
+  width: 12px;
+  height: 12px;
+}
+
+.kb-kg-evidence-nav.is-prev svg {
+  transform: rotate(90deg);
+}
+
+.kb-kg-evidence-nav.is-next svg {
+  transform: rotate(-90deg);
+}
+
+.kb-kg-evidence-nav:hover:not(:disabled) {
+  border-color: #c9d4ff;
+  color: #3b5bdb;
+  background: #f4f6ff;
+}
+
+.kb-kg-evidence-nav:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.kb-kg-evidence-head > button {
   border: 0;
   background: transparent;
   color: #6b7280;
@@ -2516,29 +2623,18 @@
   cursor: pointer;
 }
 
-.kb-kg-evidence-head button:hover {
+.kb-kg-evidence-head > button:hover {
   color: #222;
 }
 
-.kb-kg-evidence-scroll {
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-}
-
-.kb-kg-evidence ul {
-  list-style: none;
+.kb-kg-evidence-card {
+  /* 固定高度：短文本不收、长表格不撑，切段时画布不会跟着跳 */
+  height: 240px;
   display: flex;
-  gap: 8px;
-  margin: 0;
-  /* 6px 是给悬浮式滚动条留的落点：它压在卡片下沿之外，
-     既不遮住卡片边框，又是面板最底下的一条 */
-  padding: 0 0 6px;
-}
-
-.kb-kg-evidence li {
-  width: 260px;
-  flex-shrink: 0;
-  padding: 8px 10px;
+  flex-direction: column;
+  overflow: hidden;
+  /* 左右不留 padding：滚动条贴白盒右边，文字 padding 写在 meta / body 上 */
+  padding: 8px 0 0;
   border-radius: 8px;
   background: #fff;
   border: 1px solid #eef0f4;
@@ -2547,13 +2643,15 @@
 .kb-kg-evidence-meta {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 6px;
+  flex-shrink: 0;
+  padding: 0 10px;
   color: #9aa0a6;
   font-size: 10.5px;
-  margin-bottom: 4px;
-  /* 文件名/实体名可能很长，别把卡片撑开 */
-  overflow-wrap: anywhere;
+  margin-bottom: 6px;
+  /* 文件名再长也单行，避免 meta 换行把下面正文高度挤掉 */
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .kb-kg-evidence-entity {
@@ -2565,10 +2663,21 @@
   font-size: 10px;
 }
 
-.kb-kg-evidence li p {
-  margin: 0;
-  max-height: 220px;
+.kb-kg-evidence-meta > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kb-kg-evidence-body {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
+  padding: 0 10px 8px;
+}
+
+.kb-kg-evidence-body p {
+  margin: 0;
   color: #55607a;
   font-size: 11.5px;
   line-height: 1.6;
@@ -2579,54 +2688,89 @@
   word-break: break-word;
 }
 
+.kb-kg-evidence .kb-chunk-table-wrap {
+  /* 纵向滚动交给 body，wrap 再 overflow-x 会变成新的滚动包含块，
+     thead sticky 就钉在表格自身高度里，等于没吸顶 */
+  overflow: visible;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.kb-kg-evidence .kb-chunk-p {
+  text-indent: 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.kb-kg-evidence .kb-chunk-table {
+  /* collapse 会让 sticky thead 失效，separate 才能钉在滚动容器顶 */
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 11px;
+}
+
+.kb-kg-evidence .kb-chunk-table th,
+.kb-kg-evidence .kb-chunk-table td {
+  padding: 4px 7px;
+}
+
+.kb-kg-evidence .kb-chunk-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f7f8fa;
+}
+
 /* ——— 滚动条：知识库内一套 ———
    细 6px、平时全透明，鼠标移入或键盘聚焦到容器内才显形；轨道与转角始终不画。
    与对话界面（chat.css）同一套参数。新增可滚动容器时，只把选择器加进这里的
    清单即可，别再单写一份。 */
 
-:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field) {
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-body, .tag-dialog-field, .kb-chunk-field) {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
 
-:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field):hover,
-:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field):focus-within {
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-body, .tag-dialog-field, .kb-chunk-field):hover,
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-body, .tag-dialog-field, .kb-chunk-field):focus-within {
   scrollbar-color: rgba(15, 23, 42, 0.28) transparent;
 }
 
-:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar {
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-body, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-track,
-:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-corner {
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-body, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-track,
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-body, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-corner {
   background: transparent;
 }
 
-:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-thumb {
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-body, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-thumb {
   background-color: transparent;
   background-clip: padding-box;
   border: 1px solid transparent;
   border-radius: 999px;
 }
 
-:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field):hover::-webkit-scrollbar-thumb,
-:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field):focus-within::-webkit-scrollbar-thumb {
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-body, .tag-dialog-field, .kb-chunk-field):hover::-webkit-scrollbar-thumb,
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-body, .tag-dialog-field, .kb-chunk-field):focus-within::-webkit-scrollbar-thumb {
   background-color: rgba(15, 23, 42, 0.2);
 }
 
-:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-thumb:hover {
+:is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-body, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-thumb:hover {
   background-color: rgba(15, 23, 42, 0.38);
 }
 
 /* 触屏没有 hover，直接常显一档浅色 */
 @media (hover: none) {
-  :is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field) {
+  :is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-body, .tag-dialog-field, .kb-chunk-field) {
     scrollbar-color: rgba(15, 23, 42, 0.22) transparent;
   }
 
-  :is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-scroll, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-thumb {
+  :is(.kb-panel-scroll, .kb-chunk-scroll, .kg-detail, .kb-kg-evidence-body, .tag-dialog-field, .kb-chunk-field)::-webkit-scrollbar-thumb {
     background-color: rgba(15, 23, 42, 0.2);
   }
 }
@@ -2667,12 +2811,15 @@
     padding-right: 16px;
   }
 
-  .kb-body.panel-collapsed .kb-chunks-head {
+  .kb-body.panel-collapsed .kb-chunks-head,
+  .kb-body.panel-collapsed .kb-kg-bar,
+  .kb-body.panel-collapsed .kb-kg-head {
     /* 窄屏 .kb-chunks 左 padding 更小，多让出 4px 以免仍被按钮压住 */
     padding-left: 76px;
   }
 
   .kb-kg-bar,
+  .kb-kg-head,
   .kb-kg-seeds {
     padding-right: 16px;
   }

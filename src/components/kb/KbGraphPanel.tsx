@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import {
   fetchKgGraph,
@@ -10,6 +10,7 @@ import {
   type KgGraph,
   type KgSearchResult,
 } from '../../api'
+import { ChunkContent } from './ChunkContent'
 import KnowledgeGraph, { KG_HUB_CAP } from './KnowledgeGraph'
 import { KgBuildDialog } from './KgBuildDialog'
 import { SearchIcon, ChevronDownIcon, CheckIcon, CloseIcon } from '../chat/icons'
@@ -24,7 +25,9 @@ type Props = {
   building?: boolean
   /** 管理能力开关：构建/重建按钮只对管理员出现，普通用户只能看图与检索 */
   canManage?: boolean
-  /** 把当前范围的统计抛给父组件，放到页面标题里显示 */
+  /** 与检索栏同一行的标题（文件名 / 全库图谱 / 合并图谱） */
+  heading?: ReactNode
+  /** 把当前范围的统计抛给父组件，放到标题旁显示 */
   onStats?: (stats: KgGraph['stats'] | null) => void
   /** 单文件视图拉到图谱后，把 graph_status 推回父组件同步进文件列表：
       构建入口在右侧面板，列表轮询认不到这次构建，不推回去勾选框会一直禁用 */
@@ -44,6 +47,7 @@ export default function KbGraphPanel({
   fileIds,
   building = false,
   canManage = false,
+  heading,
   onStats,
   onStatus,
 }: Props) {
@@ -56,6 +60,8 @@ export default function KbGraphPanel({
   const [result, setResult] = useState<KgSearchResult | null>(null)
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState('')
+  // 命中依据一次只展示一段，用下标在条数之间切换
+  const [evidenceIndex, setEvidenceIndex] = useState(0)
 
   // 抽取配置（文档类型 + 粒度）：构建/重建时在弹窗里选，提交时落库并触发重抽
   const [docTypes, setDocTypes] = useState<KgDocType[]>([])
@@ -189,7 +195,7 @@ export default function KbGraphPanel({
   }
 
   /**
-   * 检索只在「输入停顿 / 回车 / 点清空 / 切跳数」时发生。
+   * 检索只在「回车 / 失焦 / 点清空 / 切跳数」时发生，打字过程不发请求。
    *
    * 空词也是合法检索：不做实体匹配，直接取消筛选回到当前范围的全图。
    * 这条路径不发请求——图本来就在手上，后端也明确拒收空检索词。
@@ -204,9 +210,7 @@ export default function KbGraphPanel({
       resetResult()
       return
     }
-    if (searchingRef.current) return
-    // 检索期间用户可能清空或改词重检，用序号丢弃过期响应，
-    // 否则清空之后迟到的结果会把命中依据又弹回来
+    // 用序号丢弃过期响应：失焦刚发出去又点清空，迟到的结果不该把命中依据弹回来
     const token = ++searchIdRef.current
     searchingRef.current = true
     setSearching(true)
@@ -239,23 +243,7 @@ export default function KbGraphPanel({
     inputRef.current?.focus()
   }
 
-  // 输入即检索：query 变化后防抖 400ms 自动发起，省掉「检索」按钮。
-  // 首次挂载跳过（初始 query 为空，不该发请求）；空词走 runSearch('') 回到全图。
-  const runSearchRef = useRef(runSearch)
-  useEffect(() => {
-    runSearchRef.current = runSearch
-  })
-  const firstQueryRef = useRef(true)
-  useEffect(() => {
-    if (firstQueryRef.current) {
-      firstQueryRef.current = false
-      return
-    }
-    const timer = setTimeout(() => {
-      void runSearchRef.current(query)
-    }, 400)
-    return () => clearTimeout(timer)
-  }, [query])
+  const composingRef = useRef(false)
 
   /**
    * 收起命中依据 = 退出这次检索。
@@ -268,6 +256,11 @@ export default function KbGraphPanel({
     setQuery('')
     resetResult()
   }
+
+  // 新检索结果进来时回到第一段，避免下标还停在上一轮的第 N 段
+  useEffect(() => {
+    setEvidenceIndex(0)
+  }, [result])
 
   /**
    * 打开建图配置弹窗：构建（首次）与重建（已有图）共用，标题/按钮文案
@@ -402,6 +395,10 @@ export default function KbGraphPanel({
 
   const seeds = result?.seeds ?? []
   const evidence = result?.chunks ?? []
+  const evidenceItem =
+    evidence.length > 0
+      ? evidence[Math.min(evidenceIndex, evidence.length - 1)]
+      : undefined
 
   /**
    * 画布数据源：检索有结果时换成「命中的子图」，没结果就看完整图。
@@ -478,11 +475,15 @@ export default function KbGraphPanel({
 
   return (
     <div className="kb-kg">
-      {/* 还没有图谱时不显示检索栏：没有实体可检索，空留一排控件反而误导。
-          有图才出现着色/搜索/跳数，配合画布右上角 hover 的「重建」按钮 */}
+      {/* 标题单独一行；着色/搜索/跳数仍是原来的检索栏，按类型在最左。 */}
+      {heading ? (
+        <div className="kb-kg-head">
+          <h2 className="kb-chunks-title">{heading}</h2>
+        </div>
+      ) : null}
+
       {hasGraph ? (
       <div className="kb-kg-bar">
-        {/* 着色选择：最左，做成检索按钮同款样式。左列 按类型/按簇，右列展开各簇 */}
         {clusters.length > 0 ? (
           <div className="kb-kg-shade" ref={shadeRef}>
             <button
@@ -616,16 +617,28 @@ export default function KbGraphPanel({
           </div>
         ) : null}
 
-        {/* 搜索框：占满中间，输入即检索（防抖） */}
         <label className="kb-kg-search">
           <SearchIcon />
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onCompositionStart={() => {
+              composingRef.current = true
+            }}
+            onCompositionEnd={(e) => {
+              composingRef.current = false
+              setQuery(e.currentTarget.value)
+            }}
+            onBlur={() => {
+              // 点别处才检索；输入法组合中失焦不搜，避免半截拼音发出去
+              if (composingRef.current) return
+              void runSearch()
+            }}
             onKeyDown={(e) => {
-              // 中文输入法用回车选候选词时 isComposing 为 true，别当成检索
-              if (e.key === 'Enter' && !e.nativeEvent.isComposing) void runSearch()
+              // 中文输入法用回车选候选词时 isComposing 为 true，别当成检索。
+              // 回车只失焦，真正发请求走 onBlur，避免搜两次。
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) e.currentTarget.blur()
               if (e.key === 'Escape') clearSearch()
             }}
             placeholder={
@@ -758,27 +771,65 @@ export default function KbGraphPanel({
       {evidence.length > 0 ? (
         <div className="kb-kg-evidence">
           <div className="kb-kg-evidence-head">
-            <span>命中依据 · {evidence.length} 段原文</span>
+            <div className="kb-kg-evidence-title">
+              <span>命中依据 · {evidence.length} 段原文</span>
+              {evidence.length > 1 ? (
+                <div className="kb-kg-evidence-pager" role="group" aria-label="切换原文">
+                  <button
+                    type="button"
+                    className="kb-kg-evidence-nav is-prev"
+                    disabled={evidenceIndex <= 0}
+                    onClick={() => setEvidenceIndex((i) => Math.max(0, i - 1))}
+                    aria-label="上一段"
+                    title="上一段"
+                  >
+                    <ChevronDownIcon />
+                  </button>
+                  <span className="kb-kg-evidence-pos">
+                    {evidenceIndex + 1} / {evidence.length}
+                  </span>
+                  <button
+                    type="button"
+                    className="kb-kg-evidence-nav is-next"
+                    disabled={evidenceIndex >= evidence.length - 1}
+                    onClick={() =>
+                      setEvidenceIndex((i) => Math.min(evidence.length - 1, i + 1))
+                    }
+                    aria-label="下一段"
+                    title="下一段"
+                  >
+                    <ChevronDownIcon />
+                  </button>
+                </div>
+              ) : null}
+            </div>
             <button type="button" onClick={collapseEvidence} title="收起并清空检索">
               收起
             </button>
           </div>
-          <div className="kb-kg-evidence-scroll">
-            <ul>
-              {evidence.map((item) => (
-                <li key={`${item.filename}-${item.chunk_seq}`}>
-                  <div className="kb-kg-evidence-meta">
-                    <span className="kb-kg-evidence-entity">{item.entity}</span>
-                    <span>
-                      {item.filename}
-                      {item.page !== null ? ` · 第${item.page}页` : ` · 第${item.chunk_seq + 1}段`}
-                    </span>
-                  </div>
-                  <p>{item.text}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {evidenceItem ? (
+            <div className="kb-kg-evidence-card">
+              <div className="kb-kg-evidence-meta">
+                <span className="kb-kg-evidence-entity">{evidenceItem.entity}</span>
+                <span>
+                  {evidenceItem.filename}
+                  {evidenceItem.page !== null
+                    ? ` · 第${evidenceItem.page}页`
+                    : ` · 第${evidenceItem.chunk_seq + 1}段`}
+                </span>
+              </div>
+              <div
+                className="kb-kg-evidence-body"
+                key={`${evidenceItem.filename}-${evidenceItem.chunk_seq}`}
+              >
+                {evidenceItem.kind === 'table' ? (
+                  <ChunkContent text={evidenceItem.text} />
+                ) : (
+                  <p>{evidenceItem.text}</p>
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

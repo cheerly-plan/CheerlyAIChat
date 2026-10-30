@@ -8,6 +8,7 @@ import {
   type KgNode,
   type KgEntityType,
 } from '../../api'
+import { ChunkContent } from './ChunkContent'
 
 /**
  * 知识图谱画布。
@@ -1278,6 +1279,33 @@ export default function KnowledgeGraph({
     drawLinks()
   }, [view, drawLinks])
 
+  // 点详情抽屉以外的任何地方都关掉：搜索栏、命中依据、左侧文件列表、
+  // 画布空白、缩放按钮都算外面。点另一个实体留给画布自己切选中，避免先关再开闪一下。
+  useEffect(() => {
+    if (!activeNode) return
+    const onPointerDown = (event: PointerEvent) => {
+      const panel = detailRef.current
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (panel?.contains(target)) return
+      if (target instanceof Element && target.closest('.kg-node-g')) return
+      setPicked(null)
+      onSelect?.(null)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.isComposing) {
+        setPicked(null)
+        onSelect?.(null)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [activeNode, onSelect])
+
   // 选中实体 → 拉原文证据
   useEffect(() => {
     const id = activeNode?.id
@@ -1746,7 +1774,11 @@ export default function KnowledgeGraph({
                         ? ` · 第${item.page}页`
                         : ` · 第${item.chunk_seq + 1}段`}
                     </div>
-                    <p>{item.text}</p>
+                    {item.kind === 'table' ? (
+                      <ChunkContent text={item.text} />
+                    ) : (
+                      <p>{item.text}</p>
+                    )}
                   </li>
                 ))}
               </ul>

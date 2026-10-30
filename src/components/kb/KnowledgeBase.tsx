@@ -1600,35 +1600,6 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
         {buildFile ? (
           // 「图谱」tab 点徽标单独查看：这份文件自己的图谱；没生成时空态里有构建按钮
           <section className="kb-chunks" aria-label="文件图谱">
-            <header className="kb-chunks-head">
-              <h2 className="kb-chunks-title" title={buildFile.filename}>
-                {extBadge(buildFile)}
-                {buildFile.filename}
-                <span className="kb-graph-sub">文件图谱</span>
-                {(() => {
-                  const prog = graphBuildProgress(buildFile)
-                  if (!prog) return null
-                  return (
-                    <span className="kb-graph-stats">
-                      <span className="kb-graph-tag">
-                        {prog.aligning ? (
-                          '对齐中'
-                        ) : (
-                          <>
-                            <b>{prog.pct ?? 0}</b>%
-                          </>
-                        )}
-                      </span>
-                      {prog.entities > 0 ? (
-                        <span className="kb-graph-tag">
-                          <b>{prog.entities}</b> 实体
-                        </span>
-                      ) : null}
-                    </span>
-                  )
-                })()}
-              </h2>
-            </header>
             <KbGraphPanel
               key={`${buildFile.file_id}:${graphEpoch}`}
               fileId={buildFile.file_id}
@@ -1636,6 +1607,34 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
               canManage={canManage}
               building={buildFile.graph_status === 'building'}
               onStatus={syncGraphStatus}
+              heading={
+                <>
+                  {extBadge(buildFile)}
+                  <span className="kb-chunks-name">{buildFile.filename}</span>
+                  {(() => {
+                    const prog = graphBuildProgress(buildFile)
+                    if (!prog) return null
+                    return (
+                      <span className="kb-graph-stats">
+                        <span className="kb-graph-tag">
+                          {prog.aligning ? (
+                            '对齐中'
+                          ) : (
+                            <>
+                              <b>{prog.pct ?? 0}</b>%
+                            </>
+                          )}
+                        </span>
+                        {prog.entities > 0 ? (
+                          <span className="kb-graph-tag">
+                            <b>{prog.entities}</b> 实体
+                          </span>
+                        ) : null}
+                      </span>
+                    )
+                  })()}
+                </>
+              }
             />
           </section>
         ) : selectedFile && tab === 'files' ? (
@@ -1895,47 +1894,6 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
         ) : (
           // 图谱视图：由图谱 tab 的勾选驱动（勾 1 个=单文件，多选=合并，0=全库）
           <section className="kb-chunks" aria-label="知识图谱">
-            <header className="kb-chunks-head">
-              <h2 className="kb-chunks-title">
-                {checkedIds.length === 1 && checkedFile ? (
-                  <>
-                    {extBadge(checkedFile)}
-                    {checkedFile.filename}
-                    <span className="kb-graph-sub">文件图谱</span>
-                  </>
-                ) : checkedIds.length > 1 ? (
-                  <>
-                    合并图谱
-                    <span className="kb-graph-sub">
-                      {checkedIds.length} 份勾选文件
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    全库图谱
-                    <span className="kb-graph-sub">实体关系总览</span>
-                  </>
-                )}
-                {/* 概览拆成独立小标签：挤在一行文字里既看不出重点，
-                    又容易被当成标题的一部分。单文件视图 files 恒为 1，
-                    「文件」这颗标签只在真的跨文件时出现 */}
-                {graphStats ? (
-                  <span className="kb-graph-stats">
-                    <span className="kb-graph-tag">
-                      <b>{graphStats.entities}</b> 实体
-                    </span>
-                    <span className="kb-graph-tag">
-                      <b>{graphStats.relations}</b> 关系
-                    </span>
-                    {graphStats.files > 1 ? (
-                      <span className="kb-graph-tag">
-                        <b>{graphStats.files}</b> 文件
-                      </span>
-                    ) : null}
-                  </span>
-                ) : null}
-              </h2>
-            </header>
             <KbGraphPanel
               key={`${checkedKey}:${graphEpoch}`}
               fileId={checkedIds.length === 1 ? checkedIds[0] : null}
@@ -1948,6 +1906,35 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
               building={checkedIds.length !== 1 && graphBuilding}
               onStats={setGraphStats}
               onStatus={syncGraphStatus}
+              heading={
+                <>
+                  {checkedIds.length === 1 && checkedFile ? (
+                    <>
+                      {extBadge(checkedFile)}
+                      <span className="kb-chunks-name">{checkedFile.filename}</span>
+                    </>
+                  ) : checkedIds.length > 1 ? (
+                    '合并图谱'
+                  ) : (
+                    '全库图谱'
+                  )}
+                  {graphStats ? (
+                    <span className="kb-graph-stats">
+                      <span className="kb-graph-tag">
+                        <b>{graphStats.entities}</b> 实体
+                      </span>
+                      <span className="kb-graph-tag">
+                        <b>{graphStats.relations}</b> 关系
+                      </span>
+                      {graphStats.files > 1 ? (
+                        <span className="kb-graph-tag">
+                          <b>{graphStats.files}</b> 文件
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
+                </>
+              }
             />
           </section>
         )}
