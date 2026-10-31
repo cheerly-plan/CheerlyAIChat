@@ -30,6 +30,7 @@ import { ConfirmDialog } from '../common/ConfirmDialog'
 import KbGraphPanel from './KbGraphPanel'
 import { KgBuildDialog } from './KgBuildDialog'
 import { FileEditDialog } from './FileEditDialog'
+import { KbRetrieveDialog } from './KbRetrieveDialog'
 import { ChunkContent } from './ChunkContent'
 import './kb.css'
 
@@ -471,9 +472,11 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
   // 「支持 PDF / DOCX…」再跳成文件列表
   const [filesLoaded, setFilesLoaded] = useState(false)
   const [uploading, setUploading] = useState<string | null>(null)
+  const [retrieveOpen, setRetrieveOpen] = useState(false)
   const [error, setError] = useState('')
   // 文件名/标签筛选：客户端过滤（文件量级小，不值得每次打接口）
   const [query, setQuery] = useState('')
+  const [searchFocus, setSearchFocus] = useState(false)
   // 编辑弹窗（文件名 + 标签）：非空即打开该文件的编辑弹窗（一次只编一个）
   const [editingFile, setEditingFile] = useState<KbFile | null>(null)
   const [savingFileEdit, setSavingFileEdit] = useState(false)
@@ -1272,7 +1275,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
             {/* 搜索 + 上传：装进同一条工具条，两者同高，视觉上是一组。
                 文件 tab 才显示上传（只有管理员能传），搜索两个 tab 共用 */}
             {filesLoaded && files.length > 0 ? (
-              <div className="kb-toolbar">
+              <div className={`kb-toolbar${searchFocus ? ' is-focus' : ''}`}>
                 <div className="kb-search-wrap">
                   <span className="kb-search-icon" aria-hidden="true">
                     <SearchIcon />
@@ -1283,20 +1286,36 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                     placeholder="搜索文档、标签…"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
+                    onFocus={() => setSearchFocus(true)}
+                    onBlur={() => setSearchFocus(false)}
                   />
                 </div>
-                {tab === 'files' && canManage ? (
-                  <button
-                    type="button"
-                    className="kb-upload"
-                    onClick={() => inputRef.current?.click()}
-                    disabled={uploading !== null}
-                    title={uploading ? '正在上传' : undefined}
-                  >
-                    <UploadIcon />
-                    <span>上传</span>
-                  </button>
-                ) : null}
+                <div className="kb-toolbar-actions" aria-hidden={searchFocus}>
+                  {tab === 'files' && canManage ? (
+                    <button
+                      type="button"
+                      className="kb-upload"
+                      tabIndex={searchFocus ? -1 : 0}
+                      onClick={() => inputRef.current?.click()}
+                      disabled={uploading !== null}
+                      title={uploading ? '正在上传' : undefined}
+                    >
+                      <UploadIcon />
+                      <span>上传</span>
+                    </button>
+                  ) : null}
+                  {tab === 'files' ? (
+                    <button
+                      type="button"
+                      className="kb-retrieve"
+                      tabIndex={searchFocus ? -1 : 0}
+                      onClick={() => setRetrieveOpen(true)}
+                    >
+                      <SearchIcon />
+                      <span>检索</span>
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ) : null}
             </div>
@@ -1989,6 +2008,10 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
           onCancel={() => setRebuildTarget(null)}
           onSubmit={(config) => void submitRebuild(config)}
         />
+      ) : null}
+
+      {retrieveOpen ? (
+        <KbRetrieveDialog files={files} onClose={() => setRetrieveOpen(false)} />
       ) : null}
 
       {/* 跳页等操作的轻提示：fixed 不随滚动，2.6s 自动消失 */}

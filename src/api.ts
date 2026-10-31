@@ -465,6 +465,32 @@ export async function fetchKbFiles(): Promise<KbFile[]> {
   return data.files ?? []
 }
 
+export type KbSearchHit = {
+  file_id: string
+  filename: string
+  seq: number
+  page: number | null
+  page_end: number | null
+  section: string | null
+  kind: string
+  where: string
+  text: string
+}
+
+/** 知识库页检索演示。fileIds 为空表示全库。 */
+export async function searchKb(query: string, fileIds: string[]): Promise<KbSearchHit[]> {
+  const response = await authedFetch('/v1/kb/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ query, file_ids: fileIds }),
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '检索失败'))
+  }
+  const data = (await response.json()) as { hits?: KbSearchHit[] }
+  return data.hits ?? []
+}
+
 export async function deleteKbFile(fileId: string): Promise<void> {
   const response = await authedFetch(`/v1/kb/files/${fileId}`, {
     method: 'DELETE',

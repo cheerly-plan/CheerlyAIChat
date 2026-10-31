@@ -156,17 +156,38 @@
   margin-left: 5px;
 }
 
-/* 文件面板工具条：搜索 + 上传同高并排，视觉上是一组 */
+/* 文件面板工具条：搜索 + 上传/检索同高并排 */
 .kb-toolbar {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
+.kb-toolbar.is-focus {
+  gap: 0;
+}
+
 .kb-search-wrap {
   position: relative;
   flex: 1;
   min-width: 0;
+}
+
+.kb-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  max-width: 168px;
+  overflow: hidden;
+  opacity: 1;
+  transition: max-width 0.2s ease, opacity 0.15s ease;
+}
+
+.kb-toolbar.is-focus .kb-toolbar-actions {
+  max-width: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* 放大镜压在输入框左侧，点它等于点输入框（穿透） */
@@ -218,8 +239,9 @@
   color: #9aa0a6;
 }
 
-/* 上传：实心主色按钮（淡蓝底蓝字），与搜索框同高，组内最显眼的一个 */
-.kb-upload {
+/* 上传 / 检索：同一套淡蓝底蓝字，与搜索框同高 */
+.kb-upload,
+.kb-retrieve {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -234,21 +256,427 @@
   font-weight: 500;
   cursor: pointer;
   flex-shrink: 0;
+  white-space: nowrap;
   transition: background 0.15s;
 }
 
-.kb-upload svg {
+.kb-upload svg,
+.kb-retrieve svg {
   width: 14px;
   height: 14px;
 }
 
-.kb-upload:hover:not(:disabled) {
+.kb-upload:hover:not(:disabled),
+.kb-retrieve:hover {
   background: #d9e3ff;
 }
 
 .kb-upload:disabled {
   opacity: 0.65;
   cursor: default;
+}
+
+.session-dialog.kb-retrieve-dialog {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: min(780px, calc(100vw - 48px));
+  height: min(640px, calc(100vh - 64px));
+  padding-bottom: 16px;
+}
+
+.kb-retrieve-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.kb-retrieve-query {
+  display: flex;
+  align-items: center;
+  flex: 1.4;
+  min-width: 0;
+  gap: 8px;
+}
+
+.kb-retrieve-query .session-dialog-input {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.kb-retrieve-query .primary {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #4d6bfe;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.kb-retrieve-query .primary:disabled {
+  background: #c5d0ff;
+  cursor: not-allowed;
+}
+
+.kb-retrieve-query .primary.is-loading,
+.kb-retrieve-query .primary.is-loading:disabled {
+  background: #4d6bfe;
+  cursor: wait;
+}
+
+.kb-retrieve-query .primary .kb-gspinner {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  color: #fff;
+}
+
+.kb-retrieve-select-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.kb-retrieve-select {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 5px 8px 5px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  cursor: text;
+}
+
+.kb-retrieve-select-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.kb-retrieve-select-wrap.is-open .kb-retrieve-select,
+.kb-retrieve-select:focus-within {
+  border-color: #3b7bff;
+}
+
+.kb-retrieve-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 180px;
+  height: 24px;
+  padding: 0 4px 0 8px;
+  border-radius: 6px;
+  background: #f2f6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+}
+
+.kb-retrieve-chip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-retrieve-more {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.kb-retrieve-chip button,
+.kb-retrieve-select-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #9aa1ac;
+  cursor: pointer;
+}
+
+.kb-retrieve-chip button {
+  width: 16px;
+  height: 16px;
+  color: #6b8cff;
+}
+
+.kb-retrieve-chip svg {
+  width: 12px;
+  height: 12px;
+}
+
+.kb-retrieve-select-chevron {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.kb-retrieve-select-chevron svg {
+  width: 16px;
+  height: 16px;
+}
+
+.kb-retrieve-select-wrap.is-open .kb-retrieve-select-chevron svg {
+  transform: rotate(180deg);
+}
+
+.kb-retrieve-select-chevron:disabled {
+  cursor: default;
+}
+
+.kb-retrieve-select-input {
+  flex: 1;
+  min-width: 88px;
+  height: 28px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.kb-retrieve-select-input::placeholder {
+  color: #9aa1ac;
+}
+
+.kb-retrieve-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  border: 1px solid #ececf1;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+}
+
+.kb-retrieve-menu ul {
+  max-height: 220px;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+  list-style: none;
+}
+
+.kb-retrieve-menu li {
+  margin: 0;
+}
+
+.kb-retrieve-menu-empty {
+  padding: 12px 8px;
+  color: #6b7280;
+  font-size: 13px;
+  text-align: center;
+}
+
+.kb-retrieve-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kb-retrieve-option span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-retrieve-option:hover {
+  background: #f2f6ff;
+}
+
+.kb-retrieve-option.is-on {
+  color: #1d4ed8;
+}
+
+.kb-retrieve-option svg {
+  width: 15px;
+  height: 15px;
+  color: #3b7bff;
+  flex-shrink: 0;
+}
+
+.kb-retrieve-results {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+}
+
+.kb-retrieve-empty {
+  margin: 0;
+  padding: 16px 4px;
+  color: #6b7280;
+  font-size: 13px;
+  text-align: center;
+}
+
+.kb-retrieve-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kb-retrieve-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 0 12px;
+}
+
+.kb-retrieve-pager-label,
+.kb-retrieve-pager-ctrl {
+  color: #8b93a1;
+  font-size: 12px;
+}
+
+.kb-retrieve-pager-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.kb-retrieve-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid #e6e8ee;
+  border-radius: 8px;
+  background: #fff;
+  color: #9aa3b2;
+  cursor: pointer;
+}
+
+.kb-retrieve-nav:hover:not(:disabled) {
+  border-color: #c7d4ff;
+  color: #4d6bfe;
+  background: #f7f9ff;
+}
+
+.kb-retrieve-nav:disabled {
+  color: #d5d9e2;
+  cursor: default;
+}
+
+.kb-retrieve-hit {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0 0 12px;
+  overflow: hidden;
+  border: 1px solid #eef0f3;
+  border-radius: 12px;
+  background: #fafbfc;
+}
+
+.kb-retrieve-hit header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding-right: 12px;
+}
+
+.kb-retrieve-hit-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.kb-retrieve-hit-where {
+  flex-shrink: 0;
+  color: #4d6bfe;
+  font-size: 12px;
+}
+
+.kb-retrieve-hit-where.is-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.kb-retrieve-hit-where.is-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.kb-retrieve-hit-section {
+  margin: 0 0 6px;
+  padding-right: 12px;
+  color: #9aa0a6;
+  font-size: 12px;
+}
+
+.kb-retrieve-hit-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 0 12px 12px 0;
+  color: #374151;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* 竖向滚动条贴在卡片右缘；表格留在内容区内横向滚，不贴滚动条 */
+.kb-retrieve-hit-body .kb-chunk-table-wrap {
+  max-width: 100%;
 }
 
 .kb-error {
@@ -1103,35 +1531,30 @@
   flex-shrink: 0;
 }
 
-/* 跳页入口：轻量描边按钮，hover/展开变主色 */
+/* 跳页入口：和上传按钮同一套淡蓝底蓝字，高度收一档以贴合标题行 */
 .kb-jump-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 24px;
-  padding: 0 9px;
-  border: 1px solid #e4e7ee;
-  border-radius: 7px;
-  background: #fff;
-  color: #5b6472;
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: #e6ecff;
+  color: #4d6bfe;
   font: inherit;
-  font-size: 11.5px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition: background 0.15s;
 }
 
-.kb-jump-btn:hover {
-  border-color: #bcd0ff;
-  background: #f5f8ff;
-  color: #4d6bfe;
-}
-
-/* 展开态比 hover 再深一档，气泡开着时能看出锚点在哪 */
+.kb-jump-btn:hover,
 .kb-jump-btn.is-open {
-  border-color: #b9c8ff;
-  background: #eef3ff;
+  background: #d9e3ff;
   color: #4d6bfe;
-  box-shadow: 0 0 0 3px rgba(77, 107, 254, 0.08);
+  box-shadow: none;
 }
 
 .kb-jump-btn:focus-visible {
@@ -1140,6 +1563,8 @@
 }
 
 .kb-jump-btn svg {
+  width: 12px;
+  height: 12px;
   flex-shrink: 0;
 }
 
