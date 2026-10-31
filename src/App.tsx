@@ -17,6 +17,7 @@ function toUserInfo(user: AuthUser): UserInfo {
     user_id: user.user_id,
     chat_session_id: 'default',
     user_name: user.user_name,
+    is_admin: user.is_admin,
   }
 }
 
@@ -50,8 +51,16 @@ function App() {
     }
   }, [status])
 
-  const handleAuthed = useCallback((authUser: AuthUser) => {
-    setUser(toUserInfo(authUser))
+  const handleAuthed = useCallback(async (authUser: AuthUser) => {
+    // 登录响应只作为兜底：权威用户信息（含 is_admin）以 /user/info 为准。
+    // 两个接口字段可能不同步（登录接口未及时更新时 is_admin 会缺失），
+    // 任一侧判定为管理员即放行入口，真正的权限校验在后端 require_admin。
+    const seed = toUserInfo(authUser)
+    const info = await fetchUserInfo().catch(() => null)
+    const merged = info
+      ? { ...seed, ...info, is_admin: Boolean(info.is_admin || seed.is_admin) }
+      : seed
+    setUser(merged)
     setChatEpoch((epoch) => epoch + 1)
     setStatus('authed')
   }, [])

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { ChatMessage } from '../../types'
+import type { ChatMessage, ChatSource } from '../../types'
+import { ChunkContent } from '../kb/ChunkContent'
 import { CheckIcon, CopyIcon, EditIcon, RefreshIcon } from './icons'
 import { Markdown } from './Markdown'
 
@@ -24,7 +25,7 @@ export function MessageItem({
   onRegenerate,
   onResume,
 }: Props) {
-  const done = !loading && Boolean(message.content)
+  const done = !loading && Boolean(message.content || message.sources?.length)
   const interrupted = canResume && !loading
 
   if (message.role === 'user') {
@@ -38,39 +39,38 @@ export function MessageItem({
     )
   }
 
-  const toolRuns = message.tools ?? []
-  const waiting = loading && !message.content && !toolRuns.length
-  // 有工具记录但都在执行完、还没等到下一批 token：展示「正在思考」，
-  // 避免工具已跑完还一直挂着「正在调用 xx」
-  const thinking = loading && !message.content && toolRuns.length > 0
-  // 多轮循环里模型可能重复调用同一工具（如连续两次搜索），展示时去重
-  const runningLabels = [
-    ...new Set(toolRuns.filter((tool) => tool.running).map((tool) => tool.label)),
-  ].join('、')
-  const statusText = runningLabels ? `正在调用 ${runningLabels}` : '正在思考…'
+  const sources = message.sources ?? []
+  const waiting = loading && !message.content
   return (
     <div className="row assistant" id={`msg-${message.id}`}>
       <div className="assistant-body">
-        {thinking ? (
-          <p className={runningLabels ? 'tool' : 'tool thinking'}>{statusText}</p>
-        ) : null}
         {waiting ? <span className="typing" /> : null}
         {message.content ? (
           <Markdown content={message.content} streaming={loading} />
         ) : null}
+        {!loading && !message.content ? (
+          <p className="msg-empty">没有生成文字回复，可重新生成</p>
+        ) : null}
+        {sources.length > 0 && (done || interrupted) ? (
+          <SourceList sources={sources} />
+        ) : null}
         {done || interrupted ? (
-          <MessageActions>
-            {done ? <CopyButton text={message.content} /> : null}
-            {canRegenerate ? (
-              <button
-                type="button"
-                aria-label="重新生成"
-                title="重新生成"
-                disabled={busy}
-                onClick={() => onRegenerate?.(message.id)}
-              >
-                <RefreshIcon />
-              </button>
+          <div className={`msg-footer${interrupted ? ' has-resume' : ''}`}>
+            {done ? (
+              <MessageActions>
+                <CopyButton text={message.content} />
+                {canRegenerate ? (
+                  <button
+                    type="button"
+                    aria-label="重新生成"
+                    title="重新生成"
+                    disabled={busy}
+                    onClick={() => onRegenerate?.(message.id)}
+                  >
+                    <RefreshIcon />
+                  </button>
+                ) : null}
+              </MessageActions>
             ) : null}
             {interrupted ? (
               <button
@@ -82,7 +82,7 @@ export function MessageItem({
                 继续生成
               </button>
             ) : null}
-          </MessageActions>
+          </div>
         ) : null}
       </div>
     </div>
@@ -107,8 +107,13 @@ function UserMessage({
   function resize() {
     const el = areaRef.current
     if (!el) return
+    const wrap = el.parentElement
+    const pin = wrap
+      ? wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight <= 8
+      : true
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+    el.style.height = `${el.scrollHeight}px`
+    if (wrap && pin) wrap.scrollTop = wrap.scrollHeight
   }
 
   useEffect(() => {
@@ -134,27 +139,29 @@ function UserMessage({
             onEditSubmit?.(text)
           }}
         >
-          <textarea
-            ref={areaRef}
-            value={draft}
-            rows={1}
-            disabled={busy}
-            onChange={(event) => {
-              setDraft(event.target.value)
-              resize()
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') {
-                event.preventDefault()
-                setEditing(false)
-                setDraft(message.content)
-              }
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault()
-                event.currentTarget.form?.requestSubmit()
-              }
-            }}
-          />
+          <div className="inline-composer-input">
+            <textarea
+              ref={areaRef}
+              value={draft}
+              rows={1}
+              disabled={busy}
+              onChange={(event) => {
+                setDraft(event.target.value)
+                resize()
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  setEditing(false)
+                  setDraft(message.content)
+                }
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault()
+                  event.currentTarget.form?.requestSubmit()
+                }
+              }}
+            />
+          </div>
           <div className="inline-composer-bar">
             <button
               type="button"
@@ -205,6 +212,106 @@ function UserMessage({
 
 function MessageActions({ children }: { children: ReactNode }) {
   return <div className="msg-actions">{children}</div>
+}
+
+/**
+ * 参考来源：回答里用到的知识库切片。
+ *
+ * 一排小卡片（编号 + 文件名 + 位置），点任意一张就在下面展开这段原文——
+ * 用户想核实「这句话是从文档哪一段来的」，需要看到原文本身，而不是只看到
+ * 文件名。默认全部收起：回答已经是主体，引用不该抢注意力。
+ *
+ * 位置按「P134」/「P134–P135」展示：按章节切块后同节内允许跨页聚合，
+ * 约一半切片跨两页，只写起始页会让用户翻错页。章节名放详情里——它比
+ * 页码长得多，塞进小卡片会把文件名挤没。
+ */
+function SourceList({ sources }: { sources: ChatSource[] }) {
+  const [openKey, setOpenKey] = useState<string | null>(null)
+  const active = sources.find((item) => item.key === openKey) ?? null
+  const activeLoc = active ? sourceLocator(active) : null
+
+  return (
+    <div className="msg-sources">
+      <span className="msg-sources-label">参考来源</span>
+      <div className="msg-sources-chips">
+        {sources.map((source, index) => {
+          const open = source.key === openKey
+          const loc = sourceLocator(source)
+          return (
+            <button
+              key={source.key}
+              type="button"
+              className={`msg-source${open ? ' is-open' : ''}`}
+              title={[source.filename, loc.where, loc.section].filter(Boolean).join(' · ')}
+              aria-expanded={open}
+              onClick={() => setOpenKey(open ? null : source.key)}
+            >
+              <span className="msg-source-idx">{index + 1}</span>
+              <span className="msg-source-name">{source.filename}</span>
+              <span className="msg-source-where">{loc.where}</span>
+            </button>
+          )
+        })}
+      </div>
+      {active ? (
+        <div className="msg-source-detail">
+          <div className="msg-source-head">
+            {activeLoc?.section ? (
+              <span className="msg-source-section" title={activeLoc.section}>
+                {activeLoc.section}
+              </span>
+            ) : null}
+            {active.kind === 'figure' ? (
+              <span className="msg-source-note">图像识别，可能有误差</span>
+            ) : null}
+            {isCrossPage(active) ? (
+              <span className="msg-source-hint">
+                该片段跨第 {active.page_start ?? active.page}–
+                {active.page_end ?? active.page} 页
+              </span>
+            ) : null}
+          </div>
+          {active.kind === 'table' ? (
+            <div className="msg-source-body">
+              <ChunkContent text={active.excerpt} />
+            </div>
+          ) : (
+            <pre className="msg-source-text">
+              <span className="msg-source-text-inner">{active.excerpt}</span>
+            </pre>
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/** 芯片只放页码；章节进展开区。旧图谱引用曾把「页码 · 章节」写进 where。 */
+function sourceLocator(source: ChatSource): { where: string; section: string | null } {
+  const raw = sourceWhere(source)
+  const cut = raw.indexOf(' · ')
+  const where = cut > 0 ? raw.slice(0, cut) : raw
+  const fromWhere = cut > 0 ? raw.slice(cut + 3).trim() : ''
+  return { where, section: source.section?.trim() || fromWhere || null }
+}
+
+/** PDF/Word 表格落在页上；旧引用把页码写成了「表43」，这里按页码显示。Excel 仍用表号。 */
+function sourceWhere(source: ChatSource): string {
+  if (source.kind !== 'table') return source.where
+  const name = (source.filename || '').toLowerCase()
+  if (/\.(xlsx|xlsm|xls|csv)$/.test(name)) return source.where
+  const start = source.page_start ?? source.page
+  const end = source.page_end ?? source.page
+  if (start == null) return source.where || '表格'
+  if (end != null && end !== start) return `第${start}–${end}页`
+  return `第${start}页`
+}
+
+/** 切片是否跨页：页码区间不一致即跨页（老数据没有 page_end，视为单页） */
+function isCrossPage(source: ChatSource): boolean {
+  const start = source.page_start ?? source.page
+  const end = source.page_end ?? source.page
+  return start != null && end != null && start !== end
 }
 
 function CopyButton({ text }: { text: string }) {

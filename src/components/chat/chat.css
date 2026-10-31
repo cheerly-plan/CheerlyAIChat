@@ -45,9 +45,17 @@
 }
 
 .brand,
-.new-chat,
 .account {
   margin-right: 12px;
+}
+
+/* 两个入口按钮的右边界与会话列表项对齐（历史列表右侧留 16px），
+   不给 width: 100%——否则 100% + margin 会溢出侧栏被裁掉，看起来像贴着右边；
+   min-width 相应扣掉右侧间距，收起动画时不至于被挤压换行 */
+.new-chat,
+.kb-entry {
+  min-width: 232px;
+  margin-right: 16px;
 }
 
 .brand {
@@ -67,32 +75,69 @@
   color: #4d6bfe;
 }
 
-.new-chat {
+/* 「开启新对话」与「知识库」共用同一套尺寸：等高、等宽、icon 与文字居左，
+   两者唯一区别是外观（前者白底描边、后者透明 ghost） */
+.new-chat,
+.kb-entry {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 10px;
   height: 40px;
-  border: 1px solid #e5e7eb;
+  padding: 0 12px;
   border-radius: 12px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.new-chat {
+  margin-top: 2px;
+  border: 1px solid #e5e7eb;
   background: #fff;
   color: #222;
-  font: inherit;
-  cursor: pointer;
 }
 
 .new-chat:hover {
   background: #f3f4f6;
 }
 
+.kb-entry {
+  margin-top: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #4b5563;
+}
+
+.kb-entry:hover {
+  background: #eef1f5;
+  color: #222;
+}
+
+.new-chat > svg {
+  flex-shrink: 0;
+}
+
+.kb-entry-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: block;
+}
+
 .history {
   flex: 1;
   min-height: 0;
-  padding: 0 16px 8px 4px;
+  padding: 0;
   color: #9aa0a6;
   font-size: 13px;
   overflow: auto;
   overscroll-behavior: contain;
+}
+
+.history-inner {
+  padding: 0 16px 8px 4px;
 }
 
 .history-empty {
@@ -295,11 +340,11 @@
 .history-menu {
   position: fixed;
   z-index: 20;
-  min-width: 180px;
-  padding: 6px;
-  border-radius: 12px;
+  min-width: 132px;
+  padding: 4px;
+  border-radius: 8px;
   background: #fff;
-  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.14);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
 }
 
 .history-menu-icon {
@@ -314,14 +359,14 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  height: 40px;
-  padding: 0 12px;
+  height: 32px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 6px;
   background: transparent;
   color: #1f1f1f;
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   text-align: left;
   cursor: pointer;
 }
@@ -331,7 +376,7 @@
 }
 
 .history-menu button.danger {
-  color: #f54a45;
+  color: #e5484d;
 }
 
 .history-menu-sep {
@@ -572,16 +617,21 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 28px 24px 8px;
+  padding: 0;
   overflow-anchor: none;
   overscroll-behavior: contain;
+}
+
+.list-inner {
+  padding: 28px 24px 8px;
 }
 
 .list,
 .history,
 .markdown pre,
-.composer textarea,
-.inline-composer textarea {
+.composer-input,
+.inline-composer-input,
+.msg-source-text {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
@@ -591,18 +641,20 @@
 .history:hover,
 .history:focus-within,
 .markdown pre:hover,
-.composer textarea:hover,
-.composer textarea:focus,
-.inline-composer textarea:hover,
-.inline-composer textarea:focus {
+.composer-input:hover,
+.composer-input:focus-within,
+.inline-composer-input:hover,
+.inline-composer-input:focus-within,
+.msg-source-text:hover {
   scrollbar-color: rgba(15, 23, 42, 0.28) transparent;
 }
 
 .list::-webkit-scrollbar,
 .history::-webkit-scrollbar,
 .markdown pre::-webkit-scrollbar,
-.composer textarea::-webkit-scrollbar,
-.inline-composer textarea::-webkit-scrollbar {
+.composer-input::-webkit-scrollbar,
+.inline-composer-input::-webkit-scrollbar,
+.msg-source-text::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
@@ -610,8 +662,9 @@
 .list::-webkit-scrollbar-track,
 .history::-webkit-scrollbar-track,
 .markdown pre::-webkit-scrollbar-track,
-.composer textarea::-webkit-scrollbar-track,
-.inline-composer textarea::-webkit-scrollbar-track,
+.composer-input::-webkit-scrollbar-track,
+.inline-composer-input::-webkit-scrollbar-track,
+.msg-source-text::-webkit-scrollbar-track,
 .list::-webkit-scrollbar-corner,
 .history::-webkit-scrollbar-corner,
 .markdown pre::-webkit-scrollbar-corner {
@@ -621,8 +674,9 @@
 .list::-webkit-scrollbar-thumb,
 .history::-webkit-scrollbar-thumb,
 .markdown pre::-webkit-scrollbar-thumb,
-.composer textarea::-webkit-scrollbar-thumb,
-.inline-composer textarea::-webkit-scrollbar-thumb {
+.composer-input::-webkit-scrollbar-thumb,
+.inline-composer-input::-webkit-scrollbar-thumb,
+.msg-source-text::-webkit-scrollbar-thumb {
   background-color: transparent;
   background-clip: padding-box;
   border: 1px solid transparent;
@@ -634,18 +688,20 @@
 .history:hover::-webkit-scrollbar-thumb,
 .history:focus-within::-webkit-scrollbar-thumb,
 .markdown pre:hover::-webkit-scrollbar-thumb,
-.composer textarea:hover::-webkit-scrollbar-thumb,
-.composer textarea:focus::-webkit-scrollbar-thumb,
-.inline-composer textarea:hover::-webkit-scrollbar-thumb,
-.inline-composer textarea:focus::-webkit-scrollbar-thumb {
+.composer-input:hover::-webkit-scrollbar-thumb,
+.composer-input:focus-within::-webkit-scrollbar-thumb,
+.inline-composer-input:hover::-webkit-scrollbar-thumb,
+.inline-composer-input:focus-within::-webkit-scrollbar-thumb,
+.msg-source-text:hover::-webkit-scrollbar-thumb {
   background-color: rgba(15, 23, 42, 0.2);
 }
 
 .list::-webkit-scrollbar-thumb:hover,
 .history::-webkit-scrollbar-thumb:hover,
 .markdown pre::-webkit-scrollbar-thumb:hover,
-.composer textarea::-webkit-scrollbar-thumb:hover,
-.inline-composer textarea::-webkit-scrollbar-thumb:hover {
+.composer-input::-webkit-scrollbar-thumb:hover,
+.inline-composer-input::-webkit-scrollbar-thumb:hover,
+.msg-source-text::-webkit-scrollbar-thumb:hover {
   background-color: rgba(15, 23, 42, 0.38);
 }
 
@@ -653,16 +709,18 @@
   .list,
   .history,
   .markdown pre,
-  .composer textarea,
-  .inline-composer textarea {
+  .composer-input,
+  .inline-composer-input,
+  .msg-source-text {
     scrollbar-color: rgba(15, 23, 42, 0.22) transparent;
   }
 
   .list::-webkit-scrollbar-thumb,
   .history::-webkit-scrollbar-thumb,
   .markdown pre::-webkit-scrollbar-thumb,
-  .composer textarea::-webkit-scrollbar-thumb,
-  .inline-composer textarea::-webkit-scrollbar-thumb {
+  .composer-input::-webkit-scrollbar-thumb,
+  .inline-composer-input::-webkit-scrollbar-thumb,
+  .msg-source-text::-webkit-scrollbar-thumb {
     background-color: rgba(15, 23, 42, 0.2);
   }
 }
@@ -715,7 +773,7 @@
   background: #f8fafc;
 }
 
-.chat:has(.chat-header-title) .list {
+.chat:has(.chat-header-title) .list-inner {
   padding-top: 12px;
 }
 
@@ -788,7 +846,7 @@
   align-items: flex-start;
 }
 
-.list-wrap.has-session-outline .list {
+.list-wrap.has-session-outline .list-inner {
   padding-left: 42px;
 }
 
@@ -906,14 +964,20 @@
   box-shadow: 0 6px 24px rgba(15, 23, 42, 0.05);
 }
 
+.inline-composer-input {
+  max-height: 160px;
+  overflow: auto;
+}
+
 .inline-composer textarea {
   display: block;
   width: 100%;
+  padding: 0;
   border: 0;
   outline: none;
   resize: none;
+  overflow: hidden;
   min-height: 28px;
-  max-height: 160px;
   font: inherit;
   font-size: 15px;
   line-height: 1.6;
@@ -960,9 +1024,26 @@
   cursor: not-allowed;
 }
 
+.msg-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.msg-footer.has-resume {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eef0f3;
+}
+
 .msg-actions {
   display: flex;
   gap: 2px;
+  margin-top: 0;
+}
+
+.user-block .msg-actions {
   margin-top: 4px;
 }
 
@@ -975,7 +1056,8 @@
 
   .row:hover .msg-actions,
   .msg-actions:focus-within,
-  .msg-actions:has(button.copied) {
+  .msg-actions:has(button.copied),
+  .msg-footer.has-resume .msg-actions {
     opacity: 1;
     pointer-events: auto;
   }
@@ -1012,27 +1094,252 @@
   background: transparent;
 }
 
-.msg-actions:has(.msg-resume) {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.msg-actions button.msg-resume {
-  width: auto;
-  height: 28px;
-  padding: 0 8px;
+.msg-resume {
+  margin-left: auto;
+  flex-shrink: 0;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+  color: #374151;
+  font: inherit;
   font-size: 13px;
-  color: #4b5563;
+  line-height: 1;
+  cursor: pointer;
 }
 
-.msg-actions button.msg-resume:hover {
-  color: #111827;
-  background: #f3f4f6;
+.msg-resume:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.msg-resume:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .assistant-body {
   min-width: 0;
   flex: 1;
+}
+
+/* ——— 参考来源（知识库引用）——— */
+.msg-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #eef0f3;
+}
+
+.msg-sources-label {
+  font-size: 12px;
+  color: #9aa0a6;
+}
+
+.msg-sources-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.msg-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 320px;
+  padding: 4px 9px 4px 6px;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  background: #fbfcfd;
+  color: #4b5563;
+  font-size: 12.5px;
+  line-height: 1.5;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.msg-source:hover {
+  border-color: #cfd6e4;
+  background: #f5f7fb;
+  color: #1f2937;
+}
+
+.msg-source.is-open {
+  border-color: #b9c6e4;
+  background: #eef3fd;
+  color: #1d4ed8;
+}
+
+.msg-source-idx {
+  flex-shrink: 0;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: #eceff4;
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.msg-source.is-open .msg-source-idx {
+  background: #dbe6fb;
+  color: #1d4ed8;
+}
+
+.msg-source-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msg-source-where {
+  flex-shrink: 0;
+  color: #9aa0a6;
+  font-size: 12px;
+}
+
+.msg-source.is-open .msg-source-where {
+  color: #6f8fd8;
+}
+
+.msg-source-detail {
+  padding: 0;
+  border: 1px solid #eef0f3;
+  border-radius: 10px;
+  background: #fafbfc;
+  overflow: hidden;
+}
+
+.msg-source-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px 0;
+  font-size: 12px;
+  color: #9aa0a6;
+}
+
+.msg-source-head:not(:has(*)) {
+  display: none;
+}
+
+.msg-source-file {
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #4b5563;
+  font-weight: 500;
+}
+
+.msg-source-note {
+  color: #b45309;
+}
+
+.msg-source-body {
+  max-height: 280px;
+  overflow: auto;
+  padding: 8px 10px 10px;
+}
+
+.msg-source-body .kb-chunk-p {
+  text-indent: 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.msg-source-body .kb-chunk-table-wrap {
+  overflow-x: auto;
+  margin: 0;
+  border: 1px solid #e6e9ef;
+  border-radius: 8px;
+}
+
+.msg-source-body .kb-chunk-table {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.msg-source-body .kb-chunk-table th,
+.msg-source-body .kb-chunk-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid #eef0f3;
+  border-right: 1px solid #eef0f3;
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.msg-source-body .kb-chunk-table th:last-child,
+.msg-source-body .kb-chunk-table td:last-child {
+  border-right: none;
+}
+
+.msg-source-body .kb-chunk-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f7f8fa;
+  color: #4a5160;
+  font-weight: 600;
+}
+
+.msg-source-body .kb-chunk-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.msg-source-body .kb-chunk-table td.is-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 章节名：比页码长，给上限并省略；卡片里只放位置，章节放这里 */
+.msg-source-section {
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #4b5563;
+}
+
+/* 跨页提示：中性色，避免和「图像识别」的告警色混在一起 */
+.msg-source-hint {
+  flex-shrink: 0;
+  color: #8a94a6;
+}
+
+.msg-source-text {
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow: auto;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.75;
+  color: #374151;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.msg-source-text-inner {
+  display: block;
+  padding: 8px 12px 10px;
 }
 
 .markdown {
@@ -1102,14 +1409,15 @@
 
 .markdown pre {
   margin: 0.6em 0 1em;
-  padding: 12px 14px;
+  padding: 0;
   border-radius: 10px;
   background: #f6f8fa;
   overflow: auto;
 }
 
 .markdown pre code {
-  padding: 0;
+  display: block;
+  padding: 12px 14px;
   background: transparent;
   font-size: 13px;
 }
@@ -1140,39 +1448,10 @@
   white-space: pre-wrap;
 }
 
-.tool {
-  margin: 0 0 8px;
-  color: #8b8f9a;
+.msg-empty {
+  margin: 4px 0 0;
+  color: #9aa0a6;
   font-size: 13px;
-}
-
-/* 「正在思考…」流光动画：灰→蓝渐变扫过文字（DeepSeek 思考中同款质感） */
-.tool.thinking {
-  background: linear-gradient(90deg, #9aa0a6 25%, #4d6bfe 50%, #9aa0a6 75%);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  animation: thinking-shimmer 1.8s linear infinite;
-}
-
-@keyframes thinking-shimmer {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tool.thinking {
-    animation: none;
-    background: none;
-    color: #8b8f9a;
-    -webkit-text-fill-color: #8b8f9a;
-  }
 }
 
 .typing {
@@ -1185,7 +1464,7 @@
 }
 
 .dock {
-  padding: 4px 20px 0;
+  padding: 0 20px;
 }
 
 .error {
@@ -1195,41 +1474,31 @@
   font-size: 13px;
 }
 
-/* 末条不是助手消息时的兜底「继续生成」（刷新后半截未落库） */
-.chat-resume-btn {
-  display: block;
-  margin: 0 auto 8px;
-  padding: 4px 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 999px;
-  background: #fff;
-  color: #4b5563;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.chat-resume-btn:hover {
-  background: #f9fafb;
-}
-
 .composer {
   max-width: 800px;
   margin: 0 auto;
-  padding: 16px 18px 12px;
+  padding-bottom: 12px;
   background: #fff;
   border: 1px solid #e8eaee;
   border-radius: 28px;
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
 }
 
+.composer-input {
+  max-height: 160px;
+  overflow: auto;
+  padding: 16px 18px 0;
+}
+
 .composer textarea {
   display: block;
   width: 100%;
+  padding: 0;
   border: 0;
   outline: none;
   resize: none;
+  overflow: hidden;
   min-height: 52px;
-  max-height: 160px;
   font: inherit;
   font-size: 16px;
   line-height: 1.6;
@@ -1247,6 +1516,7 @@
   justify-content: space-between;
   gap: 12px;
   margin-top: 12px;
+  padding: 0 18px;
 }
 
 .chips {
@@ -1277,7 +1547,7 @@
   user-select: none;
   background: transparent;
   border-color: #dcdfe6;
-  color: #5b6472;
+  color: #0f1115;
   transition:
     background-color 0.2s ease,
     border-color 0.2s ease,
@@ -1301,16 +1571,35 @@
 }
 
 /* Lottie 图标路径强制继承 chip 文字色（灰→蓝），与 DeepSeek 同款做法 */
-.globe-toggle-icon svg {
+.globe-toggle-icon svg,
+.book-toggle-icon svg {
   display: block;
+}
+
+/* 书本 Lottie 画布留白比地球多，略放大让视觉重量对齐 */
+.book-toggle-icon svg {
+  transform: scale(1.2);
+  transform-origin: center;
 }
 
 .globe-toggle-icon svg path[fill] {
   fill: currentColor;
 }
 
-.globe-toggle-icon svg path[stroke] {
+.globe-toggle-icon svg path[stroke],
+.book-toggle-icon svg path[stroke],
+.book-toggle-icon svg rect[stroke] {
   stroke: currentColor;
+}
+
+.book-toggle-icon svg path[fill],
+.book-toggle-icon svg rect {
+  fill: none;
+}
+
+.book-toggle-icon {
+  flex-shrink: 0;
+  overflow: visible;
 }
 
 .chip-toggle:focus-visible {
@@ -1402,12 +1691,14 @@
 }
 
 .disclaimer {
+  margin: 0 auto;
   max-width: 800px;
-  margin: 10px auto 0;
-  padding: 0 20px 16px;
+  height: 32px;
+  line-height: 32px;
   text-align: center;
   color: #9aa0a6;
   font-size: 12px;
+  text-align: center;
 }
 
 @keyframes blink {

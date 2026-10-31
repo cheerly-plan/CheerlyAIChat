@@ -2,11 +2,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { DEFAULT_SESSION_TITLE } from '../../api'
 import copyIcon from '../../assets/copy.svg'
 import deleteIcon from '../../assets/delete.svg'
+import kbIcon from '../../assets/kb.svg'
 import optionsIcon from '../../assets/options.svg'
 import renameIcon from '../../assets/rename.svg'
 import type { SessionInfo } from '../../types'
+import { ConfirmDialog } from '../common/ConfirmDialog'
 import { Logo } from './Logo'
-import { CloseIcon, PanelIcon, WarningIcon } from './icons'
+import { CloseIcon, NewChatIcon, PanelIcon } from './icons'
 
 type Props = {
   onNewChat: () => void
@@ -23,6 +25,8 @@ type Props = {
   chatLoading?: boolean
   userName?: string
   onLogout?: () => void
+  /** 打开知识库页（与对话视图互斥） */
+  onOpenKb?: () => void
 }
 
 export function Sidebar({
@@ -39,6 +43,7 @@ export function Sidebar({
   chatLoading = false,
   userName = '',
   onLogout,
+  onOpenKb,
 }: Props) {
   const groups = groupSessions(sessions)
   const [menuId, setMenuId] = useState<string | null>(null)
@@ -70,56 +75,59 @@ export function Sidebar({
         </button>
       </div>
       <button type="button" className="new-chat" onClick={onNewChat}>
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-          <path
-            fill="currentColor"
-            d="M4 20.5V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10.5a2 2 0 0 1-2 2H8l-4 3Z"
-          />
-        </svg>
+        <NewChatIcon />
         开启新对话
       </button>
+      {onOpenKb ? (
+        <button type="button" className="kb-entry" onClick={onOpenKb}>
+          <img src={kbIcon} alt="" className="kb-entry-icon" />
+          知识库
+        </button>
+      ) : null}
       <div className="history">
-        {/* 显式四态，互斥渲染：加载骨架 / 加载失败 / 空态 / 会话分组 */}
-        {!sessionsReady ? (
-          <HistorySkeleton />
-        ) : sessionsError ? (
-          <div className="history-error">
-            <span>{sessionsError}</span>
-            {onRetrySessions ? (
-              <button type="button" className="history-retry" onClick={onRetrySessions}>
-                重试
-              </button>
-            ) : null}
-          </div>
-        ) : groups.length ? (
-          groups.map((group) => (
-            <section key={group.label} className="history-group">
-              <h2 className="history-label">{group.label}</h2>
-              {group.items.map((item) => (
-                <HistoryItem
-                  key={item.session_id}
-                  item={item}
-                  active={item.session_id === activeSessionId}
-                  loading={chatLoading && item.session_id === activeSessionId}
-                  menuOpen={menuId === item.session_id}
-                  onSelect={() => onSelectSession(item.session_id)}
-                  onOpenMenu={() => setMenuId(item.session_id)}
-                  onCloseMenu={() => setMenuId(null)}
-                  onStartRename={() => {
-                    setMenuId(null)
-                    setRenameItem(item)
-                  }}
-                  onDelete={() => {
-                    setMenuId(null)
-                    setDeleteItem(item)
-                  }}
-                />
-              ))}
-            </section>
-          ))
-        ) : (
-          <span className="history-empty">暂无历史会话</span>
-        )}
+        <div className="history-inner">
+          {/* 显式四态，互斥渲染：加载骨架 / 加载失败 / 空态 / 会话分组 */}
+          {!sessionsReady ? (
+            <HistorySkeleton />
+          ) : sessionsError ? (
+            <div className="history-error">
+              <span>{sessionsError}</span>
+              {onRetrySessions ? (
+                <button type="button" className="history-retry" onClick={onRetrySessions}>
+                  重试
+                </button>
+              ) : null}
+            </div>
+          ) : groups.length ? (
+            groups.map((group) => (
+              <section key={group.label} className="history-group">
+                <h2 className="history-label">{group.label}</h2>
+                {group.items.map((item) => (
+                  <HistoryItem
+                    key={item.session_id}
+                    item={item}
+                    active={item.session_id === activeSessionId}
+                    loading={chatLoading && item.session_id === activeSessionId}
+                    menuOpen={menuId === item.session_id}
+                    onSelect={() => onSelectSession(item.session_id)}
+                    onOpenMenu={() => setMenuId(item.session_id)}
+                    onCloseMenu={() => setMenuId(null)}
+                    onStartRename={() => {
+                      setMenuId(null)
+                      setRenameItem(item)
+                    }}
+                    onDelete={() => {
+                      setMenuId(null)
+                      setDeleteItem(item)
+                    }}
+                  />
+                ))}
+              </section>
+            ))
+          ) : (
+            <span className="history-empty">暂无历史会话</span>
+          )}
+        </div>
       </div>
       <div className="account">
         <span className="account-name">{userName}</span>
@@ -143,7 +151,9 @@ export function Sidebar({
       />
     ) : null}
     {deleteItem ? (
-      <DeleteDialog
+      <ConfirmDialog
+        title="确定删除对话?"
+        description="删除后，聊天记录将不可恢复。"
         onCancel={() => setDeleteItem(null)}
         onConfirm={() => void confirmDelete()}
       />
@@ -188,9 +198,9 @@ function HistoryItem({
       return
     }
     const rect = moreRef.current.getBoundingClientRect()
-    const width = 180
-    const height = 144
-    const left = Math.min(Math.max(8, rect.right - width), window.innerWidth - width - 8)
+    const width = 132
+    const height = 132
+    const left = Math.min(rect.left, window.innerWidth - width - 8)
     const openUp = rect.bottom + height > window.innerHeight - 8
     const top = openUp ? Math.max(8, rect.top - height - 4) : rect.bottom + 4
     setMenuPos({ top, left })
@@ -349,42 +359,6 @@ function RenameDialog({
           </button>
           <button type="button" className="primary" onClick={submit}>
             确定
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function DeleteDialog({
-  onCancel,
-  onConfirm,
-}: {
-  onCancel: () => void
-  onConfirm: () => void
-}) {
-  useDialogEscape(onCancel)
-
-  return (
-    <div className="session-dialog-mask" onClick={onCancel}>
-      <div
-        className="session-dialog session-dialog-warn"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="delete-session-title"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h3 id="delete-session-title">
-          <WarningIcon />
-          确定删除对话?
-        </h3>
-        <p>删除后，聊天记录将不可恢复。</p>
-        <div className="session-dialog-actions">
-          <button type="button" className="ghost" onClick={onCancel} autoFocus>
-            取消
-          </button>
-          <button type="button" className="danger" onClick={onConfirm}>
-            删除
           </button>
         </div>
       </div>
