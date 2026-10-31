@@ -68,6 +68,7 @@ export function Chat({ onLogout, initialUser = null }: Props) {
     sessionsError,
     reloadSessions,
     sessionId,
+    streamingIds,
     title,
     regenerate,
     canResume,
@@ -139,7 +140,7 @@ export function Chat({ onLogout, initialUser = null }: Props) {
         sessionsError={sessionsError}
         onRetrySessions={() => void reloadSessions()}
         activeSessionId={sessionId}
-        chatLoading={loading}
+        streamingSessionIds={streamingIds}
         userName={user?.user_name}
         onLogout={onLogout}
         onOpenKb={isAdmin ? () => navigate('kb') : undefined}

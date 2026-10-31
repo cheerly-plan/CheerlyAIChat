@@ -25,6 +25,20 @@ const TITLE_POLL_MAX_ATTEMPTS = 12
 // 尚未执行），首次 pending_run 查不到时延迟重试一次
 const RESUME_DISCOVERY_RETRY_MS = 4000
 
+// 切走会话时 SSE 继续读完。界面状态挂在这条记录上，回来再铺回当前视图。
+type LiveRun = {
+  controller: AbortController
+  assistantId: string
+  messages: ChatMessage[]
+  pending: string
+  raf: number
+  error: string
+  canResume: boolean
+  resumeRunId: string | null
+  hasMore: boolean
+  nextBeforeSeq: number | null
+}
+
 export function useChat(initialUser?: UserInfo | null) {
   const [user, setUser] = useState<UserInfo | null>(null)
   const [sessions, setSessions] = useState<SessionInfo[]>([])
@@ -39,16 +53,16 @@ export function useChat(initialUser?: UserInfo | null) {
   const [error, setError] = useState('')
   // 断点续跑：后端 checkpoint 里存在 failed/interrupted 的 run 时可"继续生成"
   const [canResume, setCanResume] = useState(false)
-  const pendingText = useRef('')
-  const streamId = useRef<string | null>(null)
-  const raf = useRef(0)
+  // 仍在读 SSE 的会话。侧栏给这些会话显示进行中，不限于当前打开的那一个
+  const [streamingIds, setStreamingIds] = useState<string[]>([])
   const nextBeforeSeq = useRef<number | null>(null)
   const loadingOlder = useRef(false)
   const draftKey = useRef(crypto.randomUUID())
   const sessionIdRef = useRef<string | null>(null)
   const sessionsRef = useRef<SessionInfo[]>([])
+  const messagesRef = useRef<ChatMessage[]>([])
   const resumeRunId = useRef<string | null>(null)
-  const abortRef = useRef<AbortController | null>(null)
+  const runsRef = useRef<Map<string, LiveRun>>(new Map())
 
   useEffect(() => {
     sessionIdRef.current = sessionId
@@ -57,6 +71,10 @@ export function useChat(initialUser?: UserInfo | null) {
   useEffect(() => {
     sessionsRef.current = sessions
   }, [sessions])
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
 
   useEffect(() => {
     let cancelled = false
@@ -114,9 +132,13 @@ export function useChat(initialUser?: UserInfo | null) {
           setSessionsReady(true)
         }
       })
+    const runs = runsRef.current
     return () => {
       cancelled = true
-      if (raf.current) cancelAnimationFrame(raf.current)
+      for (const run of runs.values()) {
+        if (run.raf) cancelAnimationFrame(run.raf)
+        run.controller.abort()
+      }
     }
     // 仅在挂载时初始化；用户切换/登出由 App 用 key 重建整个 Chat，无需依赖 initialUser
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -143,16 +165,69 @@ export function useChat(initialUser?: UserInfo | null) {
     }
   }
 
-  function patchMessage(id: string, patch: (item: ChatMessage) => ChatMessage) {
-    setMessages((prev) => {
-      const index = prev.findIndex((item) => item.id === id)
-      if (index === -1) return prev
-      const item = prev[index]
-      if (!item) return prev
-      const next = prev.slice()
-      next[index] = patch(item)
-      return next
+  function viewing(id: string) {
+    return sessionIdRef.current === id
+  }
+
+  function publishStreaming() {
+    setStreamingIds([...runsRef.current.keys()])
+  }
+
+  function commitMessages(id: string, next: ChatMessage[]) {
+    const run = runsRef.current.get(id)
+    if (run) run.messages = next
+    if (viewing(id)) {
+      messagesRef.current = next
+      setMessages(next)
+    }
+  }
+
+  function patchRun(
+    id: string,
+    messageId: string,
+    patch: (item: ChatMessage) => ChatMessage,
+  ) {
+    const run = runsRef.current.get(id)
+    const prev = run?.messages ?? (viewing(id) ? messagesRef.current : [])
+    const index = prev.findIndex((item) => item.id === messageId)
+    if (index === -1) return
+    const item = prev[index]
+    if (!item) return
+    const next = prev.slice()
+    next[index] = patch(item)
+    commitMessages(id, next)
+  }
+
+  function flushRun(id: string) {
+    const run = runsRef.current.get(id)
+    if (!run) return
+    if (run.raf) {
+      cancelAnimationFrame(run.raf)
+      run.raf = 0
+    }
+    const chunk = run.pending
+    if (!chunk) return
+    run.pending = ''
+    patchRun(id, run.assistantId, (item) => ({
+      ...item,
+      content: item.content + chunk,
+    }))
+  }
+
+  function queueRunText(id: string, chunk: string) {
+    const run = runsRef.current.get(id)
+    if (!run) return
+    run.pending += chunk
+    if (run.raf) return
+    run.raf = requestAnimationFrame(() => {
+      const current = runsRef.current.get(id)
+      if (current) current.raf = 0
+      flushRun(id)
     })
+  }
+
+  function abortRun(id: string) {
+    runsRef.current.get(id)?.controller.abort()
   }
 
   function upsertSession(session: SessionInfo) {
@@ -210,40 +285,8 @@ export function useChat(initialUser?: UserInfo | null) {
     }
   }
 
-  function flushText() {
-    if (raf.current) {
-      cancelAnimationFrame(raf.current)
-      raf.current = 0
-    }
-    const id = streamId.current
-    const chunk = pendingText.current
-    if (!id || !chunk) return
-    pendingText.current = ''
-    patchMessage(id, (item) => ({ ...item, content: item.content + chunk }))
-  }
-
-  function queueText(chunk: string) {
-    pendingText.current += chunk
-    if (raf.current) return
-    raf.current = requestAnimationFrame(() => {
-      raf.current = 0
-      flushText()
-    })
-  }
-
-  function stopStream() {
-    // 取消在途的 SSE 请求（后端会把该 run 标为 interrupted）
-    abortRef.current?.abort()
-    abortRef.current = null
-    pendingText.current = ''
-    streamId.current = null
-    if (raf.current) {
-      cancelAnimationFrame(raf.current)
-      raf.current = 0
-    }
-  }
-
   function clearConversation() {
+    messagesRef.current = []
     setMessages([])
     setError('')
     setLoading(false)
@@ -259,10 +302,10 @@ export function useChat(initialUser?: UserInfo | null) {
     setCanResume(false)
   }
 
-  // 暂停生成：中止 SSE 请求，后端收到断开后把 checkpoint 标为 interrupted，
-  // "继续生成"按钮随即亮起
+  // 暂停当前会话的生成。只断开这一条 SSE，其它会话里还在跑的流不动
   function stop() {
-    abortRef.current?.abort()
+    const id = sessionIdRef.current
+    if (id) abortRun(id)
   }
 
   // 会话记忆加载完成后查询后端有没有可恢复的未完成回复（刷新页面后找回现场）
@@ -302,18 +345,23 @@ export function useChat(initialUser?: UserInfo | null) {
         }
       }
     }
+    if (sessionIdRef.current !== activeSessionId) return
     if (resumeRunId.current) {
+      const run = runsRef.current.get(activeSessionId)
+      if (run) run.canResume = true
       setCanResume(true)
       return
     }
-    setMessages((prev) =>
-      prev.filter((item) => {
+    setMessages((prev) => {
+      const next = prev.filter((item) => {
         if (item.id !== assistantId || item.role !== 'assistant') return true
-        return Boolean(
-          item.content || item.sources?.length,
-        )
-      }),
-    )
+        return Boolean(item.content || item.sources?.length)
+      })
+      messagesRef.current = next
+      const run = runsRef.current.get(activeSessionId)
+      if (run) run.messages = next
+      return next
+    })
   }
 
   // 重新生成失败（error 事件）：后端未动库、旧回答原样保留，
@@ -322,7 +370,9 @@ export function useChat(initialUser?: UserInfo | null) {
     try {
       const page = await fetchChatMemory(id)
       if (sessionIdRef.current !== id) return
-      setMessages(toChatMessages(page.messages))
+      const next = toChatMessages(page.messages)
+      messagesRef.current = next
+      setMessages(next)
       setHasMore(Boolean(page.has_more))
       nextBeforeSeq.current = page.next_before_seq ?? null
     } catch {
@@ -346,27 +396,40 @@ export function useChat(initialUser?: UserInfo | null) {
       setError('用户信息未就绪')
       return
     }
-    streamId.current = assistantId
-    pendingText.current = ''
-    if (raf.current) {
-      cancelAnimationFrame(raf.current)
-      raf.current = 0
-    }
-    setError('')
-    setLoading(true)
     const controller = new AbortController()
-    abortRef.current = controller
+    const run: LiveRun = {
+      controller,
+      assistantId,
+      messages: messagesRef.current.slice(),
+      pending: '',
+      raf: 0,
+      error: '',
+      canResume: false,
+      resumeRunId: options.resumeRunId ?? null,
+      hasMore,
+      nextBeforeSeq: nextBeforeSeq.current,
+    }
+    const previous = runsRef.current.get(activeSessionId)
+    if (previous && previous.assistantId !== assistantId) previous.controller.abort()
+    runsRef.current.set(activeSessionId, run)
+    publishStreaming()
+    if (viewing(activeSessionId)) {
+      setError('')
+      setLoading(true)
+    }
     // 流内出现 error 事件（LLM 失败等）：后端已把 checkpoint 标为 failed，
     // 属于异常收尾而非正常结束
     let sawError = false
     // 恢复时后端会重跑整段（不是只发剩余 token），第一条 text 覆盖半截内容
     let resumeReplacePending = Boolean(options.resumeRunId)
+    const owned = () => runsRef.current.get(activeSessionId)?.assistantId === assistantId
     try {
       const handler = (event: ChatEvent) => {
-        if (streamId.current !== assistantId) return
+        if (!owned()) return
         if (event.type === 'run_started') {
           // 记下本次 run 的 id：流异常断开后"继续生成"靠它发起恢复
-          resumeRunId.current = event.run_id
+          run.resumeRunId = event.run_id
+          if (viewing(activeSessionId)) resumeRunId.current = event.run_id
           return
         }
         if (event.type === 'title_updated') {
@@ -376,41 +439,44 @@ export function useChat(initialUser?: UserInfo | null) {
         if (event.type === 'text') {
           if (resumeReplacePending) {
             resumeReplacePending = false
-            pendingText.current = ''
-            patchMessage(assistantId, (item) => ({
+            run.pending = ''
+            patchRun(activeSessionId, assistantId, (item) => ({
               ...item,
               content: event.content,
             }))
             return
           }
-          queueText(event.content)
+          queueRunText(activeSessionId, event.content)
           return
         }
-        flushText()
+        flushRun(activeSessionId)
         if (event.type === 'tool_start') {
           // 工具调用不展示过程。清掉调用前的半截字，气泡只留写作光标，
           // 直到最终回答的 text 流过来。
-          pendingText.current = ''
-          patchMessage(assistantId, (item) => ({ ...item, content: '' }))
+          run.pending = ''
+          patchRun(activeSessionId, assistantId, (item) => ({ ...item, content: '' }))
         }
         if (event.type === 'tool_end') {
           const cited = event.sources
           if (cited?.length) {
-            patchMessage(assistantId, (item) => ({ ...item, sources: cited }))
+            patchRun(activeSessionId, assistantId, (item) => ({ ...item, sources: cited }))
           }
         }
         if (event.type === 'done') {
           const cited = event.sources
-          patchMessage(assistantId, (item) => ({
+          patchRun(activeSessionId, assistantId, (item) => ({
             ...item,
             sources: cited?.length ? cited : item.sources,
           }))
         }
         if (event.type === 'error') {
           sawError = true
-          setError(event.message)
-          // LLM 失败在后端标为 failed，同样可恢复
-          if (resumeRunId.current) setCanResume(true)
+          run.error = event.message
+          run.canResume = Boolean(run.resumeRunId)
+          if (viewing(activeSessionId)) {
+            setError(event.message)
+            if (run.resumeRunId) setCanResume(true)
+          }
         }
       }
       if (options.resumeRunId) {
@@ -423,38 +489,38 @@ export function useChat(initialUser?: UserInfo | null) {
           signal: controller.signal,
         })
       }
-      if (streamId.current === assistantId) flushText()
+      if (owned()) flushRun(activeSessionId)
       // 只有正常结束才清除可恢复标记；error 事件点亮的状态必须保留，
       // 否则"继续生成"按钮会刚亮起就被这里抹掉
-      if (!sawError) clearResumeState()
+      if (!sawError && viewing(activeSessionId)) clearResumeState()
       // SSE 流结束后标题由后台生成，轮询接口拿最终结果
       // （regenerate/resume 也可能补触发生成；pollSessionTitle 自带
       //  "标题非默认即退出"守卫，不会覆盖用户改过的名字）
-      if (streamId.current === assistantId) {
-        void pollSessionTitle(activeSessionId)
-      }
+      if (owned()) void pollSessionTitle(activeSessionId)
       // 重新生成失败：恢复被前端移除的旧回答（后端库里原样保留）
-      if (options.regenerate && sawError && sessionIdRef.current === activeSessionId) {
+      if (options.regenerate && sawError && viewing(activeSessionId)) {
         await restoreHistoryAfterFailedRegenerate(activeSessionId)
       }
     } catch (err) {
-      if (streamId.current === assistantId) {
-        flushText()
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          // 主动暂停：已生成的部分保留，checkpoint 在后端标为 interrupted
-          setError('')
-        } else {
-          setError(err instanceof Error ? err.message : '发送失败')
-        }
-        // 极速暂停/断网时 run_started 可能未到达前端，向后端补查一次
-        await settleInterruptedStream(activeSessionId, assistantId)
+      if (!owned()) return
+      flushRun(activeSessionId)
+      if (!viewing(activeSessionId)) return
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // 主动暂停：已生成的部分保留，checkpoint 在后端标为 interrupted
+        setError('')
+      } else {
+        setError(err instanceof Error ? err.message : '发送失败')
       }
+      // 极速暂停/断网时 run_started 可能未到达前端，向后端补查一次
+      await settleInterruptedStream(activeSessionId, assistantId)
     } finally {
-      if (abortRef.current === controller) abortRef.current = null
-      if (streamId.current === assistantId) {
-        streamId.current = null
-        setLoading(false)
+      if (runsRef.current.get(activeSessionId)?.assistantId === assistantId) {
+        const current = runsRef.current.get(activeSessionId)
+        if (current?.raf) cancelAnimationFrame(current.raf)
+        runsRef.current.delete(activeSessionId)
+        publishStreaming()
       }
+      if (viewing(activeSessionId)) setLoading(runsRef.current.has(activeSessionId))
     }
   }
 
@@ -469,10 +535,23 @@ export function useChat(initialUser?: UserInfo | null) {
       )
       const older = toChatMessages(page.messages)
       if (older.length) {
-        setMessages((prev) => [...older, ...prev])
+        setMessages((prev) => {
+          const next = [...older, ...prev]
+          messagesRef.current = next
+          const run = runsRef.current.get(sessionId)
+          if (run) run.messages = next
+          return next
+        })
       }
-      setHasMore(Boolean(page.has_more))
-      nextBeforeSeq.current = page.next_before_seq ?? null
+      const more = Boolean(page.has_more)
+      const before = page.next_before_seq ?? null
+      setHasMore(more)
+      nextBeforeSeq.current = before
+      const run = runsRef.current.get(sessionId)
+      if (run) {
+        run.hasMore = more
+        run.nextBeforeSeq = before
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载更早消息失败')
     } finally {
@@ -523,11 +602,13 @@ export function useChat(initialUser?: UserInfo | null) {
     clearResumeState()
 
     const assistantId = crypto.randomUUID()
-    setMessages((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), role: 'user', content },
-      { id: assistantId, role: 'assistant', content: '' },
-    ])
+    const next = [
+      ...messages,
+      { id: crypto.randomUUID(), role: 'user' as const, content },
+      { id: assistantId, role: 'assistant' as const, content: '' },
+    ]
+    messagesRef.current = next
+    setMessages(next)
     await streamReply(content, assistantId, activeId, {
       webSearch: options.webSearch,
       kb: options.kb,
@@ -546,10 +627,12 @@ export function useChat(initialUser?: UserInfo | null) {
     const previous = messages[index - 1]
     if (!previous || previous.role !== 'user') return
     const assistantId = crypto.randomUUID()
-    setMessages([
+    const next = [
       ...messages.slice(0, index),
-      { id: assistantId, role: 'assistant', content: '' },
-    ])
+      { id: assistantId, role: 'assistant' as const, content: '' },
+    ]
+    messagesRef.current = next
+    setMessages(next)
     // regenerate=true：后端不重复保存用户消息，并剔除旧的助手回答
     await streamReply(previous.content, assistantId, sessionId, {
       regenerate: true,
@@ -570,24 +653,42 @@ export function useChat(initialUser?: UserInfo | null) {
       assistantId = last.id
     } else {
       assistantId = crypto.randomUUID()
-      setMessages((prev) => [
-        ...prev,
-        { id: assistantId, role: 'assistant', content: '' },
-      ])
+      const next = [
+        ...messages,
+        { id: assistantId, role: 'assistant' as const, content: '' },
+      ]
+      messagesRef.current = next
+      setMessages(next)
     }
     await streamReply('', assistantId, sessionId, { resumeRunId: runId })
   }
 
   async function selectSession(id: string) {
     if (!user || id === sessionId) return
-    stopStream()
+    const leaving = sessionIdRef.current
+    if (leaving) flushRun(leaving)
     draftKey.current = crypto.randomUUID()
     sessionIdRef.current = id
     setSessionId(id)
     writeActiveSessionId(user.user_id, id)
+    const run = runsRef.current.get(id)
+    if (run) {
+      // 这条会话的 SSE 还在读，直接铺回切走前的气泡，不重新拉历史盖掉半截回答
+      messagesRef.current = run.messages
+      setMessages(run.messages)
+      setLoading(true)
+      setError(run.error)
+      resumeRunId.current = run.resumeRunId
+      setCanResume(run.canResume)
+      setHasMore(run.hasMore)
+      nextBeforeSeq.current = run.nextBeforeSeq
+      setHistoryLoading(false)
+      return
+    }
     setError('')
     setLoading(false)
     clearResumeState()
+    messagesRef.current = []
     setMessages([])
     setHasMore(false)
     nextBeforeSeq.current = null
@@ -596,11 +697,14 @@ export function useChat(initialUser?: UserInfo | null) {
     try {
       const page = await fetchChatMemory(id)
       if (sessionIdRef.current !== id) return
-      setMessages(toChatMessages(page.messages))
+      const next = toChatMessages(page.messages)
+      messagesRef.current = next
+      setMessages(next)
       setHasMore(Boolean(page.has_more))
       nextBeforeSeq.current = page.next_before_seq ?? null
     } catch (err) {
       if (sessionIdRef.current === id) {
+        messagesRef.current = []
         setMessages([])
         setError(err instanceof Error ? err.message : '获取会话记忆失败')
       }
@@ -626,6 +730,7 @@ export function useChat(initialUser?: UserInfo | null) {
     if (!user) return
     try {
       await deleteSession(id)
+      abortRun(id)
       setSessions((prev) => prev.filter((item) => item.session_id !== id))
       if (sessionIdRef.current === id) reset()
     } catch (err) {
@@ -634,7 +739,8 @@ export function useChat(initialUser?: UserInfo | null) {
   }
 
   function reset() {
-    stopStream()
+    const leaving = sessionIdRef.current
+    if (leaving) flushRun(leaving)
     draftKey.current = crypto.randomUUID()
     sessionIdRef.current = null
     setSessionId(null)
@@ -652,6 +758,7 @@ export function useChat(initialUser?: UserInfo | null) {
     sessionsError,
     reloadSessions,
     sessionId,
+    streamingIds,
     messages,
     input,
     setInput,

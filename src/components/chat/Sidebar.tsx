@@ -21,8 +21,8 @@ type Props = {
   sessionsError?: string
   onRetrySessions?: () => void
   activeSessionId?: string | null
-  /** 对话进行中（等待/流式回复），会话列表对应标题右侧显示 loading 指示 */
-  chatLoading?: boolean
+  /** 仍在读 SSE 的会话（含切走后还在后台生成的） */
+  streamingSessionIds?: string[]
   userName?: string
   onLogout?: () => void
   /** 打开知识库页（与对话视图互斥） */
@@ -40,7 +40,7 @@ export function Sidebar({
   sessionsError = '',
   onRetrySessions,
   activeSessionId = null,
-  chatLoading = false,
+  streamingSessionIds = [],
   userName = '',
   onLogout,
   onOpenKb,
@@ -107,7 +107,7 @@ export function Sidebar({
                     key={item.session_id}
                     item={item}
                     active={item.session_id === activeSessionId}
-                    loading={chatLoading && item.session_id === activeSessionId}
+                    loading={streamingSessionIds.includes(item.session_id)}
                     menuOpen={menuId === item.session_id}
                     onSelect={() => onSelectSession(item.session_id)}
                     onOpenMenu={() => setMenuId(item.session_id)}
