@@ -191,12 +191,8 @@ export function Chat({ onLogout, initialUser = null }: Props) {
                   historyLoading={historyLoading}
                   hasMore={hasMore}
                   canResume={canResume}
-                  onEditSubmit={(text) =>
-                    void send(text, { webSearch, kb: kbOn })
-                  }
-                  onRegenerate={(id) =>
-                    void regenerate(id, { webSearch, kb: kbOn })
-                  }
+                  onEditSubmit={(text) => void send(text, { webSearch, kb: kbOn })}
+                  onRegenerate={(id) => void regenerate(id, { webSearch, kb: kbOn })}
                   onResume={() => void resumeRun()}
                   onLoadOlder={() => void loadOlder()}
                 />
