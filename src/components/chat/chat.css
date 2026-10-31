@@ -1448,95 +1448,10 @@
   white-space: pre-wrap;
 }
 
-.tool {
-  margin: 0 0 8px;
-  color: #8b8f9a;
-  font-size: 13px;
-}
-
-/* 过程时间线：调工具前的计划（黑字）和工具动作（灰字）按到达顺序交错 */
-.trace {
-  margin: 0 0 18px;
-}
-
-.trace-time {
-  margin: 0 0 14px;
-  padding-bottom: 10px;
-  border-bottom: 1px dashed #e6e8ee;
-  color: #b4b8c0;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.trace-plan {
-  margin: 0 0 14px;
-  color: #1f2329;
-  font-size: 16px;
-  line-height: 1.75;
-}
-
-.trace-plan p {
-  margin: 0 0 0.7em;
-  white-space: pre-wrap;
-}
-
-.trace-plan p:last-child {
-  margin-bottom: 0;
-}
-
-.trace-action {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 12px;
-  color: #8b8f9a;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.trace-action svg {
-  flex-shrink: 0;
-}
-
-.trace-action.is-run {
-  color: #6b7280;
-}
-
-.trace-empty {
+.msg-empty {
   margin: 4px 0 0;
   color: #9aa0a6;
   font-size: 13px;
-}
-
-/* 「正在思考」流光动画：灰→蓝渐变扫过文字 */
-.trace-action .thinking,
-.tool.thinking {
-  background: linear-gradient(90deg, #9aa0a6 25%, #4d6bfe 50%, #9aa0a6 75%);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  animation: thinking-shimmer 1.8s linear infinite;
-}
-
-@keyframes thinking-shimmer {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .trace-action .thinking,
-  .tool.thinking {
-    animation: none;
-    background: none;
-    color: #8b8f9a;
-    -webkit-text-fill-color: #8b8f9a;
-  }
 }
 
 .typing {

@@ -1,4 +1,4 @@
-import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, ChatSource, MemoryMessage, SessionInfo, SessionTitle, TraceStep, UserInfo } from './types'
+import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, ChatSource, MemoryMessage, SessionInfo, SessionTitle, UserInfo } from './types'
 
 export const CHAT_MEMORY_PAGE_SIZE = 20
 export const DEFAULT_SESSION_TITLE = '新会话'
@@ -242,16 +242,13 @@ export async function fetchChatMemory(
 
 export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
   const result: ChatMessage[] = []
-  let steps: TraceStep[] = []
   // 引用挂在带正文的那条回答上；万一某轮只调了工具没留正文，
   // 就顺延给下一条有正文的回答，别把引用丢了
   let pendingSources: ChatSource[] = []
 
   const flushAssistant = (content: string, sources?: ChatSource[]) => {
     const merged = sources?.length ? sources : pendingSources
-    const trace = steps.length ? steps : undefined
-    if (!content && !trace && !merged.length) {
-      steps = []
+    if (!content && !merged.length) {
       pendingSources = []
       return
     }
@@ -259,16 +256,14 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
       id: crypto.randomUUID(),
       role: 'assistant',
       content,
-      steps: trace,
       sources: merged.length ? merged : undefined,
     })
-    steps = []
     pendingSources = []
   }
 
   for (const msg of raw) {
     if (msg.role === 'user') {
-      if (steps.length) flushAssistant('')
+      if (pendingSources.length) flushAssistant('')
       pendingSources = []
       result.push({
         id: crypto.randomUUID(),
@@ -279,23 +274,16 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
     }
     if (msg.role !== 'assistant') continue
 
-    const tools = (msg.tool_calls ?? []).map((item) => item.name).filter(Boolean)
+    const tools = (msg.tool_calls ?? []).filter((item) => item.name)
     const sources = msg.meta?.sources ?? []
-    const text = msg.content ?? ''
     if (tools.length) {
-      if (text.trim()) {
-        steps.push({ kind: 'plan', text: text.trim() })
-      }
-      for (const name of tools) {
-        steps.push({ kind: 'tool', name, label: name, running: false })
-      }
       if (sources.length) pendingSources = sources
       continue
     }
 
-    flushAssistant(text, sources)
+    flushAssistant(msg.content ?? '', sources)
   }
-  if (steps.length) flushAssistant('')
+  if (pendingSources.length) flushAssistant('')
 
   return result
 }

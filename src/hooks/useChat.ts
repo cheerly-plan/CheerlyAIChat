@@ -310,7 +310,7 @@ export function useChat(initialUser?: UserInfo | null) {
       prev.filter((item) => {
         if (item.id !== assistantId || item.role !== 'assistant') return true
         return Boolean(
-          item.content || item.steps?.length || item.sources?.length,
+          item.content || item.sources?.length,
         )
       }),
     )
@@ -380,7 +380,6 @@ export function useChat(initialUser?: UserInfo | null) {
             patchMessage(assistantId, (item) => ({
               ...item,
               content: event.content,
-              steps: undefined,
             }))
             return
           }
@@ -389,46 +388,22 @@ export function useChat(initialUser?: UserInfo | null) {
         }
         flushText()
         if (event.type === 'tool_start') {
-          const extra = pendingText.current
+          // 工具调用不展示过程。清掉调用前的半截字，气泡只留写作光标，
+          // 直到最终回答的 text 流过来。
           pendingText.current = ''
-          patchMessage(assistantId, (item) => {
-            const steps = [...(item.steps ?? [])]
-            const plan = `${item.content}${extra}`.trim()
-            // 调工具前的正文是计划，不是最终回答：从 content 挪进时间线
-            if (plan) steps.push({ kind: 'plan', text: plan })
-            steps.push({
-              kind: 'tool',
-              name: event.name,
-              label: event.label ?? event.name,
-              running: true,
-            })
-            return { ...item, content: '', steps }
-          })
+          patchMessage(assistantId, (item) => ({ ...item, content: '' }))
         }
         if (event.type === 'tool_end') {
-          // 引用是累积后的整表（后端已按切片去重），直接替换
           const cited = event.sources
-          patchMessage(assistantId, (item) => {
-            const steps = item.steps ?? []
-            let marked = false
-            const next = steps.map((step) => {
-              if (step.kind !== 'tool' || !step.running || marked) return step
-              marked = true
-              return { ...step, running: false }
-            })
-            return {
-              ...item,
-              steps: next,
-              sources: cited?.length ? cited : item.sources,
-            }
-          })
+          if (cited?.length) {
+            patchMessage(assistantId, (item) => ({ ...item, sources: cited }))
+          }
         }
         if (event.type === 'done') {
           const cited = event.sources
           patchMessage(assistantId, (item) => ({
             ...item,
             sources: cited?.length ? cited : item.sources,
-            endedAt: item.endedAt ?? Date.now(),
           }))
         }
         if (event.type === 'error') {
@@ -477,9 +452,6 @@ export function useChat(initialUser?: UserInfo | null) {
     } finally {
       if (abortRef.current === controller) abortRef.current = null
       if (streamId.current === assistantId) {
-        patchMessage(assistantId, (item) =>
-          item.endedAt ? item : { ...item, endedAt: Date.now() },
-        )
         streamId.current = null
         setLoading(false)
       }
@@ -554,7 +526,7 @@ export function useChat(initialUser?: UserInfo | null) {
     setMessages((prev) => [
       ...prev,
       { id: crypto.randomUUID(), role: 'user', content },
-      { id: assistantId, role: 'assistant', content: '', startedAt: Date.now() },
+      { id: assistantId, role: 'assistant', content: '' },
     ])
     await streamReply(content, assistantId, activeId, {
       webSearch: options.webSearch,
@@ -576,7 +548,7 @@ export function useChat(initialUser?: UserInfo | null) {
     const assistantId = crypto.randomUUID()
     setMessages([
       ...messages.slice(0, index),
-      { id: assistantId, role: 'assistant', content: '', startedAt: Date.now() },
+      { id: assistantId, role: 'assistant', content: '' },
     ])
     // regenerate=true：后端不重复保存用户消息，并剔除旧的助手回答
     await streamReply(previous.content, assistantId, sessionId, {
@@ -596,16 +568,11 @@ export function useChat(initialUser?: UserInfo | null) {
     let assistantId: string
     if (last && last.role === 'assistant') {
       assistantId = last.id
-      patchMessage(assistantId, (item) => ({
-        ...item,
-        startedAt: item.startedAt ?? Date.now(),
-        endedAt: undefined,
-      }))
     } else {
       assistantId = crypto.randomUUID()
       setMessages((prev) => [
         ...prev,
-        { id: assistantId, role: 'assistant', content: '', startedAt: Date.now() },
+        { id: assistantId, role: 'assistant', content: '' },
       ])
     }
     await streamReply('', assistantId, sessionId, { resumeRunId: runId })

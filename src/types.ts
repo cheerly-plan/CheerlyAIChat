@@ -16,7 +16,7 @@ export type SessionInfo = {
 export type ChatEvent =
   | { type: 'run_started'; run_id: string }
   | { type: 'text'; content: string }
-  | { type: 'tool_start'; name: string; label?: string }
+  | { type: 'tool_start'; name: string }
   | { type: 'tool_end'; name: string; sources?: ChatSource[] }
   | { type: 'done'; sources?: ChatSource[] }
   | { type: 'error'; message: string }
@@ -77,20 +77,10 @@ export type ChatMemory = {
   next_before_seq?: number | null
 }
 
-/** 过程时间线里的一步：调工具前的计划，或一次工具调用 */
-export type TraceStep =
-  | { kind: 'plan'; text: string }
-  | { kind: 'tool'; name: string; label: string; running: boolean }
-
 export type ChatMessage = {
   id: string
   role: 'user' | 'assistant'
   content: string
-  /** 调工具前后的过程行；最终回答仍在 content */
-  steps?: TraceStep[]
-  /** 本轮开始时间，用来显示「已处理 N 秒」 */
-  startedAt?: number
-  endedAt?: number
   /** 知识库引用（回答下方「参考来源」，点开看原文摘录） */
   sources?: ChatSource[]
 }

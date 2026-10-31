@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { ChatMessage, ChatSource, TraceStep } from '../../types'
+import type { ChatMessage, ChatSource } from '../../types'
 import { ChunkContent } from '../kb/ChunkContent'
 import { CheckIcon, CopyIcon, EditIcon, RefreshIcon } from './icons'
 import { Markdown } from './Markdown'
@@ -25,7 +25,7 @@ export function MessageItem({
   onRegenerate,
   onResume,
 }: Props) {
-  const done = !loading && Boolean(message.content || message.steps?.length)
+  const done = !loading && Boolean(message.content || message.sources?.length)
   const interrupted = canResume && !loading
 
   if (message.role === 'user') {
@@ -39,31 +39,17 @@ export function MessageItem({
     )
   }
 
-  const steps = message.steps ?? []
   const sources = message.sources ?? []
-  const hasTrace = steps.length > 0
-  const toolRunning = steps.some((step) => step.kind === 'tool' && step.running)
-  const waiting = loading && !message.content && !hasTrace
-  // 工具刚跑完、下一段正文还没到：时间线末尾挂「正在思考」
-  const thinking = loading && !message.content && hasTrace && !toolRunning
+  const waiting = loading && !message.content
   return (
     <div className="row assistant" id={`msg-${message.id}`}>
       <div className="assistant-body">
-        {hasTrace ? (
-          <Trace
-            steps={steps}
-            thinking={thinking}
-            startedAt={message.startedAt}
-            endedAt={message.endedAt}
-            running={loading}
-          />
-        ) : null}
         {waiting ? <span className="typing" /> : null}
         {message.content ? (
           <Markdown content={message.content} streaming={loading} />
         ) : null}
-        {!loading && hasTrace && !message.content ? (
-          <p className="trace-empty">没有生成文字回复，可重新生成</p>
+        {!loading && !message.content ? (
+          <p className="msg-empty">没有生成文字回复，可重新生成</p>
         ) : null}
         {sources.length > 0 && (done || interrupted) ? (
           <SourceList sources={sources} />
@@ -226,90 +212,6 @@ function UserMessage({
 
 function MessageActions({ children }: { children: ReactNode }) {
   return <div className="msg-actions">{children}</div>
-}
-
-function Trace({
-  steps,
-  thinking,
-  startedAt,
-  endedAt,
-  running,
-}: {
-  steps: TraceStep[]
-  thinking: boolean
-  startedAt?: number
-  endedAt?: number
-  running: boolean
-}) {
-  const elapsed = useElapsedSeconds(startedAt, endedAt, running)
-  return (
-    <div className="trace">
-      {elapsed != null ? (
-        <p className="trace-time">已处理 {elapsed} 秒</p>
-      ) : null}
-      {steps.map((step, index) =>
-        step.kind === 'plan' ? (
-          <div key={`plan-${index}`} className="trace-plan">
-            {step.text.split(/\n{2,}/).map((block, i) => (
-              <p key={i}>{block}</p>
-            ))}
-          </div>
-        ) : (
-          <p
-            key={`tool-${index}-${step.name}`}
-            className={`trace-action${step.running ? ' is-run' : ''}`}
-          >
-            <TraceActionIcon />
-            {step.running ? `正在调用 ${step.label}` : `已调用 ${step.label}`}
-          </p>
-        ),
-      )}
-      {thinking ? (
-        <p className="trace-action">
-          <TraceActionIcon />
-          <span className="thinking">正在思考</span>
-        </p>
-      ) : null}
-    </div>
-  )
-}
-
-function useElapsedSeconds(
-  startedAt?: number,
-  endedAt?: number,
-  running?: boolean,
-) {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (!running || !startedAt) return
-    const timer = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(timer)
-  }, [running, startedAt])
-  if (!startedAt) return null
-  const end = running ? now : endedAt
-  if (!end) return null
-  return Math.max(1, Math.round((end - startedAt) / 1000))
-}
-
-function TraceActionIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-      <path
-        d="M4 3.5h6.2L13 6.3v6.2H4z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M10.2 3.5V6.3H13"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
 }
 
 /**
