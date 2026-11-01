@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ChatMessage, ChatSource } from '../../types'
-import { ChunkContent, containsHtmlTable } from '../kb/ChunkContent'
+import { ChunkContent } from '../kb/ChunkContent'
+import { containsHtmlTable } from '../kb/chunkText'
 import { CheckIcon, CopyIcon, EditIcon, RefreshIcon } from './icons'
 import { Markdown } from './Markdown'
 

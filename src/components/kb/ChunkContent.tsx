@@ -87,8 +87,15 @@ function parseHtmlTable(html: string): HtmlCell[][] {
   return rows
 }
 
-export function containsHtmlTable(text: string): boolean {
-  return /<table[\s>]/i.test(text)
+function columnClass(limit: boolean, numeric = false) {
+  const names = [limit ? 'kb-chunk-col1-cell' : '', numeric ? 'is-num' : ''].filter(Boolean)
+  return names.join(' ') || undefined
+}
+
+function firstColumn(text: string, limit: boolean) {
+  const value = text || ' '
+  if (!limit) return value
+  return <span className="kb-chunk-col1">{value}</span>
 }
 
 export function HtmlTable({ html }: { html: string }) {
@@ -107,10 +114,11 @@ export function HtmlTable({ html }: { html: string }) {
               {row.map((cell, k) => (
                 <th
                   key={k}
+                  className={columnClass(k === 0 && cell.colSpan <= 1)}
                   rowSpan={cell.rowSpan > 1 ? cell.rowSpan : undefined}
                   colSpan={cell.colSpan > 1 ? cell.colSpan : undefined}
                 >
-                  {cell.text || ' '}
+                  {firstColumn(cell.text, k === 0 && cell.colSpan <= 1)}
                 </th>
               ))}
             </tr>
@@ -125,9 +133,9 @@ export function HtmlTable({ html }: { html: string }) {
                     key={k}
                     rowSpan={cell.rowSpan > 1 ? cell.rowSpan : undefined}
                     colSpan={cell.colSpan > 1 ? cell.colSpan : undefined}
-                    className={NUMERIC_CELL.test(cell.text) ? 'is-num' : undefined}
+                    className={columnClass(k === 0 && cell.colSpan <= 1, NUMERIC_CELL.test(cell.text))}
                   >
-                    {cell.text}
+                    {firstColumn(cell.text, k === 0 && cell.colSpan <= 1)}
                   </td>
                 ))}
               </tr>
@@ -213,7 +221,9 @@ function PipeContent({ text }: { text: string }) {
               <thead>
                 <tr>
                   {block.rows[0].map((cell, j) => (
-                    <th key={j}>{cell || ' '}</th>
+                    <th key={j} className={columnClass(j === 0)}>
+                      {firstColumn(cell, j === 0)}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -221,11 +231,8 @@ function PipeContent({ text }: { text: string }) {
                 {block.rows.slice(1).map((row, j) => (
                   <tr key={j}>
                     {row.map((cell, k) => (
-                      <td
-                        key={k}
-                        className={NUMERIC_CELL.test(cell) ? 'is-num' : undefined}
-                      >
-                        {cell}
+                      <td key={k} className={columnClass(k === 0, NUMERIC_CELL.test(cell))}>
+                        {firstColumn(cell, k === 0)}
                       </td>
                     ))}
                   </tr>

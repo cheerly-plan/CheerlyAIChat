@@ -8,7 +8,8 @@ import {
   type KgNode,
   type KgEntityType,
 } from '../../api'
-import { ChunkContent, containsHtmlTable } from './ChunkContent'
+import { ChunkContent } from './ChunkContent'
+import { containsHtmlTable } from './chunkText'
 
 /**
  * 知识图谱画布。

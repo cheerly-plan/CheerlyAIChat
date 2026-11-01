@@ -10,7 +10,8 @@ import {
   type KgGraph,
   type KgSearchResult,
 } from '../../api'
-import { ChunkContent, containsHtmlTable } from './ChunkContent'
+import { ChunkContent } from './ChunkContent'
+import { containsHtmlTable } from './chunkText'
 import KnowledgeGraph, { KG_HUB_CAP } from './KnowledgeGraph'
 import { KgBuildDialog } from './KgBuildDialog'
 import { SearchIcon, ChevronDownIcon, CheckIcon, CloseIcon } from '../chat/icons'

@@ -2029,6 +2029,20 @@
   white-space: nowrap;
 }
 
+/* 竖线画在单元格边上。只限制内部文字时，表被 min-width 拉开，线仍会超过 400px。 */
+.kb-chunk-table .kb-chunk-col1-cell {
+  box-sizing: border-box;
+  max-width: 400px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.kb-chunk-col1 {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .kb-chunk-table th:last-child,
 .kb-chunk-table td:last-child {
   border-right: none;

@@ -1287,6 +1287,13 @@
   white-space: nowrap;
 }
 
+.msg-source-body .kb-chunk-table .kb-chunk-col1-cell {
+  box-sizing: border-box;
+  max-width: 400px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .msg-source-body .kb-chunk-table th:last-child,
 .msg-source-body .kb-chunk-table td:last-child {
   border-right: none;
@@ -1458,6 +1465,13 @@
   text-align: left;
   vertical-align: top;
   white-space: nowrap;
+}
+
+.markdown .kb-chunk-table .kb-chunk-col1-cell {
+  box-sizing: border-box;
+  max-width: 400px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .markdown .kb-chunk-table td:last-child,
