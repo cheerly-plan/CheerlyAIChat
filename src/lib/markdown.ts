@@ -13,6 +13,7 @@ export type Block =
   | { type: 'code'; lang: string; value: string }
   | { type: 'quote'; children: Inline[] }
   | { type: 'hr' }
+  | { type: 'table'; header: Inline[][]; rows: Inline[][][] }
 
 const FENCE = /^\s*```/
 const HEADING = /^(#{1,6})\s+(.+)$/
@@ -20,6 +21,8 @@ const UL = /^\s*[-*]\s+(.+)$/
 const OL = /^\s*\d+\.\s+(.+)$/
 const HR = /^---+$/
 const LINK = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/
+const TABLE_ROW = /^\s*\|.*\|\s*$/
+const TABLE_SEP = /^\s*\|(\s*:?-{2,}:?\s*\|)+\s*$/
 
 export function splitClosed(source: string, streaming: boolean) {
   const text = source.replace(/\r\n/g, '\n')
@@ -120,6 +123,23 @@ export function parseBlocks(source: string): Block[] {
       continue
     }
 
+    if (isTableStart(lines, i)) {
+      const header = parseTableRow(line)
+      i += 2
+      const rows: string[][] = []
+      while (i < lines.length && TABLE_ROW.test(lines[i] ?? '')) {
+        rows.push(parseTableRow(lines[i] ?? ''))
+        i += 1
+      }
+      const width = Math.max(header.length, ...rows.map((row) => row.length))
+      blocks.push({
+        type: 'table',
+        header: fitRow(header, width).map(parseInline),
+        rows: rows.map((row) => fitRow(row, width).map(parseInline)),
+      })
+      continue
+    }
+
     if (line.startsWith('>')) {
       const quoted: string[] = []
       while (i < lines.length && (lines[i] ?? '').startsWith('>')) {
@@ -132,7 +152,12 @@ export function parseBlocks(source: string): Block[] {
 
     const para: string[] = [line]
     i += 1
-    while (i < lines.length && lines[i] !== '' && !isBlockStart(lines[i] ?? '')) {
+    while (
+      i < lines.length &&
+      lines[i] !== '' &&
+      !isBlockStart(lines[i] ?? '') &&
+      !isTableStart(lines, i)
+    ) {
       para.push(lines[i] ?? '')
       i += 1
     }
@@ -145,6 +170,24 @@ export function parseBlocks(source: string): Block[] {
   }
 
   return blocks
+}
+
+function isTableStart(lines: string[], index: number) {
+  return TABLE_ROW.test(lines[index] ?? '') && TABLE_SEP.test(lines[index + 1] ?? '')
+}
+
+function parseTableRow(line: string): string[] {
+  return line
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .replace(/\\\|/g, '\u0000')
+    .split('|')
+    .map((cell) => cell.replaceAll('\u0000', '|').trim())
+}
+
+function fitRow(cells: string[], width: number): string[] {
+  return [...cells, ...Array(Math.max(0, width - cells.length)).fill('')]
 }
 
 function isBlockStart(line: string) {

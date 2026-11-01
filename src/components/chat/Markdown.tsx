@@ -81,7 +81,55 @@ function BlockView({ block }: { block: Block }) {
       return <blockquote>{renderInline(block.children)}</blockquote>
     case 'hr':
       return <hr />
+    case 'table':
+      return (
+        <div className="kb-chunk-table-wrap">
+          <table className="kb-chunk-table">
+            <thead>
+              <tr>
+                {block.header.map((cell, index) => (
+                  <th key={index} className={index === 0 ? 'kb-chunk-col1-cell' : undefined}>
+                    {columnContent(cell, index === 0)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {block.rows.map((row, rowIndex) => (
+                <tr key={rowIndex}>
+                  {row.map((cell, index) => (
+                    <td
+                      key={index}
+                      className={columnClass(index === 0, isNumericCell(cell))}
+                    >
+                      {columnContent(cell, index === 0)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
   }
+}
+
+const NUMERIC_CELL = /^[-+]?[\d,]+(\.\d+)?%?$/
+
+function columnClass(first: boolean, numeric: boolean) {
+  const names = [first ? 'kb-chunk-col1-cell' : '', numeric ? 'is-num' : ''].filter(Boolean)
+  return names.join(' ') || undefined
+}
+
+function columnContent(nodes: Inline[], first: boolean) {
+  const content = renderInline(nodes)
+  if (!first) return content
+  return <span className="kb-chunk-col1">{content}</span>
+}
+
+function isNumericCell(nodes: Inline[]) {
+  if (nodes.length !== 1 || nodes[0].type !== 'text') return false
+  return NUMERIC_CELL.test(nodes[0].value.trim())
 }
 
 function renderInline(nodes: Inline[]): ReactNode {

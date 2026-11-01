@@ -1289,9 +1289,18 @@
 
 .msg-source-body .kb-chunk-table .kb-chunk-col1-cell {
   box-sizing: border-box;
+  width: max-content;
   max-width: 400px;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.msg-source-body .kb-chunk-col1 {
+  display: inline-block;
+  max-width: 400px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
 }
 
 .msg-source-body .kb-chunk-table th:last-child,
@@ -1469,9 +1478,18 @@
 
 .markdown .kb-chunk-table .kb-chunk-col1-cell {
   box-sizing: border-box;
+  width: max-content;
   max-width: 400px;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.markdown .kb-chunk-col1 {
+  display: inline-block;
+  max-width: 400px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
 }
 
 .markdown .kb-chunk-table td:last-child,
