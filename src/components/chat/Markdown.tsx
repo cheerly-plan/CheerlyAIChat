@@ -1,5 +1,24 @@
 import { useMemo, type ReactNode } from 'react'
 import { parseBlocks, parseInline, splitClosed, type Block, type Inline } from '../../lib/markdown'
+import { HtmlTable } from '../kb/ChunkContent'
+
+const HTML_TABLE = /<table\b[^>]*>[\s\S]*?<\/table>/gi
+
+type Piece = { kind: 'html'; html: string } | { kind: 'text'; text: string }
+
+function splitHtmlTables(source: string): Piece[] {
+  const pieces: Piece[] = []
+  let last = 0
+  for (const match of source.matchAll(HTML_TABLE)) {
+    const index = match.index ?? 0
+    if (index > last) pieces.push({ kind: 'text', text: source.slice(last, index) })
+    pieces.push({ kind: 'html', html: match[0] })
+    last = index + match[0].length
+  }
+  if (last < source.length) pieces.push({ kind: 'text', text: source.slice(last) })
+  if (!pieces.length) pieces.push({ kind: 'text', text: source })
+  return pieces
+}
 
 type Props = {
   content: string
@@ -11,7 +30,7 @@ export function Markdown({ content, streaming = false }: Props) {
     () => splitClosed(content, streaming),
     [content, streaming],
   )
-  const blocks = useMemo(() => parseBlocks(closed), [closed])
+  const pieces = useMemo(() => splitHtmlTables(closed), [closed])
   const pendingView = useMemo(() => {
     if (!pending) return null
     if (/^\s*```/.test(pending)) return pending
@@ -20,9 +39,15 @@ export function Markdown({ content, streaming = false }: Props) {
 
   return (
     <div className="markdown">
-      {blocks.map((block, index) => (
-        <BlockView key={index} block={block} />
-      ))}
+      {pieces.map((piece, index) =>
+        piece.kind === 'html' ? (
+          <HtmlTable html={piece.html} key={index} />
+        ) : (
+          parseBlocks(piece.text).map((block, blockIndex) => (
+            <BlockView key={`${index}-${blockIndex}`} block={block} />
+          ))
+        ),
+      )}
       {pendingView ? <span className="markdown-pending">{pendingView}</span> : null}
     </div>
   )

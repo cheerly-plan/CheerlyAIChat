@@ -8,7 +8,7 @@ import {
   type KgNode,
   type KgEntityType,
 } from '../../api'
-import { ChunkContent } from './ChunkContent'
+import { ChunkContent, containsHtmlTable } from './ChunkContent'
 
 /**
  * 知识图谱画布。
@@ -1774,7 +1774,7 @@ export default function KnowledgeGraph({
                         ? ` · 第${item.page}页`
                         : ` · 第${item.chunk_seq + 1}段`}
                     </div>
-                    {item.kind === 'table' ? (
+                    {item.kind === 'table' || containsHtmlTable(item.text) ? (
                       <ChunkContent text={item.text} />
                     ) : (
                       <p>{item.text}</p>
