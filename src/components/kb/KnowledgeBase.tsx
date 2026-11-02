@@ -32,6 +32,8 @@ import { KgBuildDialog } from './KgBuildDialog'
 import { FileEditDialog } from './FileEditDialog'
 import { KbRetrieveDialog } from './KbRetrieveDialog'
 import { ChunkContent } from './ChunkContent'
+import { visibleChunkLength } from './chunkText'
+import { htmlTablesToMarkdown } from './tableGrid'
 import './kb.css'
 
 const STATUS_LABEL: Record<KbFile['status'], string> = {
@@ -1066,7 +1068,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
   const startEdit = (chunk: KbChunk) => {
     setEditError('')
     setEditingSeq(chunk.seq)
-    setEditingText(chunk.text)
+    setEditingText(htmlTablesToMarkdown(chunk.text))
   }
 
   const cancelEdit = () => {
@@ -1814,7 +1816,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                                   {' · '}
                                 </>
                               ) : null}
-                              {chunk.text.length} 字
+                              {visibleChunkLength(chunk.text)} 字
                             </span>
                             {/* 修订 = 人工审核：改完保存即单片重嵌入（管理员） */}
                             {canManage &&

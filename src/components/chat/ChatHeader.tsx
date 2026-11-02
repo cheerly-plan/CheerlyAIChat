@@ -16,12 +16,13 @@ export function ChatHeader({
   onToggleSidebar,
   onNewChat,
 }: Props) {
-  if (!collapsed && !title && !titleLoading) return null
+  const showTitle = Boolean(title) || titleLoading
+  if (!collapsed && !showTitle) return null
 
   return (
     <header className="chat-header">
       {collapsed ? (
-        <>
+        <div className="header-side">
           <Logo size={28} />
           <div className="header-capsule">
             <button type="button" aria-label="展开侧栏" onClick={onToggleSidebar}>
@@ -34,12 +35,25 @@ export function ChatHeader({
               <NewChatIcon />
             </button>
           </div>
-        </>
-      ) : null}
-      {titleLoading && !title ? (
-        <span className="chat-header-title skeleton-line skeleton-title" aria-hidden="true" />
-      ) : title ? (
-        <span className="chat-header-title">{title}</span>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className="sidebar-toggle chat-header-toggle"
+          aria-label="收起侧栏"
+          onClick={onToggleSidebar}
+        >
+          <PanelIcon />
+        </button>
+      )}
+      {showTitle ? (
+        <div className="chat-header-center">
+          {titleLoading && !title ? (
+            <span className="chat-header-title skeleton-line skeleton-title" aria-hidden="true" />
+          ) : (
+            <span className="chat-header-title">{title}</span>
+          )}
+        </div>
       ) : null}
     </header>
   )
