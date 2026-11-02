@@ -51,17 +51,12 @@ function isSectionRow(row: string[]): boolean {
   return filled.length === 1 && /[：:]$/.test(filled[0])
 }
 
-function isHeaderRow(row: string[]): boolean {
-  if (isSectionRow(row)) return false
-  const filled = row.map((cell) => cell.trim()).filter(Boolean)
-  if (filled.length < 2 || filled.some((cell) => NUMERIC_CELL.test(cell))) return false
-  return filled.some((cell) => /[\u4e00-\u9fff]/.test(cell))
-}
+type HtmlCell = { text: string; colspan: number; rowspan: number }
 
-export function expandHtmlGrid(html: string): string[][] {
-  const parsed: { text: string; colspan: number; rowspan: number }[][] = []
+function parseHtmlRows(html: string): HtmlCell[][] {
+  const parsed: HtmlCell[][] = []
   for (const rowMatch of html.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
-    const cells: { text: string; colspan: number; rowspan: number }[] = []
+    const cells: HtmlCell[] = []
     for (const cellMatch of (rowMatch[1] ?? '').matchAll(/<t[dh]\b([^>]*)>([\s\S]*?)<\/t[dh]>/gi)) {
       const attrs = cellMatch[1] ?? ''
       cells.push({
@@ -72,6 +67,18 @@ export function expandHtmlGrid(html: string): string[][] {
     }
     if (cells.length) parsed.push(cells)
   }
+  return parsed
+}
+
+function isHeaderRow(row: string[]): boolean {
+  if (isSectionRow(row)) return false
+  const filled = row.map((cell) => cell.trim()).filter(Boolean)
+  if (filled.length < 2 || filled.some((cell) => NUMERIC_CELL.test(cell))) return false
+  return filled.some((cell) => /[\u4e00-\u9fff]/.test(cell))
+}
+
+export function expandHtmlGrid(html: string): string[][] {
+  const parsed = parseHtmlRows(html)
 
   const grid: (string | null)[][] = []
   parsed.forEach((cells, rowIndex) => {
@@ -80,7 +87,8 @@ export function expandHtmlGrid(html: string): string[][] {
     for (const cell of cells) {
       while (column < (grid[rowIndex]?.length ?? 0) && grid[rowIndex][column] != null) column += 1
       const section = sectionRow && cell.colspan > 1
-      for (let down = 0; down < cell.rowspan; down += 1) {
+      const span = Math.min(cell.rowspan, parsed.length - rowIndex)
+      for (let down = 0; down < span; down += 1) {
         while (grid.length <= rowIndex + down) grid.push([])
         const target = grid[rowIndex + down]
         while (target.length < column + cell.colspan) target.push(null)
@@ -155,6 +163,43 @@ export function visibleTableLength(text: string): number {
     index += 1
   }
   return (changed ? out.join('\n') : lines.join('\n')).trim().length
+}
+
+/** 按 HTML 自己的 rowspan / colspan 画。rowspan 超出本片行数时收短，不补空行。 */
+export function layoutHtmlTable(html: string): LaidCell[][] {
+  const parsed = parseHtmlRows(html)
+  if (!parsed.length) return []
+  let headerCount = 0
+  while (headerCount < parsed.length && isHeaderRow(parsed[headerCount].map((cell) => cell.text))) {
+    headerCount += 1
+  }
+  if (headerCount === 0) headerCount = 1
+
+  const coveredUntil: number[] = []
+  const laid: LaidCell[][] = parsed.map(() => [])
+  parsed.forEach((cells, rowIndex) => {
+    let col = 0
+    for (const cell of cells) {
+      while ((coveredUntil[col] ?? 0) > rowIndex) col += 1
+      const rowSpan = Math.min(cell.rowspan, parsed.length - rowIndex)
+      const colSpan = cell.colspan
+      laid[rowIndex].push({
+        text: cell.text,
+        row: rowIndex,
+        col,
+        rowSpan,
+        colSpan,
+        header: rowIndex < headerCount,
+        numeric: NUMERIC_CELL.test(cell.text),
+        limitFirst: col === 0 && colSpan <= 1,
+      })
+      for (let offset = 0; offset < colSpan; offset += 1) {
+        coveredUntil[col + offset] = rowIndex + rowSpan
+      }
+      col += colSpan
+    }
+  })
+  return laid
 }
 
 export function layoutTable(rows: string[][]): LaidCell[][] {
