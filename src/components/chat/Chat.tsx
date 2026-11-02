@@ -124,6 +124,7 @@ export function Chat({ onLogout, initialUser = null }: Props) {
     <div className={`shell${sidebarOpen ? '' : ' sidebar-collapsed'}`}>
       <div className="sidebar-mask" onClick={() => setSidebarOpen(false)} />
       <Sidebar
+        hideToggle={Boolean(title) || (!sessionsReady && hasCachedActiveSession())}
         onNewChat={() => {
           navigate('chat')
           reset()

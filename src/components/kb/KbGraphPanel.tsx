@@ -11,7 +11,7 @@ import {
   type KgSearchResult,
 } from '../../api'
 import { ChunkContent } from './ChunkContent'
-import { containsHtmlTable } from './chunkText'
+import { containsTable } from './chunkText'
 import KnowledgeGraph, { KG_HUB_CAP } from './KnowledgeGraph'
 import { KgBuildDialog } from './KgBuildDialog'
 import { SearchIcon, ChevronDownIcon, CheckIcon, CloseIcon } from '../chat/icons'
@@ -823,7 +823,7 @@ export default function KbGraphPanel({
                 className="kb-kg-evidence-body"
                 key={`${evidenceItem.filename}-${evidenceItem.chunk_seq}`}
               >
-                {evidenceItem.kind === 'table' || containsHtmlTable(evidenceItem.text) ? (
+                {evidenceItem.kind === 'table' || containsTable(evidenceItem.text) ? (
                   <ChunkContent text={evidenceItem.text} />
                 ) : (
                   <p>{evidenceItem.text}</p>

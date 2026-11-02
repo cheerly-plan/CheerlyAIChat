@@ -1,8 +1,8 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
+import { expandHtmlGrid, layoutTable, parseMarkdownRow, type LaidCell } from './tableGrid'
 
-// 解析层把 PDF/DOCX/Excel 的表格转成 Markdown 表格存进 text（列关系全靠
-// 竖线撑着），这里再渲染回 <table>。不还原的话表格就是一串竖线文本，
-// 销量、收入、占比三项根本对不上列。
+// 解析层的 Markdown 表、整页 OCR 的 HTML 表，都铺成同一套格子再画出来。
+// 表头里被展开的重复字（两列都写「期末余额」）合并回跨列，和模型读到的行列一致。
 
 type ContentBlock =
   | { kind: 'text'; text: string }
@@ -10,16 +10,9 @@ type ContentBlock =
 
 const TABLE_ROW = /^\s*\|.*\|\s*$/
 const TABLE_SEP = /^\s*\|(\s*:?-{2,}:?\s*\|)+\s*$/
-const NUMERIC_CELL = /^[-+]?[\d,]+(\.\d+)?%?$/
 
 function parseRow(line: string): string[] {
-  return line
-    .trim()
-    .replace(/^\|/, '')
-    .replace(/\|$/, '')
-    .replace(/\\\|/g, '@@PIPE@@')
-    .split('|')
-    .map((cell) => cell.replace(/@@PIPE@@/g, '|').trim())
+  return parseMarkdownRow(line)
 }
 
 function splitContent(text: string): ContentBlock[] {
@@ -52,99 +45,54 @@ function splitContent(text: string): ContentBlock[] {
 const HTML_TABLE = /<table\b[^>]*>[\s\S]*?<\/table>/gi
 const HTML_ROW = /<tr\b[^>]*>[\s\S]*?<\/tr>/gi
 
-type HtmlCell = { text: string; rowSpan: number; colSpan: number }
-
-function decodeEntities(value: string): string {
-  return value
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&amp;/g, '&')
-}
-
-function parseHtmlTable(html: string): HtmlCell[][] {
-  const rows: HtmlCell[][] = []
-  const rowRe = /<tr\b[^>]*>([\s\S]*?)<\/tr>/gi
-  let rowMatch: RegExpExecArray | null
-  while ((rowMatch = rowRe.exec(html))) {
-    const cells: HtmlCell[] = []
-    const cellRe = /<td\b([^>]*)>([\s\S]*?)<\/td>/gi
-    let cellMatch: RegExpExecArray | null
-    const rowHtml = rowMatch[1] ?? ''
-    while ((cellMatch = cellRe.exec(rowHtml))) {
-      const attrs = cellMatch[1] ?? ''
-      const rowSpan = Number(/rowspan="(\d+)"/i.exec(attrs)?.[1] ?? 1)
-      const colSpan = Number(/colspan="(\d+)"/i.exec(attrs)?.[1] ?? 1)
-      cells.push({
-        text: decodeEntities(cellMatch[2] ?? ''),
-        rowSpan: rowSpan > 0 ? rowSpan : 1,
-        colSpan: colSpan > 0 ? colSpan : 1,
-      })
-    }
-    if (cells.length) rows.push(cells)
-  }
-  return rows
-}
-
 function columnClass(limit: boolean, numeric = false) {
   const names = [limit ? 'kb-chunk-col1-cell' : '', numeric ? 'is-num' : ''].filter(Boolean)
   return names.join(' ') || undefined
 }
 
-function firstColumn(text: string, limit: boolean) {
-  const value = text || ' '
-  if (!limit) return value
-  return <span className="kb-chunk-col1">{value}</span>
+function firstColumn(content: ReactNode, limit: boolean) {
+  if (!limit) return content
+  return <span className="kb-chunk-col1">{content}</span>
 }
 
-export function HtmlTable({ html }: { html: string }) {
-  const rows = parseHtmlTable(html)
-  if (!rows.length) return null
-  const headSpan = Math.max(1, ...rows[0].map((cell) => cell.rowSpan))
-  const headCount = Math.min(headSpan, rows.length)
-  const head = rows.slice(0, headCount)
-  const body = rows.slice(headCount)
+export function DataTable({
+  rows,
+  cell,
+}: {
+  rows: string[][]
+  cell?: (row: number, col: number, text: string) => ReactNode
+}) {
+  const laid = useMemo(() => layoutTable(rows), [rows])
+  if (!laid.some((row) => row.length)) return null
+  const head = laid.filter((row) => row.some((item) => item.header))
+  const body = laid.filter((row) => row.length > 0 && row.every((item) => !item.header))
+  const renderRow = (row: LaidCell[], rowKey: number, header: boolean) => (
+    <tr key={rowKey}>
+      {row.map((item) => {
+        const content = cell ? cell(item.row, item.col, item.text) : item.text || ' '
+        const props = {
+          className: columnClass(item.limitFirst, !header && item.numeric),
+          rowSpan: item.rowSpan > 1 ? item.rowSpan : undefined,
+          colSpan: item.colSpan > 1 ? item.colSpan : undefined,
+          children: firstColumn(content, item.limitFirst),
+        }
+        return header ? <th key={item.col} {...props} /> : <td key={item.col} {...props} />
+      })}
+    </tr>
+  )
   return (
     <div className="kb-chunk-table-wrap">
       <table className="kb-chunk-table">
-        <thead>
-          {head.map((row, j) => (
-            <tr key={j}>
-              {row.map((cell, k) => (
-                <th
-                  key={k}
-                  className={columnClass(k === 0 && cell.colSpan <= 1)}
-                  rowSpan={cell.rowSpan > 1 ? cell.rowSpan : undefined}
-                  colSpan={cell.colSpan > 1 ? cell.colSpan : undefined}
-                >
-                  {firstColumn(cell.text, k === 0 && cell.colSpan <= 1)}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        {body.length ? (
-          <tbody>
-            {body.map((row, j) => (
-              <tr key={j}>
-                {row.map((cell, k) => (
-                  <td
-                    key={k}
-                    rowSpan={cell.rowSpan > 1 ? cell.rowSpan : undefined}
-                    colSpan={cell.colSpan > 1 ? cell.colSpan : undefined}
-                    className={columnClass(k === 0 && cell.colSpan <= 1, NUMERIC_CELL.test(cell.text))}
-                  >
-                    {firstColumn(cell.text, k === 0 && cell.colSpan <= 1)}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        ) : null}
+        <thead>{head.map((row, index) => renderRow(row, index, true))}</thead>
+        {body.length ? <tbody>{body.map((row, index) => renderRow(row, index, false))}</tbody> : null}
       </table>
     </div>
   )
+}
+
+export function HtmlTable({ html }: { html: string }) {
+  const rows = useMemo(() => expandHtmlGrid(html), [html])
+  return <DataTable rows={rows} />
 }
 
 type MixedBlock = { kind: 'html'; html: string } | { kind: 'text'; text: string }
@@ -216,30 +164,7 @@ function PipeContent({ text }: { text: string }) {
     <>
       {blocks.map((block, i) =>
         block.kind === 'table' ? (
-          <div className="kb-chunk-table-wrap" key={i}>
-            <table className="kb-chunk-table">
-              <thead>
-                <tr>
-                  {block.rows[0].map((cell, j) => (
-                    <th key={j} className={columnClass(j === 0)}>
-                      {firstColumn(cell, j === 0)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {block.rows.slice(1).map((row, j) => (
-                  <tr key={j}>
-                    {row.map((cell, k) => (
-                      <td key={k} className={columnClass(k === 0, NUMERIC_CELL.test(cell))}>
-                        {firstColumn(cell, k === 0)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable rows={block.rows} key={i} />
         ) : (
           <div className="kb-chunk-text" key={i}>
             {block.text.split(/\n+/).map((para, j) => (

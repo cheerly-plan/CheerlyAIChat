@@ -27,6 +27,8 @@ type Props = {
   onLogout?: () => void
   /** 打开知识库页（与对话视图互斥） */
   onOpenKb?: () => void
+  /** 会话标题旁已经有收起按钮时，侧栏品牌行不再放一个 */
+  hideToggle?: boolean
 }
 
 export function Sidebar({
@@ -44,6 +46,7 @@ export function Sidebar({
   userName = '',
   onLogout,
   onOpenKb,
+  hideToggle = false,
 }: Props) {
   const groups = groupSessions(sessions)
   const [menuId, setMenuId] = useState<string | null>(null)
@@ -70,9 +73,11 @@ export function Sidebar({
       <div className="brand">
         <Logo size={28} />
         <span>Cheerly</span>
-        <button type="button" className="sidebar-toggle" aria-label="收起侧栏" onClick={onCollapse}>
-          <PanelIcon />
-        </button>
+        {hideToggle ? null : (
+          <button type="button" className="sidebar-toggle" aria-label="收起侧栏" onClick={onCollapse}>
+            <PanelIcon />
+          </button>
+        )}
       </div>
       <button type="button" className="new-chat" onClick={onNewChat}>
         <NewChatIcon />

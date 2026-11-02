@@ -33,6 +33,7 @@ import { FileEditDialog } from './FileEditDialog'
 import { KbRetrieveDialog } from './KbRetrieveDialog'
 import { ChunkContent } from './ChunkContent'
 import { visibleChunkLength } from './chunkText'
+import { htmlTablesToMarkdown } from './tableGrid'
 import './kb.css'
 
 const STATUS_LABEL: Record<KbFile['status'], string> = {
@@ -1067,7 +1068,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
   const startEdit = (chunk: KbChunk) => {
     setEditError('')
     setEditingSeq(chunk.seq)
-    setEditingText(chunk.text)
+    setEditingText(htmlTablesToMarkdown(chunk.text))
   }
 
   const cancelEdit = () => {

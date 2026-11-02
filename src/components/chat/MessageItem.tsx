@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ChatMessage, ChatSource } from '../../types'
 import { ChunkContent } from '../kb/ChunkContent'
-import { containsHtmlTable } from '../kb/chunkText'
+import { containsTable } from '../kb/chunkText'
 import { CheckIcon, CopyIcon, EditIcon, RefreshIcon } from './icons'
 import { Markdown } from './Markdown'
 
@@ -272,7 +272,7 @@ function SourceList({ sources }: { sources: ChatSource[] }) {
               </span>
             ) : null}
           </div>
-          {active.kind === 'table' || containsHtmlTable(active.excerpt) ? (
+          {active.kind === 'table' || containsTable(active.excerpt) ? (
             <div className="msg-source-body">
               <ChunkContent text={active.excerpt} />
             </div>
