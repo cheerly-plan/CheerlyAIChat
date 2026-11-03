@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from 'react'
-import { expandHtmlGrid, layoutTable, parseMarkdownRow, type LaidCell } from './tableGrid'
+import { layoutHtmlTable, layoutTable, parseMarkdownRow, type LaidCell } from './tableGrid'
 
 // 解析层的 Markdown 表、整页 OCR 的 HTML 表，都铺成同一套格子再画出来。
 // 表头里被展开的重复字（两列都写「期末余额」）合并回跨列，和模型读到的行列一致。
@@ -55,14 +55,13 @@ function firstColumn(content: ReactNode, limit: boolean) {
   return <span className="kb-chunk-col1">{content}</span>
 }
 
-export function DataTable({
-  rows,
+function TableView({
+  laid,
   cell,
 }: {
-  rows: string[][]
+  laid: LaidCell[][]
   cell?: (row: number, col: number, text: string) => ReactNode
 }) {
-  const laid = useMemo(() => layoutTable(rows), [rows])
   if (!laid.some((row) => row.length)) return null
   const head = laid.filter((row) => row.some((item) => item.header))
   const body = laid.filter((row) => row.length > 0 && row.every((item) => !item.header))
@@ -90,9 +89,20 @@ export function DataTable({
   )
 }
 
+export function DataTable({
+  rows,
+  cell,
+}: {
+  rows: string[][]
+  cell?: (row: number, col: number, text: string) => ReactNode
+}) {
+  const laid = useMemo(() => layoutTable(rows), [rows])
+  return <TableView laid={laid} cell={cell} />
+}
+
 export function HtmlTable({ html }: { html: string }) {
-  const rows = useMemo(() => expandHtmlGrid(html), [html])
-  return <DataTable rows={rows} />
+  const laid = useMemo(() => layoutHtmlTable(html), [html])
+  return <TableView laid={laid} />
 }
 
 type MixedBlock = { kind: 'html'; html: string } | { kind: 'text'; text: string }

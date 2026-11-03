@@ -17,7 +17,7 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 12px 0 12px 12px;
+  padding: 0 0 12px 12px;
   background: #f7f8fa;
   border-right: 1px solid #eef0f3;
   overflow: hidden;
@@ -58,11 +58,15 @@
   margin-right: 16px;
 }
 
+/* 与 .chat-header 同高，logo / 名称和右侧会话标题在同一条水平中线上 */
 .brand {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
-  padding: 8px 6px 16px;
+  height: 52px;
+  padding: 0 6px;
+  margin-bottom: 4px;
   font-weight: 700;
   font-size: 16px;
   line-height: 1;
@@ -130,19 +134,23 @@
   flex: 1;
   min-height: 0;
   padding: 0;
-  color: #9aa0a6;
-  font-size: 13px;
+  color: #0f1115;
+  font-size: 14px;
+  line-height: 22px;
   overflow: auto;
   overscroll-behavior: contain;
 }
 
 .history-inner {
-  padding: 0 16px 8px 4px;
+  padding: 8px 16px 8px 4px;
 }
 
 .history-empty {
   display: block;
-  padding: 10px 8px;
+  padding: 10px 10px;
+  color: #81858c;
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .history-error {
@@ -209,7 +217,7 @@
 }
 
 .history-group + .history-group {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .history-label {
@@ -217,54 +225,54 @@
   top: 0;
   z-index: 2;
   margin: 0;
-  padding: 10px 8px 8px;
+  padding: 8px 10px 4px;
   background: #f7f8fa;
   box-shadow: 0 -1px 0 #f7f8fa;
-  color: #9aa0a6;
-  font: inherit;
+  color: #81858c;
   font-size: 12px;
-  font-weight: 400;
-  line-height: 1.2;
+  font-weight: 500;
+  line-height: 18px;
 }
 
 .history-item {
-  --row-bg: #f7f8fa;
+  --row-bg: transparent;
   position: relative;
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 36px;
-  padding: 2px 8px 2px 10px;
-  border-radius: 10px;
-  color: #374151;
+  height: 40px;
+  margin-top: 2px;
+  padding: 0 10px;
+  border-radius: 12px;
+  color: #0f1115;
+  font-size: 14px;
+  line-height: 22px;
 }
 
 .history-item:hover,
 .history-item.menu-open {
-  --row-bg: #eceef1;
-  background: #eceef1;
+  --row-bg: #eaecf0;
+  background: rgba(38, 49, 72, 0.06);
 }
 
-.history-item.active {
-  --row-bg: #eef3ff;
-  background: #eef3ff;
-  color: #3b5bdb;
-}
-
+.history-item.active,
 .history-item.active:hover,
 .history-item.active.menu-open {
-  --row-bg: #e4ebff;
-  background: #e4ebff;
+  --row-bg: #e4edfd;
+  background: #e4edfd;
+  color: #0f1115;
 }
 
 .history-item-title {
   min-width: 0;
   flex: 1;
-  padding: 7px 4px 7px 0;
+  padding: 0;
   border: 0;
   background: transparent;
   color: inherit;
   font: inherit;
+  font-size: 14px;
+  line-height: 22px;
   text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -293,14 +301,14 @@
 
 .history-actions {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  bottom: 2px;
+  top: 0;
+  right: 4px;
+  bottom: 0;
   z-index: 2;
   display: flex;
   align-items: center;
-  padding-left: 20px;
-  background: linear-gradient(90deg, transparent, var(--row-bg) 14px);
+  padding-left: 28px;
+  background: linear-gradient(90deg, transparent, var(--row-bg) 18px);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s ease;
@@ -313,13 +321,12 @@
 }
 
 .history-more {
-  width: 24px;
-  height: 24px;
-  margin-right: 4px;
+  width: 28px;
+  height: 28px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
-  color: #6b7280;
+  color: #61666b;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -333,18 +340,21 @@
 }
 
 .history-more:hover {
-  background: rgba(15, 23, 42, 0.06);
-  color: #374151;
+  background: rgba(38, 49, 72, 0.06);
+  color: #0f1115;
 }
 
 .history-menu {
   position: fixed;
   z-index: 20;
-  min-width: 132px;
-  padding: 4px;
-  border-radius: 8px;
+  min-width: 148px;
+  padding: 6px;
+  border-radius: 12px;
   background: #fff;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  box-shadow:
+    0 0 1px rgba(0, 0, 0, 0.2),
+    0 0 4px rgba(0, 0, 0, 0.02),
+    0 12px 32px rgba(0, 0, 0, 0.08);
 }
 
 .history-menu-icon {
@@ -359,24 +369,29 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  height: 32px;
+  height: 36px;
   padding: 0 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
-  color: #1f1f1f;
+  color: #0f1115;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 22px;
   text-align: left;
   cursor: pointer;
 }
 
 .history-menu button:hover {
-  background: #f3f4f6;
+  background: rgba(38, 49, 72, 0.06);
 }
 
 .history-menu button.danger {
-  color: #e5484d;
+  color: #ec1313;
+}
+
+.history-menu button.danger:hover {
+  background: #fee2e2;
 }
 
 .history-menu-sep {
@@ -1857,7 +1872,7 @@
 
   .sidebar-collapsed .sidebar {
     width: 260px;
-    padding: 12px 0 12px 12px;
+    padding: 0 0 12px 12px;
     opacity: 1;
     border-right-color: #eef0f3;
     transform: translateX(-100%);
