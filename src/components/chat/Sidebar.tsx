@@ -2,13 +2,12 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { DEFAULT_SESSION_TITLE } from '../../api'
 import copyIcon from '../../assets/copy.svg'
 import deleteIcon from '../../assets/delete.svg'
-import kbIcon from '../../assets/kb.svg'
 import optionsIcon from '../../assets/options.svg'
 import renameIcon from '../../assets/rename.svg'
 import type { SessionInfo } from '../../types'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { Logo } from './Logo'
-import { CloseIcon, NewChatIcon, PanelIcon } from './icons'
+import { CloseIcon, LogoutIcon, NewChatIcon, PanelIcon } from './icons'
 
 type Props = {
   onNewChat: () => void
@@ -25,8 +24,6 @@ type Props = {
   streamingSessionIds?: string[]
   userName?: string
   onLogout?: () => void
-  /** 打开知识库页（与对话视图互斥） */
-  onOpenKb?: () => void
   /** 会话标题旁已经有收起按钮时，侧栏品牌行不再放一个 */
   hideToggle?: boolean
 }
@@ -45,7 +42,6 @@ export function Sidebar({
   streamingSessionIds = [],
   userName = '',
   onLogout,
-  onOpenKb,
   hideToggle = false,
 }: Props) {
   const groups = groupSessions(sessions)
@@ -83,12 +79,6 @@ export function Sidebar({
         <NewChatIcon />
         开启新对话
       </button>
-      {onOpenKb ? (
-        <button type="button" className="kb-entry" onClick={onOpenKb}>
-          <img src={kbIcon} alt="" className="kb-entry-icon" />
-          知识库
-        </button>
-      ) : null}
       <div className="history">
         <div className="history-inner">
           {/* 显式四态，互斥渲染：加载骨架 / 加载失败 / 空态 / 会话分组 */}
@@ -134,18 +124,26 @@ export function Sidebar({
           )}
         </div>
       </div>
-      <div className="account">
-        <span className="account-name">{userName}</span>
-        {onLogout ? (
-          <button
-            type="button"
-            className="account-logout"
-            onClick={onLogout}
-            aria-label="退出登录"
-          >
-            退出登录
-          </button>
-        ) : null}
+      <div className="sidebar-foot">
+        <div className="account">
+          {userName.trim() ? (
+            <span className="account-avatar" aria-hidden="true">
+              {userName.trim().slice(0, 1)}
+            </span>
+          ) : null}
+          <span className="account-name">{userName}</span>
+          {onLogout ? (
+            <button
+              type="button"
+              className="account-logout"
+              onClick={onLogout}
+              aria-label="退出登录"
+              title="退出登录"
+            >
+              <LogoutIcon />
+            </button>
+          ) : null}
+        </div>
       </div>
     </aside>
     {renameItem ? (

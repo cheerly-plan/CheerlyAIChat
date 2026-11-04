@@ -1,3 +1,25 @@
+export function LogoutIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <path
+        d="M10 7V5.8A1.8 1.8 0 0 1 11.8 4H18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6.2A1.8 1.8 0 0 1 10 18.2V17"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+      />
+      <path
+        d="M13.5 12H4m0 0 2.6-2.6M4 12l2.6 2.6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 export function PanelIcon() {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">

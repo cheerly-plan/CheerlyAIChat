@@ -1,15 +1,23 @@
 import { useSyncExternalStore } from 'react'
 
 /**
- * 极简路由：只区分「对话」和「知识库」两个页面。
+ * 极简路由：看板、对话、知识库。
  *
- * 用 hash（#/kb）而不是真实路径，是为了刷新/直接打开链接时无需服务端配置
- * SPA fallback 也能落到同一页面；页面状态全部由 URL 决定，不额外保存。
+ * 用 hash（#/board、#/chat、#/kb）而不是真实路径，是为了刷新/直接打开链接时
+ * 无需服务端配置 SPA fallback 也能落到同一页面；页面状态全部由 URL 决定。
+ * 空 hash 视为对话，管理员首次进入时再换成 #/board。
  */
-export type Route = 'chat' | 'kb'
+export type Route = 'board' | 'chat' | 'kb'
 
 function routeFromHash(): Route {
-  return window.location.hash.replace(/^#\/?/, '').toLowerCase() === 'kb' ? 'kb' : 'chat'
+  const raw = window.location.hash.replace(/^#\/?/, '').toLowerCase()
+  if (raw === 'kb') return 'kb'
+  if (raw === 'board') return 'board'
+  return 'chat'
+}
+
+export function isBareHash(): boolean {
+  return window.location.hash.replace(/^#\/?/, '') === ''
 }
 
 const listeners = new Set<() => void>()
@@ -30,23 +38,29 @@ function subscribe(listener: () => void) {
   }
 }
 
-export function navigate(route: Route) {
-  if (routeFromHash() === route) return
-  if (route === 'kb') {
-    window.history.pushState({ route }, '', '#/kb')
-  } else if ((window.history.state as { route?: Route } | null)?.route === 'kb') {
-    // 从知识库返回：回退上个记录而不是再压一条，避免浏览器后退在 chat/kb 之间来回弹
+function hashFor(route: Route) {
+  if (route === 'kb') return '#/kb'
+  if (route === 'board') return '#/board'
+  return '#/chat'
+}
+
+export function navigate(route: Route, opts?: { replace?: boolean }) {
+  const next = `${window.location.pathname}${window.location.search}${hashFor(route)}`
+  const here = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  if (!opts?.replace && here === next) return
+  const state = { route }
+  if (opts?.replace) window.history.replaceState(state, '', next)
+  else window.history.pushState(state, '', next)
+  emit()
+}
+
+/** 知识库页的返回：有站内上一页就退回去，否则回到 fallback。 */
+export function goBack(fallback: Route) {
+  if ((window.history.state as { route?: Route } | null)?.route) {
     window.history.back()
     return
-  } else {
-    // 直接以 #/kb 打开（刷新、分享链接）时没有站内历史可回退，就地替换 URL
-    window.history.replaceState(
-      null,
-      '',
-      `${window.location.pathname}${window.location.search}`,
-    )
   }
-  emit()
+  navigate(fallback, { replace: true })
 }
 
 export function useRoute(): Route {
