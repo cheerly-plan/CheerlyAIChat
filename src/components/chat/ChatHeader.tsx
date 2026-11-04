@@ -1,4 +1,3 @@
-import { Logo } from './Logo'
 import { NewChatIcon, PanelIcon, SearchIcon } from './icons'
 
 type Props = {
@@ -23,7 +22,6 @@ export function ChatHeader({
     <header className="chat-header">
       {collapsed ? (
         <div className="header-side">
-          <Logo size={28} />
           <div className="header-capsule">
             <button type="button" aria-label="展开侧栏" onClick={onToggleSidebar}>
               <PanelIcon />
@@ -36,16 +34,7 @@ export function ChatHeader({
             </button>
           </div>
         </div>
-      ) : (
-        <button
-          type="button"
-          className="sidebar-toggle chat-header-toggle"
-          aria-label="收起侧栏"
-          onClick={onToggleSidebar}
-        >
-          <PanelIcon />
-        </button>
-      )}
+      ) : null}
       {showTitle ? (
         <div className="chat-header-center">
           {titleLoading && !title ? (

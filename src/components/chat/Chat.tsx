@@ -7,7 +7,6 @@ import { Board } from '../board/Board'
 import { KnowledgeBase } from '../kb/KnowledgeBase'
 import { ChatHeader } from './ChatHeader'
 import { Composer } from './Composer'
-import { Logo } from './Logo'
 import { MessageList } from './MessageList'
 import { Sidebar } from './Sidebar'
 import './chat.css'
@@ -80,7 +79,7 @@ export function Chat({ onLogout, initialUser = null }: Props) {
     () => window.matchMedia('(min-width: 861px)').matches,
   )
   // 主区域由 URL 决定：#/board 看板、#/chat 对话、#/kb 知识库。
-  // 空 hash 先当对话；管理员登录后换成看板，刷新 #/chat 仍停在对话。
+  // 空 hash 先当对话；管理员登录时由 App 换成看板，刷新 #/chat 仍停在对话。
   const route = useRoute()
   const knownUser = user ?? initialUser
   const isAdmin = Boolean(knownUser?.is_admin)
@@ -143,7 +142,6 @@ export function Chat({ onLogout, initialUser = null }: Props) {
     <div className={`shell${sidebarOpen ? '' : ' sidebar-collapsed'}`}>
       <div className="sidebar-mask" onClick={() => setSidebarOpen(false)} />
       <Sidebar
-        hideToggle={Boolean(title) || (!sessionsReady && hasCachedActiveSession())}
         onNewChat={() => {
           navigate('chat')
           reset()
@@ -180,10 +178,7 @@ export function Chat({ onLogout, initialUser = null }: Props) {
               <div className="landing">
                 {error ? <p className="error">{error}</p> : null}
                 <div className="landing-hero">
-                  <h1 className="landing-hello">
-                    <Logo size={36} />
-                    <span>{timeGreeting()}，让我们开始聊天吧</span>
-                  </h1>
+                  <h1 className="landing-hello">{timeGreeting()}，让我们开始聊天吧</h1>
                   <Composer
                     value={input}
                     loading={loading || !ready}

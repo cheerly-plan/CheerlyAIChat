@@ -8,6 +8,7 @@ import {
 import type { AuthUser, UserInfo } from './types'
 import { Chat } from './components/chat/Chat'
 import { LoginView } from './components/auth/Login'
+import { navigate } from './router'
 
 type AuthStatus = 'checking' | 'authed' | 'anonymous'
 
@@ -63,6 +64,8 @@ function App() {
     setUser(merged)
     setChatEpoch((epoch) => epoch + 1)
     setStatus('authed')
+    // 登录这一下进面板；已经在对话里刷新则保留 #/chat，不在这里改
+    if (merged.is_admin) navigate('board', { replace: true })
   }, [])
 
   const handleLogout = useCallback(() => {

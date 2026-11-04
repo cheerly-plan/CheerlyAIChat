@@ -1,6 +1,5 @@
 import kbIcon from '../../assets/kb.svg'
 import { LogoutIcon, NewChatIcon } from '../chat/icons'
-import { Logo } from '../chat/Logo'
 import './board.css'
 
 type Props = {
@@ -25,7 +24,6 @@ export function Board({ userName, onOpenKb, onOpenChat, onLogout }: Props) {
     <div className="board">
       <header className="board-bar">
         <div className="board-brand">
-          <Logo size={28} />
           <span>Cheerly</span>
         </div>
         <div className="board-account">

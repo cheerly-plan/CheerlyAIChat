@@ -6,7 +6,6 @@ import optionsIcon from '../../assets/options.svg'
 import renameIcon from '../../assets/rename.svg'
 import type { SessionInfo } from '../../types'
 import { ConfirmDialog } from '../common/ConfirmDialog'
-import { Logo } from './Logo'
 import { CloseIcon, LogoutIcon, NewChatIcon, PanelIcon } from './icons'
 
 type Props = {
@@ -24,8 +23,6 @@ type Props = {
   streamingSessionIds?: string[]
   userName?: string
   onLogout?: () => void
-  /** 会话标题旁已经有收起按钮时，侧栏品牌行不再放一个 */
-  hideToggle?: boolean
 }
 
 export function Sidebar({
@@ -42,7 +39,6 @@ export function Sidebar({
   streamingSessionIds = [],
   userName = '',
   onLogout,
-  hideToggle = false,
 }: Props) {
   const groups = groupSessions(sessions)
   const [menuId, setMenuId] = useState<string | null>(null)
@@ -67,13 +63,10 @@ export function Sidebar({
     <>
     <aside className="sidebar">
       <div className="brand">
-        <Logo size={28} />
         <span>Cheerly</span>
-        {hideToggle ? null : (
-          <button type="button" className="sidebar-toggle" aria-label="收起侧栏" onClick={onCollapse}>
-            <PanelIcon />
-          </button>
-        )}
+        <button type="button" className="sidebar-toggle" aria-label="收起侧栏" onClick={onCollapse}>
+          <PanelIcon />
+        </button>
       </div>
       <button type="button" className="new-chat" onClick={onNewChat}>
         <NewChatIcon />
@@ -190,6 +183,7 @@ function HistoryItem({
   onDelete,
 }: ItemProps) {
   const boxRef = useRef<HTMLDivElement>(null)
+  const titleRef = useRef<HTMLSpanElement>(null)
   const moreRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
@@ -220,6 +214,30 @@ function HistoryItem({
     return () => document.removeEventListener('mousedown', onPointer)
   }, [menuOpen, onCloseMenu])
 
+  function syncTitleMarquee() {
+    const text = titleRef.current
+    if (!text) return
+    const overflow = text.scrollWidth - text.clientWidth
+    if (overflow > 2) {
+      // 多滚过「更多」按钮盖住的宽度，末尾才能从按钮下面露出来
+      const shift = overflow + 28
+      text.style.setProperty('--marquee-shift', `${shift}px`)
+      const scrollSeconds = shift / 32
+      text.style.setProperty('--marquee-duration', `${Math.max(3.2, scrollSeconds / 0.72)}s`)
+      text.classList.add('marquee')
+    } else {
+      text.classList.remove('marquee')
+    }
+  }
+
+  function onRowEnter() {
+    requestAnimationFrame(syncTitleMarquee)
+  }
+
+  function onRowLeave() {
+    titleRef.current?.classList.remove('marquee')
+  }
+
   async function copyName() {
     try {
       await navigator.clipboard.writeText(title)
@@ -241,9 +259,13 @@ function HistoryItem({
     <div
       ref={boxRef}
       className={`history-item${active ? ' active' : ''}${menuOpen ? ' menu-open' : ''}`}
+      onMouseEnter={onRowEnter}
+      onMouseLeave={onRowLeave}
     >
       <button type="button" className="history-item-title" onClick={onSelect}>
-        {title}
+        <span ref={titleRef} className="history-item-title-text">
+          {title}
+        </span>
       </button>
       {loading ? (
         <span className="history-item-loading" role="status" aria-label="正在回复" />

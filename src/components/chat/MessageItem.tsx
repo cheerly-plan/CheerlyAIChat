@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import type { ChatMessage, ChatSource } from '../../types'
 import { ChunkContent } from '../kb/ChunkContent'
-import { containsTable } from '../kb/chunkText'
-import { CheckIcon, CopyIcon, EditIcon, RefreshIcon } from './icons'
+import { CheckIcon, CloseIcon, CopyIcon, EditIcon, RefreshIcon, SendIcon } from './icons'
 import { Markdown } from './Markdown'
 
 type Props = {
@@ -52,11 +52,9 @@ export function MessageItem({
         {!loading && !message.content ? (
           <p className="msg-empty">没有生成文字回复，可重新生成</p>
         ) : null}
-        {sources.length > 0 && (done || interrupted) ? (
-          <SourceList sources={sources} />
-        ) : null}
         {done || interrupted ? (
           <div className={`msg-footer${interrupted ? ' has-resume' : ''}`}>
+            {sources.length > 0 ? <SourceList sources={sources} /> : null}
             {done ? (
               <MessageActions>
                 <CopyButton text={message.content} />
@@ -175,9 +173,7 @@ function UserMessage({
               取消
             </button>
             <button type="submit" disabled={busy || !draft.trim()} aria-label="发送">
-              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                <path fill="currentColor" d="M12 4 5 11h4v9h6v-9h4z" />
-              </svg>
+              <SendIcon />
             </button>
           </div>
         </form>
@@ -218,76 +214,374 @@ function MessageActions({ children }: { children: ReactNode }) {
 /**
  * 参考来源：回答里用到的知识库切片。
  *
- * 一排小卡片（编号 + 文件名 + 位置），点任意一张就在下面展开这段原文——
- * 用户想核实「这句话是从文档哪一段来的」，需要看到原文本身，而不是只看到
- * 文件名。默认全部收起：回答已经是主体，引用不该抢注意力。
+ * 按钮和复制放在同一行，默认就显示。点开后，右侧面板按文件列出全部原文，不再折叠。
+ * 文字直接铺开。摘录里的表格换成「表格」按钮，悬停后在按钮左侧弹出。
  *
- * 位置按「P134」/「P134–P135」展示：按章节切块后同节内允许跨页聚合，
- * 约一半切片跨两页，只写起始页会让用户翻错页。章节名放详情里——它比
- * 页码长得多，塞进小卡片会把文件名挤没。
+ * 位置按「第134页」/「第134–135页」展示：按章节切块后同节内允许跨页聚合，
+ * 约一半切片跨两页，只写起始页会让用户翻错页。
  */
 function SourceList({ sources }: { sources: ChatSource[] }) {
-  const [openKey, setOpenKey] = useState<string | null>(null)
-  const active = sources.find((item) => item.key === openKey) ?? null
-  const activeLoc = active ? sourceLocator(active) : null
+  const [open, setOpen] = useState(false)
+  const [tableTip, setTableTip] = useState<{ key: string; anchor: HTMLElement } | null>(null)
+  const hideTipRef = useRef(0)
+  const groups = groupSources(sources)
+  const tableSource = sources.find((item) => item.key === tableTip?.key) ?? null
+
+  function close() {
+    window.clearTimeout(hideTipRef.current)
+    setOpen(false)
+    setTableTip(null)
+  }
+
+  function showTableTip(key: string, anchor: HTMLElement) {
+    window.clearTimeout(hideTipRef.current)
+    setTableTip({ key, anchor })
+  }
+
+  function queueHideTableTip() {
+    window.clearTimeout(hideTipRef.current)
+    hideTipRef.current = window.setTimeout(() => setTableTip(null), 140)
+  }
+
+  useEffect(() => {
+    if (!open) return
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') close()
+    }
+    function onPointer(event: MouseEvent) {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (
+        target.closest('.msg-source-drawer') ||
+        target.closest('.msg-sources-open') ||
+        target.closest('.msg-source-popover')
+      ) {
+        return
+      }
+      close()
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onPointer)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', onPointer)
+    }
+  }, [open])
 
   return (
-    <div className="msg-sources">
-      <span className="msg-sources-label">参考来源</span>
-      <div className="msg-sources-chips">
-        {sources.map((source, index) => {
-          const open = source.key === openKey
-          const loc = sourceLocator(source)
-          return (
-            <button
-              key={source.key}
-              type="button"
-              className={`msg-source${open ? ' is-open' : ''}`}
-              title={[source.filename, loc.where, loc.section].filter(Boolean).join(' · ')}
-              aria-expanded={open}
-              onClick={() => setOpenKey(open ? null : source.key)}
-            >
-              <span className="msg-source-idx">{index + 1}</span>
-              <span className="msg-source-name">{source.filename}</span>
-              <span className="msg-source-where">{loc.where}</span>
-            </button>
+    <>
+      <button
+        type="button"
+        className={`msg-sources-open${open ? ' is-open' : ''}`}
+        aria-expanded={open}
+        onClick={() => (open ? close() : setOpen(true))}
+      >
+        参考来源
+        <span className="msg-sources-count">{sources.length}</span>
+      </button>
+      {open
+        ? createPortal(
+            <div className="msg-source-layer">
+              <aside className="msg-source-drawer" role="dialog" aria-modal="false" aria-label="参考来源">
+                <div className="msg-source-drawer-bar">
+                  <div className="msg-source-drawer-title">
+                    <span className="msg-source-file">参考来源</span>
+                    <span className="msg-source-drawer-count">{sources.length} 条</span>
+                  </div>
+                  <button type="button" className="msg-source-drawer-close" aria-label="关闭" onClick={close}>
+                    <CloseIcon />
+                  </button>
+                </div>
+                <div className="msg-source-drawer-body">
+                  <div className="msg-source-list">
+                    {groups.map((group) => (
+                      <section key={`${group.filename}:${group.items[0]?.source.key}`} className="msg-source-group">
+                        <h3 className="msg-source-group-name" title={group.filename}>
+                          {group.filename}
+                        </h3>
+                        <ul>
+                          {group.items.map(({ source, index }) => (
+                            <SourceCard
+                              key={source.key}
+                              source={source}
+                              index={index}
+                              tipOpen={tableTip?.key === source.key}
+                              onTableEnter={(anchor) => showTableTip(source.key, anchor)}
+                              onTableLeave={queueHideTableTip}
+                            />
+                          ))}
+                        </ul>
+                      </section>
+                    ))}
+                  </div>
+                </div>
+              </aside>
+              {tableSource && tableTip ? (
+                <TablePopover
+                  source={tableSource}
+                  anchor={tableTip.anchor}
+                  onEnter={() => window.clearTimeout(hideTipRef.current)}
+                  onLeave={queueHideTableTip}
+                />
+              ) : null}
+            </div>,
+            document.body,
           )
-        })}
+        : null}
+    </>
+  )
+}
+
+function SourceCard({
+  source,
+  index,
+  tipOpen,
+  onTableEnter,
+  onTableLeave,
+}: {
+  source: ChatSource
+  index: number
+  tipOpen: boolean
+  onTableEnter: (anchor: HTMLElement) => void
+  onTableLeave: () => void
+}) {
+  const loc = sourceLocator(source)
+  const kind = sourceKindLabel(source.kind)
+  const prose = excerptProse(source.excerpt)
+  const tableText = excerptTable(source.excerpt)
+  const title = loc.section || (!prose ? sourcePreview(source.excerpt) || '原文' : null)
+
+  return (
+    <li>
+      <div className="msg-source">
+        <span className="msg-source-idx">{index + 1}</span>
+        <span className="msg-source-main">
+          <span className="msg-source-line">
+            {title ? (
+              <span className="msg-source-section" title={title}>
+                {title}
+              </span>
+            ) : null}
+            <span className="msg-source-meta">
+              {kind && !tableText ? <span className="msg-source-tag">{kind}</span> : null}
+              <span className="msg-source-where">{loc.where}</span>
+            </span>
+          </span>
+        </span>
       </div>
-      {active ? (
-        <div className="msg-source-detail">
-          <div className="msg-source-head">
-            {activeLoc?.section ? (
-              <span className="msg-source-section" title={activeLoc.section}>
-                {activeLoc.section}
-              </span>
-            ) : null}
-            {active.kind === 'figure' ? (
-              <span className="msg-source-note">图像识别，可能有误差</span>
-            ) : null}
-            {isCrossPage(active) ? (
-              <span className="msg-source-hint">
-                该片段跨第 {active.page_start ?? active.page}–
-                {active.page_end ?? active.page} 页
-              </span>
-            ) : null}
-          </div>
-          {active.kind === 'table' || containsTable(active.excerpt) ? (
-            <div className="msg-source-body">
-              <ChunkContent text={active.excerpt} />
-            </div>
-          ) : (
-            <pre className="msg-source-text">
-              <span className="msg-source-text-inner">{active.excerpt}</span>
-            </pre>
-          )}
+      {prose ? <SourceExcerpt source={source} text={prose} /> : null}
+      {tableText ? (
+        <div className="msg-source-table-slot">
+          <button
+            type="button"
+            className={`msg-source-table-btn${tipOpen ? ' is-open' : ''}`}
+            onMouseEnter={(event) => onTableEnter(event.currentTarget)}
+            onMouseLeave={onTableLeave}
+          >
+            表格
+          </button>
         </div>
       ) : null}
+    </li>
+  )
+}
+
+/** 多级表头不能都吸在 top: 0，否则滚动时叠成一层。按每一行自己的高度往下排。 */
+function stickHeaderRows(table: HTMLTableElement) {
+  const rows = [...(table.tHead?.rows ?? [])]
+  let offset = 0
+  rows.forEach((row, index) => {
+    const singles = [...row.cells].filter((cell) => cell.rowSpan <= 1)
+    const rowHeight = singles.length
+      ? Math.max(...singles.map((cell) => cell.getBoundingClientRect().height))
+      : row.getBoundingClientRect().height
+    for (const cell of row.cells) {
+      cell.style.top = `${offset}px`
+      cell.style.zIndex = String(3 + rows.length - index)
+    }
+    offset += rowHeight
+  })
+}
+
+function TablePopover({
+  source,
+  anchor,
+  onEnter,
+  onLeave,
+}: {
+  source: ChatSource
+  anchor: HTMLElement
+  onEnter: () => void
+  onLeave: () => void
+}) {
+  const popRef = useRef<HTMLDivElement>(null)
+  const [box, setBox] = useState({ left: 8, width: 320, arrow: 20, bridge: 24, scrollX: false })
+
+  useLayoutEffect(() => {
+    function place() {
+      const pop = popRef.current
+      const rect = anchor.getBoundingClientRect()
+      const margin = 8
+      const drawer = anchor.closest('.msg-source-drawer')
+      const drawerLeft = drawer ? window.innerWidth - drawer.getBoundingClientRect().width : rect.left
+      const limitRight = Math.max(margin + 160, drawerLeft - 12)
+      const available = limitRight - margin
+      const body = pop?.querySelector('.msg-source-popover-body') as HTMLElement | null
+      const table = pop?.querySelector('table')
+      const prev = {
+        width: pop?.style.width ?? '',
+        maxWidth: pop?.style.maxWidth ?? '',
+        overflow: body?.style.overflow ?? '',
+      }
+      if (pop) {
+        pop.style.width = 'max-content'
+        pop.style.maxWidth = 'none'
+      }
+      if (body) body.style.overflow = 'visible'
+      const intrinsic = Math.max(160, Math.ceil((table?.getBoundingClientRect().width ?? 296) + 24))
+      if (pop) {
+        pop.style.width = prev.width
+        pop.style.maxWidth = prev.maxWidth
+      }
+      if (body) body.style.overflow = prev.overflow
+      const width = Math.min(Math.max(intrinsic, Math.min(320, available)), available)
+      const left = Math.max(margin, limitRight - width)
+      const popHeight = pop?.offsetHeight ?? Math.min(300, window.innerHeight - margin * 2)
+      const visualTop = Math.max(margin, (window.innerHeight - popHeight) / 2)
+      const arrow = Math.min(
+        Math.max(14, popHeight - 20),
+        Math.max(14, rect.top + rect.height / 2 - visualTop - 6),
+      )
+      const bridge = Math.max(16, rect.right - (left + width))
+      if (body) body.scrollLeft = 0
+      setBox({ left, width, arrow, bridge, scrollX: intrinsic > width + 1 })
+    }
+    place()
+    const scroller = anchor.closest('.msg-source-drawer-body')
+    scroller?.addEventListener('scroll', place, { passive: true })
+    window.addEventListener('resize', place)
+    return () => {
+      scroller?.removeEventListener('scroll', place)
+      window.removeEventListener('resize', place)
+    }
+  }, [anchor])
+
+  useLayoutEffect(() => {
+    const table = popRef.current?.querySelector('table')
+    if (table) stickHeaderRows(table)
+  }, [box.width, box.scrollX, source.excerpt])
+
+  return (
+    <div
+      ref={popRef}
+      className="msg-source-popover"
+      style={{
+        left: box.left,
+        width: box.width,
+        maxWidth: box.width,
+        ['--arrow' as string]: `${box.arrow}px`,
+        ['--bridge' as string]: `${box.bridge}px`,
+      }}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+    >
+      <div
+        className={`msg-source-popover-body${box.scrollX ? ' is-scroll-x' : ''}`}
+      >
+        <div className="msg-source-body">
+          <ChunkContent text={excerptTable(source.excerpt) || source.excerpt} />
+        </div>
+      </div>
     </div>
   )
 }
 
-/** 芯片只放页码；章节进展开区。旧图谱引用曾把「页码 · 章节」写进 where。 */
+function SourceExcerpt({ source, text }: { source: ChatSource; text: string }) {
+  return (
+    <div className="msg-source-excerpt">
+      {source.kind === 'figure' ? <p className="msg-source-note">图像识别，可能有误差</p> : null}
+      <div className="msg-source-body">
+        <ChunkContent text={reflowExcerpt(text)} />
+      </div>
+    </div>
+  )
+}
+
+/** 摘录里的正文：去掉 HTML 表和 Markdown 表，剩下的按文字显示。 */
+function excerptProse(excerpt: string): string {
+  return excerpt
+    .replace(/<table\b[^>]*>[\s\S]*?<\/table>/gi, '')
+    .split('\n')
+    .filter((line) => !/^\s*\|/.test(line))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+/** 摘录里的表格：HTML 表和 Markdown 表单独交给弹出框。 */
+function excerptTable(excerpt: string): string {
+  const html = excerpt.match(/<table\b[^>]*>[\s\S]*?<\/table>/gi) ?? []
+  const pipes = excerpt
+    .split('\n')
+    .filter((line) => /^\s*\|/.test(line))
+    .join('\n')
+    .trim()
+  return [...html, pipes].filter(Boolean).join('\n\n')
+}
+
+function groupSources(sources: ChatSource[]) {
+  const groups: { filename: string; items: { source: ChatSource; index: number }[] }[] = []
+  sources.forEach((source, index) => {
+    const last = groups[groups.length - 1]
+    const item = { source, index }
+    if (last && last.filename === source.filename) last.items.push(item)
+    else groups.push({ filename: source.filename, items: [item] })
+  })
+  return groups
+}
+
+function sourceKindLabel(kind: string): string | null {
+  if (kind === 'figure') return '图表'
+  if (kind === 'table') return '表格'
+  return null
+}
+
+/** 卡片上的两行摘要：去掉表格标记，把换行收成一句。 */
+function sourcePreview(excerpt: string): string {
+  const plain = excerpt
+    .replace(/<[^>]+>/g, ' ')
+    .split('\n')
+    .filter((line) => !/^\s*\|/.test(line))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .replace(/…+$/g, '')
+    .trim()
+  return plain
+}
+
+/**
+ * PDF 抽取常常一行一句。阅读页把段内换行接上，空行仍分段。
+ * 英文单词之间补空格，中文直接相接。
+ */
+function reflowExcerpt(text: string): string {
+  return text
+    .split(/\n{2,}/)
+    .map((block) =>
+      block
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .reduce((acc, line) => {
+          if (!acc) return line
+          const needSpace = /[A-Za-z0-9.,;:!?)]$/.test(acc) && /^[A-Za-z0-9(]/.test(line)
+          return acc + (needSpace ? ' ' : '') + line
+        }, ''),
+    )
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+/** 页码和章节拆开。旧图谱引用曾把「页码 · 章节」写进 where。 */
 function sourceLocator(source: ChatSource): { where: string; section: string | null } {
   const raw = sourceWhere(source)
   const cut = raw.indexOf(' · ')
@@ -306,13 +600,6 @@ function sourceWhere(source: ChatSource): string {
   if (start == null) return source.where || '表格'
   if (end != null && end !== start) return `第${start}–${end}页`
   return `第${start}页`
-}
-
-/** 切片是否跨页：页码区间不一致即跨页（老数据没有 page_end，视为单页） */
-function isCrossPage(source: ChatSource): boolean {
-  const start = source.page_start ?? source.page
-  const end = source.page_end ?? source.page
-  return start != null && end != null && start !== end
 }
 
 function CopyButton({ text }: { text: string }) {
