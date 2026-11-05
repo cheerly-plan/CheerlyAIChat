@@ -199,7 +199,8 @@
 .history-label {
   position: sticky;
   top: 0;
-  z-index: 2;
+  /* 高于行内「更多」和 loading（都是 2），滚到日期下面时盖住，不再穿出来 */
+  z-index: 3;
   margin: 0;
   padding: 8px 10px 4px;
   background: #f7f8fa;
