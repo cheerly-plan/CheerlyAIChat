@@ -64,6 +64,21 @@ export function SearchIcon() {
 }
 
 
+export function TraceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+      <path
+        d="M5 6.5h9M5 12h14M5 17.5h9"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <circle cx="17.5" cy="6.5" r="1.4" fill="currentColor" />
+      <circle cx="17.5" cy="17.5" r="1.4" fill="currentColor" />
+    </svg>
+  )
+}
+
 export function NewChatIcon() {
   return (
     <svg viewBox="0 0 16 16" width="18" height="18" fill="none" aria-hidden="true">

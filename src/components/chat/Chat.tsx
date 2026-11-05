@@ -5,6 +5,7 @@ import { goBack, isBareHash, navigate, useRoute } from '../../router'
 import type { UserInfo } from '../../types'
 import { Board } from '../board/Board'
 import { KnowledgeBase } from '../kb/KnowledgeBase'
+import { Trace } from '../trace/Trace'
 import { ChatHeader } from './ChatHeader'
 import { Composer } from './Composer'
 import { MessageList } from './MessageList'
@@ -78,7 +79,7 @@ export function Chat({ onLogout, initialUser = null }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(
     () => window.matchMedia('(min-width: 861px)').matches,
   )
-  // 主区域由 URL 决定：#/board 看板、#/chat 对话、#/kb 知识库。
+  // 主区域由 URL 决定：#/board 看板、#/chat 对话、#/kb 知识库、#/trace 对话过程。
   // 空 hash 先当对话；管理员登录时由 App 换成看板，刷新 #/chat 仍停在对话。
   const route = useRoute()
   const knownUser = user ?? initialUser
@@ -86,7 +87,7 @@ export function Chat({ onLogout, initialUser = null }: Props) {
   const identityPending = !knownUser && !ready && !sessionsReady
   useEffect(() => {
     if (identityPending) return
-    if (!isAdmin && (route === 'kb' || route === 'board')) {
+    if (!isAdmin && (route === 'kb' || route === 'board' || route === 'trace')) {
       navigate('chat', { replace: true })
       return
     }
@@ -120,19 +121,18 @@ export function Chat({ onLogout, initialUser = null }: Props) {
     (sessionsReady || !hasCachedActiveSession())
 
   const showBoard = isAdmin && (route === 'board' || isBareHash())
-  if (identityPending && (route === 'board' || route === 'kb' || isBareHash())) {
+  if (identityPending && (route === 'board' || route === 'kb' || route === 'trace' || isBareHash())) {
     return <div className="board-boot" />
+  }
+  if (isAdmin && route === 'trace') {
+    return <Trace currentUserId={knownUser?.user_id ?? ''} />
   }
   if (showBoard) {
     return (
       <Board
         userName={knownUser?.user_name ?? ''}
         onOpenKb={() => navigate('kb')}
-        onOpenChat={() => {
-          const url = `${window.location.pathname}${window.location.search}#/chat`
-          const opened = window.open(url, 'cheerly-chat')
-          opened?.focus()
-        }}
+        onOpenTrace={() => navigate('trace')}
         onLogout={onLogout}
       />
     )

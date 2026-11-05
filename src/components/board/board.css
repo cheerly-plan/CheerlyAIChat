@@ -93,7 +93,7 @@
 
 .board-main h1 {
   margin: 0 auto;
-  max-width: 720px;
+  max-width: 1080px;
   font-size: 28px;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -101,16 +101,16 @@
 
 .board-main > p {
   margin: 8px auto 28px;
-  max-width: 720px;
+  max-width: 1080px;
   color: #6b7280;
   font-size: 14px;
 }
 
 .board-cards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
-  max-width: 720px;
+  max-width: 1080px;
   margin: 0 auto;
 }
 
@@ -125,6 +125,8 @@
   background: #fff;
   text-align: left;
   font: inherit;
+  color: inherit;
+  text-decoration: none;
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -171,6 +173,12 @@
   color: #6b7280;
   font-size: 13px;
   line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .board-cards {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 640px) {

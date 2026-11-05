@@ -1,18 +1,19 @@
 import { useSyncExternalStore } from 'react'
 
 /**
- * 极简路由：看板、对话、知识库。
+ * 极简路由：看板、对话、知识库、对话过程。
  *
  * 用 hash（#/board、#/chat、#/kb）而不是真实路径，是为了刷新/直接打开链接时
  * 无需服务端配置 SPA fallback 也能落到同一页面；页面状态全部由 URL 决定。
  * 空 hash 视为对话，管理员首次进入时再换成 #/board。
  */
-export type Route = 'board' | 'chat' | 'kb'
+export type Route = 'board' | 'chat' | 'kb' | 'trace'
 
 function routeFromHash(): Route {
   const raw = window.location.hash.replace(/^#\/?/, '').toLowerCase()
   if (raw === 'kb') return 'kb'
   if (raw === 'board') return 'board'
+  if (raw === 'trace') return 'trace'
   return 'chat'
 }
 
@@ -41,6 +42,7 @@ function subscribe(listener: () => void) {
 function hashFor(route: Route) {
   if (route === 'kb') return '#/kb'
   if (route === 'board') return '#/board'
+  if (route === 'trace') return '#/trace'
   return '#/chat'
 }
 

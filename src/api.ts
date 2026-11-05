@@ -870,3 +870,66 @@ export async function rebuildKgGraph(
     throw new Error(`重建图谱失败 ${response.status}`)
   }
 }
+
+export type InspectUser = {
+  user_id: string
+  user_name: string
+  username: string
+  is_admin: boolean
+}
+
+export type InspectSession = {
+  session_id: string
+  title: string
+  updated_at: string
+}
+
+export type InspectStep = {
+  kind: 'llm' | 'tool' | 'tool_result' | string
+  name: string
+  tool_call_id: string
+  content: string
+  arguments: Record<string, unknown>
+}
+
+export type InspectTurn = {
+  index: number
+  question: string
+  steps: InspectStep[]
+}
+
+export async function fetchInspectUsers(): Promise<InspectUser[]> {
+  const response = await authedFetch('/v1/inspect/users', { headers: authHeaders() })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '用户列表加载失败'))
+  }
+  const data = (await response.json()) as { users: InspectUser[] }
+  return data.users
+}
+
+export async function fetchInspectSessions(userId: string): Promise<InspectSession[]> {
+  const params = new URLSearchParams({ user_id: userId })
+  const response = await authedFetch(`/v1/inspect/sessions?${params}`, {
+    headers: authHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '会话列表加载失败'))
+  }
+  const data = (await response.json()) as { sessions: InspectSession[] }
+  return data.sessions
+}
+
+export async function fetchInspectTurns(
+  userId: string,
+  sessionId: string,
+): Promise<{ title: string; turns: InspectTurn[] }> {
+  const params = new URLSearchParams({ user_id: userId, session_id: sessionId })
+  const response = await authedFetch(`/v1/inspect/turns?${params}`, {
+    headers: authHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '对话过程加载失败'))
+  }
+  const data = (await response.json()) as { title: string; turns: InspectTurn[] }
+  return { title: data.title, turns: data.turns }
+}

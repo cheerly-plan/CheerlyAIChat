@@ -1,11 +1,11 @@
 import kbIcon from '../../assets/kb.svg'
-import { LogoutIcon, NewChatIcon } from '../chat/icons'
+import { LogoutIcon, NewChatIcon, TraceIcon } from '../chat/icons'
 import './board.css'
 
 type Props = {
   userName: string
   onOpenKb: () => void
-  onOpenChat: () => void
+  onOpenTrace: () => void
   onLogout: () => void
 }
 
@@ -18,8 +18,9 @@ function timeGreeting() {
   return '晚上好'
 }
 
-export function Board({ userName, onOpenKb, onOpenChat, onLogout }: Props) {
+export function Board({ userName, onOpenKb, onOpenTrace, onLogout }: Props) {
   const initial = userName.trim().slice(0, 1)
+  const chatHref = `${window.location.pathname}${window.location.search}#/chat`
   return (
     <div className="board">
       <header className="board-bar">
@@ -43,7 +44,7 @@ export function Board({ userName, onOpenKb, onOpenChat, onLogout }: Props) {
           {timeGreeting()}
           {userName ? `，${userName}` : ''}
         </h1>
-        <p>从这里进入知识库，或和 Cheerly 对话。</p>
+        <p>从这里进入知识库、查看对话过程，或和 Cheerly 对话。</p>
         <div className="board-cards">
           <button type="button" className="board-card" onClick={onOpenKb}>
             <span className="board-card-icon">
@@ -52,13 +53,20 @@ export function Board({ userName, onOpenKb, onOpenChat, onLogout }: Props) {
             <span className="board-card-title">知识库管理</span>
             <span className="board-card-desc">上传文档，查看切片和图谱</span>
           </button>
-          <button type="button" className="board-card" onClick={onOpenChat}>
+          <button type="button" className="board-card" onClick={onOpenTrace}>
+            <span className="board-card-icon">
+              <TraceIcon />
+            </span>
+            <span className="board-card-title">对话过程</span>
+            <span className="board-card-desc">按用户、会话和提问查看工具、技能与模型结果</span>
+          </button>
+          <a className="board-card" href={chatHref} target="_blank" rel="noopener noreferrer">
             <span className="board-card-icon board-card-icon-chat">
               <NewChatIcon />
             </span>
             <span className="board-card-title">和 Cheerly 对话</span>
             <span className="board-card-desc">开一轮新对话，基于知识库提问</span>
-          </button>
+          </a>
         </div>
       </main>
     </div>
