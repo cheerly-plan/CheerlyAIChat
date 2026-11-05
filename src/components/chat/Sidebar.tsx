@@ -216,14 +216,19 @@ function HistoryItem({
 
   function syncTitleMarquee() {
     const text = titleRef.current
-    if (!text) return
+    const copy = text?.querySelector(':scope > .history-item-title-copy')
+    if (!text || !(copy instanceof HTMLElement)) return
     const overflow = text.scrollWidth - text.clientWidth
     if (overflow > 2) {
-      // 多滚过「更多」按钮盖住的宽度，末尾才能从按钮下面露出来
-      const shift = overflow + 28
+      // 第二份标题跟在后面，滚过「一份标题 + 间隙」后画面和开头重合，循环才接得上。
+      // 间隙要盖过右侧「更多」按钮，否则上一句的尾巴还在按钮下，下一句已经挤进来。
+      const gap = 48
+      const shift = copy.offsetWidth + gap
+      const speed = 80
+      text.style.setProperty('--marquee-gap', `${gap}px`)
       text.style.setProperty('--marquee-shift', `${shift}px`)
-      const scrollSeconds = shift / 32
-      text.style.setProperty('--marquee-duration', `${Math.max(3.2, scrollSeconds / 0.72)}s`)
+      // 前 8% 停在开头，剩下的时间按 speed 匀速滚
+      text.style.setProperty('--marquee-duration', `${(shift / speed / 0.92).toFixed(2)}s`)
       text.classList.add('marquee')
     } else {
       text.classList.remove('marquee')
@@ -264,7 +269,10 @@ function HistoryItem({
     >
       <button type="button" className="history-item-title" onClick={onSelect}>
         <span ref={titleRef} className="history-item-title-text">
-          {title}
+          <span className="history-item-title-copy">{title}</span>
+          <span className="history-item-title-copy" aria-hidden="true">
+            {title}
+          </span>
         </span>
       </button>
       {loading ? (

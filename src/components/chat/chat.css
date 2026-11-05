@@ -265,8 +265,17 @@
   white-space: nowrap;
 }
 
+.history-item-title-copy {
+  white-space: nowrap;
+}
+
+/* 平时只留一份，省略号才量得准；滚动时才放出第二份用来接尾 */
+.history-item-title-text .history-item-title-copy + .history-item-title-copy {
+  display: none;
+}
+
 .history-item-title-text.marquee {
-  display: inline-block;
+  display: inline-flex;
   width: max-content;
   max-width: none;
   overflow: visible;
@@ -274,18 +283,24 @@
   animation: history-title-marquee var(--marquee-duration, 4s) linear infinite;
 }
 
-/* 停一下，匀速滚到末尾，再停一下，然后跳回开头。和豆包会话标题一样，不来回弹 */
+.history-item-title-text.marquee .history-item-title-copy {
+  flex: none;
+}
+
+.history-item-title-text.marquee .history-item-title-copy + .history-item-title-copy {
+  display: inline;
+  padding-left: var(--marquee-gap, 48px);
+}
+
+/* 开头停一下再匀速滚。滚完一轮时第二份标题正好顶到开头的位置，
+   循环接上，不会倒滑回起点。 */
 @keyframes history-title-marquee {
   0%,
-  14% {
+  8% {
     transform: translateX(0);
-  }
-  86%,
-  98% {
-    transform: translateX(calc(var(--marquee-shift, 0px) * -1));
   }
   100% {
-    transform: translateX(0);
+    transform: translateX(calc(var(--marquee-shift, 0px) * -1));
   }
 }
 
