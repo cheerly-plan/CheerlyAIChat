@@ -555,6 +555,10 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
   const listRef = useRef<HTMLDivElement | null>(null)
   const [viewportH, setViewportH] = useState(600)
   const [scrollTop, setScrollTop] = useState(0)
+  // 切到图谱时切片列表会藏起来，DOM 的 scrollTop 可能被清掉；
+  // 渲染期同步这份最新值，回来时按它把视口滚回去
+  const scrollTopRef = useRef(0)
+  scrollTopRef.current = scrollTop
   // 每张卡片实测高度（seq → px），存 state：布局前缀和依赖它重算。
   // 同一批挂载的多张卡片会在 commit 阶段合并成一次重渲染（React 自动批处理）
   const [heights, setHeights] = useState<Map<number, number>>(() => new Map())
@@ -812,16 +816,30 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
     }
   }, [selectedId, chunksTotal])
 
-  // 视口高度跟随容器尺寸
-  useEffect(() => {
+  // 切片列表真正挂上滚动容器时才量高度。图谱 tab 会把整块藏起来
+  //（display:none），这时 clientHeight 是 0，不能写进 viewportH——
+  // 虚拟窗口高度变成 0 后，卡片全被排到视口外，切回文件 tab 就像没切片。
+  const chunkListReady =
+    !!selectedFile &&
+    selectedFile.status === 'ready' &&
+    !chunksLoading &&
+    !chunksError &&
+    chunks.length > 0
+  useLayoutEffect(() => {
+    if (tab !== 'files' || !chunkListReady) return
     const el = listRef.current
     if (!el) return
-    const update = () => setViewportH(el.clientHeight)
+    const top = scrollTopRef.current
+    if (Math.abs(el.scrollTop - top) > 1) el.scrollTop = top
+    const update = () => {
+      const h = el.clientHeight
+      if (h > 0) setViewportH((prev) => (prev === h ? prev : h))
+    }
     update()
     const ro = new ResizeObserver(update)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [selectedId])
+  }, [tab, chunkListReady])
 
   // 卡片测高 ref 回调：渲染完成后记录实际高度，变化则触发重排
   const measureCard = useCallback((seq: number, el: HTMLLIElement | null) => {
@@ -1618,51 +1636,16 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
           </div>
         </aside>
 
-        {buildFile ? (
-          // 「图谱」tab 点徽标单独查看：这份文件自己的图谱；没生成时空态里有构建按钮
-          <section className="kb-chunks" aria-label="文件图谱">
-            <KbGraphPanel
-              key={`${buildFile.file_id}:${graphEpoch}`}
-              fileId={buildFile.file_id}
-              file={buildFile}
-              canManage={canManage}
-              building={buildFile.graph_status === 'building'}
-              onStatus={syncGraphStatus}
-              heading={
-                <>
-                  {extBadge(buildFile)}
-                  <span className="kb-chunks-name">{buildFile.filename}</span>
-                  {(() => {
-                    const prog = graphBuildProgress(buildFile)
-                    if (!prog) return null
-                    return (
-                      <span className="kb-graph-stats">
-                        <span className="kb-graph-tag">
-                          {prog.aligning ? (
-                            '对齐中'
-                          ) : (
-                            <>
-                              <b>{prog.pct ?? 0}</b>%
-                            </>
-                          )}
-                        </span>
-                        {prog.entities > 0 ? (
-                          <span className="kb-graph-tag">
-                            <b>{prog.entities}</b> 实体
-                          </span>
-                        ) : null}
-                      </span>
-                    )
-                  })()}
-                </>
-              }
-            />
-          </section>
-        ) : selectedFile && tab === 'files' ? (
-          <section className="kb-chunks" aria-label="文件内容">
+        {selectedFile ? (
+          // 切到图谱时不卸载：卸掉再挂上会丢掉滚动容器，虚拟列表仍按旧
+          // scrollTop 排卡片，视口却回到顶部，看起来就是切片内容没了。
+          <section
+            className="kb-chunks"
+            hidden={tab !== 'files'}
+            aria-label="文件内容"
+          >
             <header className="kb-chunks-head">
               <h2 className="kb-chunks-title" title={selectedFile.filename}>
-                {extBadge(selectedFile)}
                 <span className="kb-chunks-name">{selectedFile.filename}</span>
                 {selectedFile.status === 'ready' ? (
                   <span className="kb-graph-stats">
@@ -1777,9 +1760,10 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                     }
                     startIdx = Math.max(0, startIdx - OVERSCAN)
                     let endIdx = startIdx
+                    const viewH = viewportH > 0 ? viewportH : 640
                     while (
                       endIdx < chunks.length &&
-                      offsets[endIdx] < scrollTop + viewportH
+                      offsets[endIdx] < scrollTop + viewH
                     ) {
                       endIdx++
                     }
@@ -1874,7 +1858,9 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
               </div>
             )}
           </section>
-        ) : tab === 'files' ? (
+        ) : null}
+
+        {tab === 'files' && !selectedFile ? (
           // 文件 tab 但没有可看的文件：此前会落到下面的全库图谱兜底，
           // 空库时右侧挂着一张空画布，既没解释也没入口。
           // 首屏请求未回来时不渲染，避免「还没有文件」闪一下又消失
@@ -1912,7 +1898,48 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
               )}
             </section>
           )
-        ) : (
+        ) : null}
+
+        {tab === 'graph' && buildFile ? (
+          // 「图谱」tab 点徽标单独查看：这份文件自己的图谱；没生成时空态里有构建按钮
+          <section className="kb-chunks" aria-label="文件图谱">
+            <KbGraphPanel
+              key={`${buildFile.file_id}:${graphEpoch}`}
+              fileId={buildFile.file_id}
+              file={buildFile}
+              canManage={canManage}
+              building={buildFile.graph_status === 'building'}
+              onStatus={syncGraphStatus}
+              heading={
+                <>
+                  <span className="kb-chunks-name">{buildFile.filename}</span>
+                  {(() => {
+                    const prog = graphBuildProgress(buildFile)
+                    if (!prog) return null
+                    return (
+                      <span className="kb-graph-stats">
+                        <span className="kb-graph-tag">
+                          {prog.aligning ? (
+                            '对齐中'
+                          ) : (
+                            <>
+                              <b>{prog.pct ?? 0}</b>%
+                            </>
+                          )}
+                        </span>
+                        {prog.entities > 0 ? (
+                          <span className="kb-graph-tag">
+                            <b>{prog.entities}</b> 实体
+                          </span>
+                        ) : null}
+                      </span>
+                    )
+                  })()}
+                </>
+              }
+            />
+          </section>
+        ) : tab === 'graph' ? (
           // 图谱视图：由图谱 tab 的勾选驱动（勾 1 个=单文件，多选=合并，0=全库）
           <section className="kb-chunks" aria-label="知识图谱">
             <KbGraphPanel
@@ -1931,7 +1958,6 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                 <>
                   {checkedIds.length === 1 && checkedFile ? (
                     <>
-                      {extBadge(checkedFile)}
                       <span className="kb-chunks-name">{checkedFile.filename}</span>
                     </>
                   ) : checkedIds.length > 1 ? (
@@ -1958,7 +1984,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
               }
             />
           </section>
-        )}
+        ) : null}
       </div>
 
       {editingFile ? (

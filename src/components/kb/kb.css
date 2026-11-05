@@ -1536,6 +1536,12 @@
   overflow: hidden;
 }
 
+/* .kb-chunks 自己写了 display:flex，会盖掉 hidden 的 display:none。
+   切到图谱时切片区靠 hidden 留在 DOM 里，必须真正藏起来。 */
+.kb-chunks[hidden] {
+  display: none;
+}
+
 .kb-chunks-head {
   display: flex;
   align-items: center;
@@ -1784,17 +1790,6 @@
 .kb-body.panel-collapsed .kb-kg-bar,
 .kb-body.panel-collapsed .kb-kg-head {
   padding-left: 72px;
-}
-
-/* 标题里的类型标签：文件名已去掉后缀，标签是唯一的类型标识，比列表徽标大一档 */
-.kb-chunks-title .kb-ext {
-  /* 标题栏这里按文字自然宽度，不用列表里那个定宽对齐的框 */
-  width: auto;
-  margin-right: 0;
-  padding: 2px 7px;
-  border-radius: 5px;
-  font-size: 10.5px;
-  flex-shrink: 0;
 }
 
 .kb-chunks-empty {
