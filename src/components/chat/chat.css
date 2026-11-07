@@ -1875,6 +1875,19 @@
   font-size: 13px;
 }
 
+.msg-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.msg-progress-text {
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .typing {
   display: inline-block;
   width: 8px;
@@ -1882,6 +1895,7 @@
   border-radius: 50%;
   background: #4d6bfe;
   animation: blink 1s infinite;
+  flex-shrink: 0;
 }
 
 .dock {

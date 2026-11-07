@@ -20,7 +20,8 @@ const HEADING = /^(#{1,6})\s+(.+)$/
 const UL = /^\s*[-*]\s+(.+)$/
 const OL = /^\s*\d+\.\s+(.+)$/
 const HR = /^---+$/
-const LINK = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/
+// 研报下载链是站内相对路径 /v1/report/files/...，不能只认 http(s)
+const LINK = /^\[([^\]]+)\]\(((?:https?:\/\/|\/)[^)\s]+)\)/
 const TABLE_ROW = /^\s*\|.*\|\s*$/
 const TABLE_SEP = /^\s*\|(\s*:?-{2,}:?\s*\|)+\s*$/
 

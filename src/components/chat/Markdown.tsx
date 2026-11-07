@@ -1,4 +1,5 @@
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, type MouseEvent, type ReactNode } from 'react'
+import { downloadReportFile } from '../../api'
 import { parseBlocks, parseInline, splitClosed, type Block, type Inline } from '../../lib/markdown'
 import { DataTable, HtmlTable } from '../kb/ChunkContent'
 
@@ -111,6 +112,16 @@ function inlinePlain(nodes: Inline[]): string {
     .join('')
 }
 
+function onMarkdownLinkClick(event: MouseEvent<HTMLAnchorElement>, href: string) {
+  // 站内 /v1/... 需要 Bearer；浏览器直开 <a> 不会带鉴权头。
+  if (!href.startsWith('/v1/')) return
+  event.preventDefault()
+  void downloadReportFile(href).catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : '下载失败'
+    window.alert(message)
+  })
+}
+
 function renderInline(nodes: Inline[]): ReactNode {
   return nodes.map((node, index) => {
     switch (node.type) {
@@ -124,7 +135,13 @@ function renderInline(nodes: Inline[]): ReactNode {
         return <code key={index}>{node.value}</code>
       case 'link':
         return (
-          <a key={index} href={node.href} target="_blank" rel="noreferrer">
+          <a
+            key={index}
+            href={node.href}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(event) => onMarkdownLinkClick(event, node.href)}
+          >
             {renderInline(node.children)}
           </a>
         )

@@ -546,6 +546,27 @@ export async function downloadKbFile(file: KbFile): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
 
+/** 研报附件：路径形如 /v1/report/files/<urlencoded name>，需带鉴权取 blob。 */
+export async function downloadReportFile(path: string): Promise<void> {
+  const href = path.startsWith('/') ? path : `/${path}`
+  const response = await authedFetch(href, { headers: authHeaders() })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '研报文件下载失败'))
+  }
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  const raw = href.split('/').pop() || 'report'
+  try {
+    link.download = decodeURIComponent(raw)
+  } catch {
+    link.download = raw
+  }
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
 /**
  * 打开原件并翻到指定页：PDF 靠 `#page=N` 让浏览器内置阅读器直接跳页。
  * 标签必须先同步开出来——取 blob 是异步的，等回来了再 window.open

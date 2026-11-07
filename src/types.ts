@@ -17,6 +17,7 @@ export type ChatEvent =
   | { type: 'run_started'; run_id: string }
   | { type: 'text'; content: string }
   | { type: 'tool_start'; name: string }
+  | { type: 'tool_progress'; name: string; message: string }
   | { type: 'tool_end'; name: string; sources?: ChatSource[] }
   | { type: 'done'; sources?: ChatSource[] }
   | { type: 'error'; message: string }
@@ -83,4 +84,6 @@ export type ChatMessage = {
   content: string
   /** 知识库引用（回答下方「参考来源」，点开看原文摘录） */
   sources?: ChatSource[]
+  /** 工具执行中的瞬时进度（如研报生成阶段），不落库 */
+  status?: string
 }

@@ -42,10 +42,16 @@ export function MessageItem({
 
   const sources = message.sources ?? []
   const waiting = loading && !message.content
+  const status = message.status?.trim() || ''
   return (
     <div className="row assistant" id={`msg-${message.id}`}>
       <div className="assistant-body">
-        {waiting ? <span className="typing" /> : null}
+        {waiting ? (
+          <div className="msg-progress" role="status" aria-live="polite">
+            {status ? <span className="msg-progress-text">{status}</span> : null}
+            <span className="typing" />
+          </div>
+        ) : null}
         {message.content ? (
           <Markdown content={message.content} streaming={loading} />
         ) : null}
