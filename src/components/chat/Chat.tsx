@@ -1,4 +1,10 @@
-import { useEffect, useState } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react'
 import { hasCachedActiveSession } from '../../api'
 import { useChat } from '../../hooks/useChat'
 import { goBack, isBareHash, navigate, useRoute } from '../../router'
@@ -9,6 +15,9 @@ import { Trace } from '../trace/Trace'
 import { ChatHeader } from './ChatHeader'
 import { Composer } from './Composer'
 import { MessageList } from './MessageList'
+import { ReportPreviewPanel } from './ReportPreviewPanel'
+import { ReportPreviewProvider, useChatSidePanel } from './ReportPreviewContext'
+import { SourcePreviewPanel } from './SourcePreviewPanel'
 import { Sidebar } from './Sidebar'
 import './chat.css'
 
@@ -139,85 +148,234 @@ export function Chat({ onLogout, initialUser = null }: Props) {
   }
 
   return (
-    <div className={`shell${sidebarOpen ? '' : ' sidebar-collapsed'}`}>
-      <div className="sidebar-mask" onClick={() => setSidebarOpen(false)} />
-      <Sidebar
-        onNewChat={() => {
-          navigate('chat')
-          reset()
-        }}
-        onCollapse={() => setSidebarOpen(false)}
-        onSelectSession={(id) => {
-          navigate('chat')
-          void selectSession(id)
-        }}
-        onRenameSession={(id, next) => renameSessionTitle(id, next)}
-        onDeleteSession={(id) => removeSession(id)}
-        sessions={sessions}
+    <ReportPreviewProvider>
+      <ChatShell
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        route={route}
+        isAdmin={isAdmin}
+        isLanding={isLanding}
+        title={title}
         sessionsReady={sessionsReady}
+        error={error}
+        input={input}
+        setInput={setInput}
+        loading={loading}
+        ready={ready}
+        webSearch={webSearch}
+        toggleWebSearch={toggleWebSearch}
+        kbOn={kbOn}
+        toggleKb={toggleKb}
+        send={send}
+        stop={stop}
+        messages={messages}
+        historyLoading={historyLoading}
+        hasMore={hasMore}
+        canResume={canResume}
+        regenerate={regenerate}
+        resumeRun={resumeRun}
+        loadOlder={loadOlder}
+        reset={reset}
+        selectSession={selectSession}
+        renameSessionTitle={renameSessionTitle}
+        removeSession={removeSession}
+        sessions={sessions}
         sessionsError={sessionsError}
-        onRetrySessions={() => void reloadSessions()}
-        activeSessionId={sessionId}
-        streamingSessionIds={streamingIds}
+        reloadSessions={reloadSessions}
+        sessionId={sessionId}
+        streamingIds={streamingIds}
         userName={user?.user_name}
         onLogout={onLogout}
       />
+    </ReportPreviewProvider>
+  )
+}
+
+type ShellProps = {
+  sidebarOpen: boolean
+  setSidebarOpen: Dispatch<SetStateAction<boolean>>
+  route: ReturnType<typeof useRoute>
+  isAdmin: boolean
+  isLanding: boolean
+  title: string
+  sessionsReady: boolean
+  error: string | null
+  input: string
+  setInput: (value: string) => void
+  loading: boolean
+  ready: boolean
+  webSearch: boolean
+  toggleWebSearch: () => void
+  kbOn: boolean
+  toggleKb: () => void
+  send: (
+    text?: string,
+    options?: { webSearch?: boolean; kb?: boolean },
+  ) => void | Promise<void>
+  stop: () => void
+  messages: ReturnType<typeof useChat>['messages']
+  historyLoading: boolean
+  hasMore: boolean
+  canResume: boolean
+  regenerate: (
+    id: string,
+    options?: { webSearch?: boolean; kb?: boolean },
+  ) => void | Promise<void>
+  resumeRun: () => void | Promise<void>
+  loadOlder: () => void | Promise<void>
+  reset: () => void
+  selectSession: (id: string) => void | Promise<void>
+  renameSessionTitle: (id: string, next: string) => void
+  removeSession: (id: string) => void
+  sessions: ReturnType<typeof useChat>['sessions']
+  sessionsError: string | null
+  reloadSessions: () => void | Promise<void>
+  sessionId: string | null | undefined
+  streamingIds: ReturnType<typeof useChat>['streamingIds']
+  userName?: string | null
+  onLogout: () => void
+}
+
+function ChatShell(props: ShellProps) {
+  const { panel, close: closeSidePanel } = useChatSidePanel()
+  const panelOpen = panel != null
+  // 打开右侧面板前侧栏是否展开：关闭时仅在当时是展开的才恢复。
+  const sidebarBeforePanel = useRef<boolean | null>(null)
+  const sidebarOpenRef = useRef(props.sidebarOpen)
+  sidebarOpenRef.current = props.sidebarOpen
+
+  useEffect(() => {
+    if (panelOpen) {
+      if (sidebarBeforePanel.current === null) {
+        sidebarBeforePanel.current = sidebarOpenRef.current
+        props.setSidebarOpen(false)
+      }
+      return
+    }
+    if (sidebarBeforePanel.current !== null) {
+      if (sidebarBeforePanel.current) props.setSidebarOpen(true)
+      sidebarBeforePanel.current = null
+    }
+  }, [panelOpen, props.setSidebarOpen])
+
+  function toggleSidebar() {
+    if (props.sidebarOpen) {
+      props.setSidebarOpen(false)
+      return
+    }
+    // 用户主动展开侧栏：关掉右侧，且不要在关面板时再自动恢复侧栏。
+    sidebarBeforePanel.current = null
+    closeSidePanel()
+    props.setSidebarOpen(true)
+  }
+
+  return (
+    <div
+      className={`shell${props.sidebarOpen ? '' : ' sidebar-collapsed'}${
+        panelOpen ? ' side-panel-open' : ''
+      }`}
+    >
+      <div className="sidebar-mask" onClick={() => props.setSidebarOpen(false)} />
+      <Sidebar
+        onNewChat={() => {
+          navigate('chat')
+          props.reset()
+        }}
+        onCollapse={() => props.setSidebarOpen(false)}
+        onSelectSession={(id) => {
+          navigate('chat')
+          void props.selectSession(id)
+        }}
+        onRenameSession={(id, next) => props.renameSessionTitle(id, next)}
+        onDeleteSession={(id) => props.removeSession(id)}
+        sessions={props.sessions}
+        sessionsReady={props.sessionsReady}
+        sessionsError={props.sessionsError ?? undefined}
+        onRetrySessions={() => void props.reloadSessions()}
+        activeSessionId={props.sessionId ?? undefined}
+        streamingSessionIds={props.streamingIds}
+        userName={props.userName ?? undefined}
+        onLogout={props.onLogout}
+      />
       <main className="chat">
-        {route === 'kb' && isAdmin ? (
-          <KnowledgeBase onBack={() => goBack(isAdmin ? 'board' : 'chat')} canManage={isAdmin} />
+        {props.route === 'kb' && props.isAdmin ? (
+          <KnowledgeBase
+            onBack={() => goBack(props.isAdmin ? 'board' : 'chat')}
+            canManage={props.isAdmin}
+          />
         ) : (
           <>
             <ChatHeader
-              title={title}
-              titleLoading={!sessionsReady && hasCachedActiveSession()}
-              collapsed={!sidebarOpen}
-              onToggleSidebar={() => setSidebarOpen((open) => !open)}
-              onNewChat={reset}
+              title={props.title}
+              titleLoading={!props.sessionsReady && hasCachedActiveSession()}
+              collapsed={!props.sidebarOpen}
+              onToggleSidebar={toggleSidebar}
+              onNewChat={props.reset}
             />
-            {isLanding ? (
+            {props.isLanding ? (
               <div className="landing">
-                {error ? <p className="error">{error}</p> : null}
+                {props.error ? <p className="error">{props.error}</p> : null}
                 <div className="landing-hero">
                   <h1 className="landing-hello">{timeGreeting()}，让我们开始聊天吧</h1>
                   <Composer
-                    value={input}
-                    loading={loading || !ready}
-                    webSearch={webSearch}
-                    onToggleWebSearch={toggleWebSearch}
-                    kbOn={kbOn}
-                    onToggleKb={toggleKb}
-                    onChange={setInput}
-                    onSend={() => void send(undefined, { webSearch, kb: kbOn })}
-                    onStop={() => stop()}
+                    value={props.input}
+                    loading={props.loading || !props.ready}
+                    webSearch={props.webSearch}
+                    onToggleWebSearch={props.toggleWebSearch}
+                    kbOn={props.kbOn}
+                    onToggleKb={props.toggleKb}
+                    onChange={props.setInput}
+                    onSend={() =>
+                      void props.send(undefined, {
+                        webSearch: props.webSearch,
+                        kb: props.kbOn,
+                      })
+                    }
+                    onStop={() => props.stop()}
                   />
                 </div>
               </div>
             ) : (
               <>
                 <MessageList
-                  key={sessionId ?? 'new'}
-                  messages={messages}
-                  loading={loading}
-                  historyLoading={historyLoading}
-                  hasMore={hasMore}
-                  canResume={canResume}
-                  onEditSubmit={(text) => void send(text, { webSearch, kb: kbOn })}
-                  onRegenerate={(id) => void regenerate(id, { webSearch, kb: kbOn })}
-                  onResume={() => void resumeRun()}
-                  onLoadOlder={() => void loadOlder()}
+                  key={props.sessionId ?? 'new'}
+                  messages={props.messages}
+                  loading={props.loading}
+                  historyLoading={props.historyLoading}
+                  hasMore={props.hasMore}
+                  canResume={props.canResume}
+                  onEditSubmit={(text) =>
+                    void props.send(text, {
+                      webSearch: props.webSearch,
+                      kb: props.kbOn,
+                    })
+                  }
+                  onRegenerate={(id) =>
+                    void props.regenerate(id, {
+                      webSearch: props.webSearch,
+                      kb: props.kbOn,
+                    })
+                  }
+                  onResume={() => void props.resumeRun()}
+                  onLoadOlder={() => void props.loadOlder()}
                 />
                 <div className="dock">
-                  {error ? <p className="error">{error}</p> : null}
+                  {props.error ? <p className="error">{props.error}</p> : null}
                   <Composer
-                    value={input}
-                    loading={loading || !ready}
-                    webSearch={webSearch}
-                    onToggleWebSearch={toggleWebSearch}
-                    kbOn={kbOn}
-                    onToggleKb={toggleKb}
-                    onChange={setInput}
-                    onSend={() => void send(undefined, { webSearch, kb: kbOn })}
-                    onStop={() => stop()}
+                    value={props.input}
+                    loading={props.loading || !props.ready}
+                    webSearch={props.webSearch}
+                    onToggleWebSearch={props.toggleWebSearch}
+                    kbOn={props.kbOn}
+                    onToggleKb={props.toggleKb}
+                    onChange={props.setInput}
+                    onSend={() =>
+                      void props.send(undefined, {
+                        webSearch: props.webSearch,
+                        kb: props.kbOn,
+                      })
+                    }
+                    onStop={() => props.stop()}
                   />
                 </div>
               </>
@@ -226,6 +384,8 @@ export function Chat({ onLogout, initialUser = null }: Props) {
           </>
         )}
       </main>
+      <ReportPreviewPanel />
+      <SourcePreviewPanel />
     </div>
   )
 }

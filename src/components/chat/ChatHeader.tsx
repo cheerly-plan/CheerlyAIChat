@@ -19,9 +19,9 @@ export function ChatHeader({
   if (!collapsed && !showTitle) return null
 
   return (
-    <header className="chat-header">
-      {collapsed ? (
-        <div className="header-side">
+    <header className={`chat-header${collapsed ? ' chat-header-collapsed' : ''}`}>
+      <div className="header-side">
+        {collapsed ? (
           <div className="header-capsule">
             <button type="button" aria-label="展开侧栏" onClick={onToggleSidebar}>
               <PanelIcon />
@@ -33,17 +33,18 @@ export function ChatHeader({
               <NewChatIcon />
             </button>
           </div>
-        </div>
-      ) : null}
-      {showTitle ? (
-        <div className="chat-header-center">
-          {titleLoading && !title ? (
+        ) : null}
+      </div>
+      <div className="chat-header-center">
+        {showTitle ? (
+          titleLoading && !title ? (
             <span className="chat-header-title skeleton-line skeleton-title" aria-hidden="true" />
           ) : (
             <span className="chat-header-title">{title}</span>
-          )}
-        </div>
-      ) : null}
+          )
+        ) : null}
+      </div>
+      {collapsed ? null : <div className="chat-header-trail" aria-hidden="true" />}
     </header>
   )
 }

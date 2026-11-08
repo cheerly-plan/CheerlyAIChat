@@ -546,25 +546,49 @@ export async function downloadKbFile(file: KbFile): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
 
+export type ReportFileBlob = {
+  href: string
+  filename: string
+  blob: Blob
+  objectUrl: string
+  contentType: string
+}
+
+function reportFileNameFromPath(path: string): string {
+  const raw = path.split('/').pop() || 'report'
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return raw
+  }
+}
+
 /** 研报附件：路径形如 /v1/report/files/<urlencoded name>，需带鉴权取 blob。 */
-export async function downloadReportFile(path: string): Promise<void> {
+export async function fetchReportFile(path: string): Promise<ReportFileBlob> {
   const href = path.startsWith('/') ? path : `/${path}`
   const response = await authedFetch(href, { headers: authHeaders() })
   if (!response.ok) {
-    throw new Error(await errorMessage(response, '研报文件下载失败'))
+    throw new Error(await errorMessage(response, '研报文件打开失败'))
   }
   const blob = await response.blob()
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  const raw = href.split('/').pop() || 'report'
-  try {
-    link.download = decodeURIComponent(raw)
-  } catch {
-    link.download = raw
+  const contentType =
+    response.headers.get('content-type') || blob.type || 'application/octet-stream'
+  return {
+    href,
+    filename: reportFileNameFromPath(href),
+    blob,
+    objectUrl: URL.createObjectURL(blob),
+    contentType,
   }
+}
+
+export async function downloadReportFile(path: string): Promise<void> {
+  const file = await fetchReportFile(path)
+  const link = document.createElement('a')
+  link.href = file.objectUrl
+  link.download = file.filename
   link.click()
-  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  setTimeout(() => URL.revokeObjectURL(file.objectUrl), 10_000)
 }
 
 /**

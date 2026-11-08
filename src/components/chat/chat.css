@@ -644,11 +644,12 @@
   flex-direction: column;
 }
 
+/* 侧栏展开时：与 .row / .composer 同宽居中，标题对齐对话左缘 */
 .chat-header {
-  position: relative;
   display: grid;
-  grid-template-columns: 1fr minmax(0, 940px) 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 940px) minmax(0, 1fr);
   align-items: center;
+  column-gap: 12px;
   height: auto;
   min-height: 52px;
   padding: 8px 24px;
@@ -656,30 +657,40 @@
   border-bottom: 1px solid #e5e7eb;
 }
 
+/* 侧栏收起（含打开右侧面板）时：标题跟在按钮后，不对齐对话，避免被挡住 */
+.chat-header-collapsed {
+  display: flex;
+  gap: 12px;
+}
+
 .header-side {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
   display: flex;
   align-items: center;
-  gap: 14px;
+  justify-self: start;
+  min-width: 0;
+}
+
+.chat-header-collapsed .header-side {
+  flex-shrink: 0;
 }
 
 .chat-header-center {
-  grid-column: 2;
-  position: relative;
+  min-width: 0;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
+}
+
+.chat-header-collapsed .chat-header-center {
+  flex: 1;
+}
+
+.chat-header-trail {
   min-width: 0;
-  width: 100%;
 }
 
 .chat-header-toggle {
-  position: absolute;
-  left: 4px;
-  top: 50%;
-  transform: translateY(-50%);
+  flex-shrink: 0;
 }
 
 .header-capsule {
@@ -1494,52 +1505,264 @@
   -webkit-line-clamp: 2;
 }
 
-.msg-source-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 35;
-  pointer-events: none;
-}
-
-.msg-source-drawer {
-  pointer-events: auto;
-  position: absolute;
-  z-index: 1;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(360px, 92vw);
-  transition: width 0.2s ease;
+/* 文件预览：对齐 DeepSeek——约 45vw 起步、可拖左缘、上限 70vw，中间至少留 400px */
+.report-preview {
+  position: relative;
+  flex-shrink: 0;
+  width: 45vw;
+  min-width: 300px;
+  max-width: 70vw;
   display: flex;
   flex-direction: column;
   background: #fff;
   border-left: 1px solid #eef0f3;
-  box-shadow: -12px 0 40px rgba(15, 23, 42, 0.08);
+  box-shadow: -8px 0 24px rgba(15, 23, 42, 0.04);
   animation: msg-source-in 0.2s ease;
+  min-height: 0;
 }
 
-@keyframes msg-source-in {
-  from {
-    transform: translateX(16px);
-    opacity: 0.6;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+.report-preview-resize {
+  position: absolute;
+  z-index: 2;
+  left: -3px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
 }
 
-.msg-source-drawer-bar {
+.report-preview-resize::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.report-preview-resize:hover::after,
+body.is-resizing-preview .report-preview-resize::after {
+  background: #4d6bfe;
+}
+
+body.is-resizing-preview {
+  cursor: col-resize;
+  user-select: none;
+}
+
+body.is-resizing-preview iframe {
+  pointer-events: none;
+}
+
+.report-preview-bar {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
-  padding: 0 14px 0 16px;
-  border-bottom: 1px solid #eef0f3;
   height: 52px;
+  padding: 0 10px 0 16px;
+  border-bottom: 1px solid #eef0f3;
+  background: #fff;
 }
 
-.msg-source-drawer-title {
+.report-preview-title {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.report-preview-badge {
+  flex-shrink: 0;
+  min-width: 34px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.report-preview-badge-PDF {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.report-preview-badge-MD,
+.report-preview-badge-MARKDOWN {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.report-preview-badge-JSON {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.report-preview-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.report-preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.report-preview-action {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.report-preview-action:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.report-preview-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.report-preview-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+
+.report-preview-body.is-pdf {
+  background: #e8eaed;
+}
+
+.report-preview-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #e8eaed;
+}
+
+.report-preview-markdown,
+.report-preview-code {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 24px 32px;
+  background: #fff;
+}
+
+.report-preview-markdown .markdown {
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.report-preview-markdown .markdown h1 {
+  font-size: 18px;
+}
+
+.report-preview-markdown .markdown h2 {
+  font-size: 16px;
+}
+
+.report-preview-markdown .markdown h3 {
+  font-size: 14.5px;
+}
+
+.report-preview-markdown .markdown h4 {
+  font-size: 13.5px;
+}
+
+.report-preview-markdown .markdown pre code {
+  font-size: 12px;
+}
+
+.report-preview-code {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #1f2937;
+}
+
+.report-preview-status,
+.report-preview-error,
+.report-preview-fallback {
+  margin: 24px 18px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.report-preview-error {
+  color: #b42318;
+}
+
+.report-preview-download-btn {
+  margin-top: 12px;
+  padding: 8px 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  cursor: pointer;
+}
+
+.report-preview-download-btn:hover {
+  background: #f9fafb;
+}
+
+.markdown a.report-file-link {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* 参考来源：左侧会话列表宽 280px + 60px */
+.source-panel {
+  position: relative;
+  flex-shrink: 0;
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-left: 1px solid #eef0f3;
+  box-shadow: -8px 0 24px rgba(15, 23, 42, 0.04);
+  animation: msg-source-in 0.2s ease;
+  min-width: 0;
+}
+
+.source-panel-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  height: 52px;
+  padding: 0 10px 0 16px;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.source-panel-title {
   min-width: 0;
   flex: 1;
   display: flex;
@@ -1547,20 +1770,22 @@
   gap: 8px;
 }
 
-.msg-source-drawer-title .msg-source-file {
-  max-width: none;
-  font-size: 15px;
+.source-panel-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
   font-weight: 600;
   color: #111827;
 }
 
-.msg-source-drawer-count {
+.source-panel-count {
+  flex-shrink: 0;
+  font-size: 12px;
   color: #9aa0a6;
-  font-size: 13px;
-  white-space: nowrap;
 }
 
-.msg-source-drawer-close {
+.source-panel-close {
   width: 32px;
   height: 32px;
   flex-shrink: 0;
@@ -1573,9 +1798,51 @@
   cursor: pointer;
 }
 
-.msg-source-drawer-close:hover {
+.source-panel-close:hover {
   background: #f3f4f6;
   color: #111827;
+}
+
+.source-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: #fafbfc;
+}
+
+@media (max-width: 900px) {
+  .shell.side-panel-open .report-preview,
+  .shell.side-panel-open .source-panel {
+    position: fixed;
+    z-index: 36;
+    top: 0;
+    right: 0;
+    bottom: 0;
+  }
+
+  .shell.side-panel-open .source-panel {
+    width: min(100vw, 360px);
+  }
+
+  .shell.side-panel-open .report-preview {
+    width: min(100vw, 70vw) !important;
+    min-width: 0;
+  }
+
+  .report-preview-resize {
+    display: none;
+  }
+}
+
+@keyframes msg-source-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 .msg-source-drawer-body {
@@ -2153,20 +2420,12 @@
     padding: 8px 12px;
   }
 
-  .header-side {
-    position: static;
-    transform: none;
+  .chat-header-trail {
+    display: none;
   }
 
   .chat-header-center {
-    grid-column: auto;
     flex: 1;
-    width: auto;
-  }
-
-  .chat-header-toggle {
-    position: static;
-    transform: none;
   }
 
   .sidebar {
