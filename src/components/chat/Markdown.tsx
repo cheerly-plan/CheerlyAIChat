@@ -2,7 +2,11 @@ import { useMemo, type MouseEvent, type ReactNode } from 'react'
 import { downloadReportFile } from '../../api'
 import { parseBlocks, parseInline, splitClosed, type Block, type Inline } from '../../lib/markdown'
 import { DataTable, HtmlTable } from '../kb/ChunkContent'
-import { isReportFilePath, useReportPreview } from './ReportPreviewContext'
+import {
+  looksLikeBrokenReportLink,
+  resolveReportFilePath,
+  useReportPreview,
+} from './ReportPreviewContext'
 
 const HTML_TABLE = /<table\b[^>]*>[\s\S]*?<\/table>/gi
 
@@ -135,14 +139,23 @@ function onMarkdownLinkClick(
   label: string,
   onOpenReport: (path: string, label?: string) => void,
 ) {
-  // 站内 /v1/... 需要 Bearer；浏览器直开 <a> 不会带鉴权头。
-  if (!href.startsWith('/v1/')) return
-  event.preventDefault()
-  // 研报产物：右侧预览（DeepSeek / 豆包式）；其它站内链仍走下载。
-  if (isReportFilePath(href)) {
-    onOpenReport(href, label || undefined)
+  const reportPath = resolveReportFilePath(href)
+  if (reportPath) {
+    event.preventDefault()
+    onOpenReport(reportPath, label || undefined)
     return
   }
+  // 模型把研报链改成 example.com 等外链时，拦住新标签页，避免跳到示例域名。
+  if (looksLikeBrokenReportLink(href, label)) {
+    event.preventDefault()
+    window.alert(
+      '这条下载链接已被模型改写，无法预览。请重新生成回答，或到报告目录打开对应文件。',
+    )
+    return
+  }
+  // 其它站内 /v1/... 需要 Bearer；浏览器直开 <a> 不会带鉴权头。
+  if (!href.startsWith('/v1/')) return
+  event.preventDefault()
   void downloadReportFile(href).catch((err: unknown) => {
     const message = err instanceof Error ? err.message : '下载失败'
     window.alert(message)
@@ -165,14 +178,24 @@ function renderInline(
         return <code key={index}>{node.value}</code>
       case 'link': {
         const label = inlinePlain(node.children).trim()
+        const reportPath = resolveReportFilePath(node.href)
+        const broken = !reportPath && looksLikeBrokenReportLink(node.href, label)
         return (
           <a
             key={index}
-            href={node.href}
+            href={reportPath || node.href}
             target="_blank"
             rel="noreferrer"
-            className={isReportFilePath(node.href) ? 'report-file-link' : undefined}
-            title={isReportFilePath(node.href) ? '点击在右侧预览' : undefined}
+            className={
+              reportPath || broken ? 'report-file-link' : undefined
+            }
+            title={
+              reportPath
+                ? '点击在右侧预览'
+                : broken
+                  ? '链接已被改写，点击查看说明'
+                  : undefined
+            }
             onClick={(event) =>
               onMarkdownLinkClick(event, node.href, label, onOpenReport)
             }

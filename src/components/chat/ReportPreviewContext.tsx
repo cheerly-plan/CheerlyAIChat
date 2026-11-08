@@ -75,5 +75,42 @@ export function useReportPreview(): ChatSidePanelContextValue {
 export const useChatSidePanel = useReportPreview
 
 export function isReportFilePath(href: string): boolean {
-  return href.startsWith('/v1/report/files/')
+  return resolveReportFilePath(href) != null
+}
+
+/**
+ * 从相对路径或绝对 URL 里抽出站内研报文件路径。
+ * 模型有时会把 `/v1/report/files/...` 改成带域名的链接，甚至换成 example.com；
+ * 只要路径段还在，就按站内预览处理。
+ */
+export function resolveReportFilePath(href: string): string | null {
+  const raw = (href || '').trim()
+  if (!raw) return null
+  if (raw.startsWith('/v1/report/files/')) {
+    return raw.split(/[\s#]/)[0] || null
+  }
+  const embedded = raw.match(/\/v1\/report\/files\/[^\s?#)]+/)
+  if (embedded?.[0]) return embedded[0]
+  try {
+    const url = new URL(raw, window.location.origin)
+    if (url.pathname.startsWith('/v1/report/files/')) {
+      return `${url.pathname}${url.search}`
+    }
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+/** 链接文案看起来像研报下载，但 href 已被模型改坏（如 example.com） */
+export function looksLikeBrokenReportLink(href: string, label: string): boolean {
+  if (resolveReportFilePath(href)) return false
+  const text = `${label} ${href}`.toLowerCase()
+  if (!/(pdf|markdown|\.md|溯源|底稿|深度|研报|报告)/i.test(text)) return false
+  return (
+    /example\.(com|org|net)/i.test(href) ||
+    /^https?:\/\//i.test(href) ||
+    href === '#' ||
+    href === ''
+  )
 }

@@ -1576,6 +1576,32 @@ body.is-resizing-preview iframe {
   gap: 8px;
 }
 
+.report-preview-layer {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.report-preview-layer-draft {
+  background: #f0f9ff;
+  color: #0369a1;
+}
+
+.report-preview-layer-deep {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.report-preview-layer-meta {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
 .report-preview-badge {
   flex-shrink: 0;
   min-width: 34px;

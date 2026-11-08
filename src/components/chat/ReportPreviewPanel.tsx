@@ -153,6 +153,7 @@ export function ReportPreviewPanel() {
   const title = target.label || file?.filename || '文件预览'
   const kind = file ? kindOf(file) : null
   const ext = extensionOf(title, kind)
+  const layer = reportLayerOf(target.path, title)
 
   return (
     <aside
@@ -176,6 +177,11 @@ export function ReportPreviewPanel() {
       />
       <div className="report-preview-bar">
         <div className="report-preview-title" title={title}>
+          {layer ? (
+            <span className={`report-preview-layer report-preview-layer-${layer.tone}`}>
+              {layer.label}
+            </span>
+          ) : null}
           {ext ? <span className={`report-preview-badge report-preview-badge-${ext}`}>{ext}</span> : null}
           <span className="report-preview-name">{title}</span>
         </div>
@@ -258,6 +264,30 @@ function extensionOf(
     default:
       return ''
   }
+}
+
+/** 研报双 PDF：按文件名区分事实层底稿与深度解析，方便右侧预览一眼辨认。 */
+function reportLayerOf(
+  path: string,
+  title: string,
+): { label: string; tone: 'deep' | 'draft' | 'meta' } | null {
+  let raw = title
+  try {
+    raw = decodeURIComponent(path.split('/').pop() || title)
+  } catch {
+    raw = path.split('/').pop() || title
+  }
+  const name = raw.toLowerCase()
+  if (/\.deep\.(pdf|md|json)$/i.test(name)) {
+    return { label: '深度解析', tone: 'deep' }
+  }
+  if (/\.provenance\.md$/i.test(name) || /\.review\.json$/i.test(name)) {
+    return { label: '附件', tone: 'meta' }
+  }
+  if (/\.(pdf|md)$/i.test(name)) {
+    return { label: '底稿', tone: 'draft' }
+  }
+  return null
 }
 
 function formatText(raw: string, kind: 'json' | 'text'): string {
