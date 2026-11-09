@@ -149,7 +149,7 @@ export function Chat({ onLogout, initialUser = null }: Props) {
   }
 
   return (
-    <ReportPreviewProvider>
+    <ReportPreviewProvider canReview={isAdmin}>
       <ChatShell
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}

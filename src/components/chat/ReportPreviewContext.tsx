@@ -21,6 +21,8 @@ export type SidePanelState =
 
 type ChatSidePanelContextValue = {
   panel: SidePanelState
+  /** 审核面板只对管理员开放（后端读接口也是管理员守卫） */
+  canReview: boolean
   /** 兼容旧名：研报预览目标 */
   target: ReportPreviewTarget | null
   open: (path: string, label?: string) => void
@@ -32,7 +34,13 @@ type ChatSidePanelContextValue = {
 
 const ChatSidePanelContext = createContext<ChatSidePanelContextValue | null>(null)
 
-export function ReportPreviewProvider({ children }: { children: ReactNode }) {
+export function ReportPreviewProvider({
+  children,
+  canReview = false,
+}: {
+  children: ReactNode
+  canReview?: boolean
+}) {
   const [panel, setPanel] = useState<SidePanelState>(null)
 
   const open = useCallback((path: string, label?: string) => {
@@ -45,9 +53,14 @@ export function ReportPreviewProvider({ children }: { children: ReactNode }) {
     setPanel({ mode: 'sources', sources })
   }, [])
 
-  const openReview = useCallback((reportId?: string) => {
-    setPanel({ mode: 'review', reportId })
-  }, [])
+  const openReview = useCallback(
+    (reportId?: string) => {
+      // 非管理员点了也不打开：队列是全局的，不该让他们看到别人的报告
+      if (!canReview) return
+      setPanel({ mode: 'review', reportId })
+    },
+    [canReview],
+  )
 
   const close = useCallback(() => setPanel(null), [])
 
@@ -55,8 +68,8 @@ export function ReportPreviewProvider({ children }: { children: ReactNode }) {
     panel?.mode === 'report' ? { path: panel.path, label: panel.label } : null
 
   const value = useMemo(
-    () => ({ panel, target, open, openSources, openReview, close }),
-    [panel, target, open, openSources, openReview, close],
+    () => ({ panel, canReview, target, open, openSources, openReview, close }),
+    [panel, canReview, target, open, openSources, openReview, close],
   )
 
   return (
@@ -69,6 +82,7 @@ export function useReportPreview(): ChatSidePanelContextValue {
   if (!ctx) {
     return {
       panel: null,
+      canReview: false,
       target: null,
       open: () => undefined,
       openSources: () => undefined,

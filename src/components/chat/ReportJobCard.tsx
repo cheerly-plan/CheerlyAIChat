@@ -199,8 +199,9 @@ export function ReportJobCard({ jobId, delivery }: Props) {
                     type="button"
                     className="report-job-aux-link"
                     onClick={() => {
-                      // 「人工审核队列」指向审核面板，比下载一份 review.json 有用
-                      if (/审核/.test(link.label) && reviewId) {
+                      // 管理员：「人工审核队列」打开审核面板；其他人只能打开这份
+                      // review.json（队列是全局的，不该让普通账号看到别人的报告）
+                      if (/审核/.test(link.label) && reviewId && preview.canReview) {
                         preview.openReview(reviewId)
                         return
                       }
