@@ -67,8 +67,12 @@ export type MemoryMessage = {
   tool_calls?: { name: string }[]
   tool_call_id?: string
   name?: string
-  /** 消息级附属信息：引用 + 该轮提交的研报任务 id */
-  meta?: { sources?: ChatSource[]; report_job_id?: string } | null
+  /** 消息级附属信息：引用 + 该轮提交的研报任务 id + 完成后的交付文本 */
+  meta?: {
+    sources?: ChatSource[]
+    report_job_id?: string
+    report_delivery?: string
+  } | null
 }
 
 export type ChatMemory = {
@@ -89,6 +93,8 @@ export type ChatMessage = {
   status?: string
   /** 研报后台任务 id：提交即返回，卡片据此轮询 /v1/report/jobs/{id} */
   reportJobId?: string
+  /** 任务完成时落库的交付文本（含下载链接）：有它就不必再轮询 */
+  reportDelivery?: string
 }
 
 /** 研报后台任务（GET /v1/report/jobs/{id} 的返回；聊天入口提交后轮询它） */

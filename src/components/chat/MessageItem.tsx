@@ -56,7 +56,10 @@ export function MessageItem({
           <Markdown content={message.content} streaming={loading} />
         ) : null}
         {message.reportJobId ? (
-          <ReportJobCard jobId={message.reportJobId} />
+          <ReportJobCard
+            jobId={message.reportJobId}
+            delivery={message.reportDelivery}
+          />
         ) : null}
         {!loading && !message.content && !message.reportJobId ? (
           <p className="msg-empty">没有生成文字回复，可重新生成</p>

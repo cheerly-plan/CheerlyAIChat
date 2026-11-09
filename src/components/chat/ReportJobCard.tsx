@@ -57,15 +57,19 @@ const TITLES: Record<ReportJob['status'], string> = {
 
 type Props = {
   jobId: string
+  /** 任务完成时随消息落库的交付文本：有它就直接渲染结果，不再轮询 */
+  delivery?: string
 }
 
-export function ReportJobCard({ jobId }: Props) {
+export function ReportJobCard({ jobId, delivery }: Props) {
   const preview = useReportPreview()
   const [job, setJob] = useState<ReportJob | null>(null)
   const [error, setError] = useState('')
   const [nonce, setNonce] = useState(0)
 
   useEffect(() => {
+    // 交付文本已经在消息里：不碰接口，服务重启也不影响
+    if (delivery) return
     let cancelled = false
     let timer: number | undefined
     const startedAt = Date.now()
@@ -79,8 +83,13 @@ export function ReportJobCard({ jobId }: Props) {
         if (next.status === 'succeeded' || next.status === 'failed') return
       } catch (err) {
         if (cancelled) return
-        // 404（进程重启丢了任务表）或网络错误：停止轮询，留一个手动重试
-        setError(err instanceof Error ? err.message : '查询任务状态失败')
+        const message = err instanceof Error ? err.message : '查询任务状态失败'
+        // 404 = 进程重启丢了内存任务表；说得具体点，别让用户以为报告坏了
+        setError(
+          /没有找到|没有 job_id|not found/i.test(message)
+            ? '任务记录已失效（服务重启会清空内存任务表），这次生成的结果无法再查询；需要的话重新发起一次生成。'
+            : message,
+        )
         return
       }
       if (cancelled || Date.now() - startedAt > POLL_TIMEOUT_MS) return
@@ -92,7 +101,7 @@ export function ReportJobCard({ jobId }: Props) {
       cancelled = true
       if (timer) window.clearTimeout(timer)
     }
-  }, [jobId, nonce])
+  }, [jobId, nonce, delivery])
 
   const links = useMemo(
     () => extractReportLinks(job?.result?.text),

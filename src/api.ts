@@ -250,6 +250,7 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
     content: string,
     sources?: ChatSource[],
     reportJobId?: string,
+    reportDelivery?: string,
   ) => {
     const merged = sources?.length ? sources : pendingSources
     if (!content && !merged.length && !reportJobId) {
@@ -263,6 +264,7 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
       sources: merged.length ? merged : undefined,
       // 刷新后卡片凭它继续轮询，任务表还在的话几秒内就把下载链接长回来
       reportJobId,
+      reportDelivery,
     })
     pendingSources = []
   }
@@ -287,7 +289,12 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
       continue
     }
 
-    flushAssistant(msg.content ?? '', sources, msg.meta?.report_job_id ?? undefined)
+    flushAssistant(
+      msg.content ?? '',
+      sources,
+      msg.meta?.report_job_id ?? undefined,
+      msg.meta?.report_delivery ?? undefined,
+    )
   }
   if (pendingSources.length) flushAssistant('')
 
