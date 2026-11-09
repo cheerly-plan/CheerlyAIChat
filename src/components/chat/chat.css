@@ -2627,3 +2627,11 @@ body.is-resizing-preview iframe {
   line-height: 1.5;
   color: #98a2b3;
 }
+
+.report-job-summary {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: #344054;
+}

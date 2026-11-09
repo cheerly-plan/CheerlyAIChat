@@ -26,6 +26,19 @@ function extractReportLinks(text: string | null | undefined): FileLink[] {
   return links
 }
 
+/** 从任务结果里挑「标题：/校验：」两行，成功卡片上当作结论摘要 */
+function extractSummary(text: string | null | undefined): {
+  title: string
+  validation: string
+} {
+  if (!text) return { title: '', validation: '' }
+  const pick = (label: string) => {
+    const line = text.split('\n').find((item) => item.startsWith(label))
+    return line ? line.slice(label.length).trim() : ''
+  }
+  return { title: pick('标题：'), validation: pick('校验：') }
+}
+
 function formatElapsed(seconds: number | undefined): string {
   const total = Math.max(0, Math.round(seconds ?? 0))
   if (total < 60) return `${total} 秒`
@@ -84,6 +97,10 @@ export function ReportJobCard({ jobId }: Props) {
     () => extractReportLinks(job?.result?.text),
     [job?.result?.text],
   )
+  const summary = useMemo(
+    () => extractSummary(job?.result?.text),
+    [job?.result?.text],
+  )
 
   const status = job?.status ?? 'running'
   const progress = Math.max(0, Math.min(100, Math.round(job?.progress ?? 0)))
@@ -139,6 +156,9 @@ export function ReportJobCard({ jobId }: Props) {
 
       {!error && status === 'succeeded' ? (
         <>
+          {summary.title ? (
+            <p className="report-job-summary">{summary.title}</p>
+          ) : null}
           {links.length ? (
             <div className="report-job-links">
               {links.map((link) => (
@@ -158,6 +178,9 @@ export function ReportJobCard({ jobId }: Props) {
               /v1/report/reviews 查看产物。
             </p>
           )}
+          {summary.validation ? (
+            <p className="report-job-note">校验：{summary.validation}</p>
+          ) : null}
           <p className="report-job-note">
             深度 PDF 与底稿分开审核：PDF 需管理员批准后才能下载，Markdown 可先看。
           </p>
