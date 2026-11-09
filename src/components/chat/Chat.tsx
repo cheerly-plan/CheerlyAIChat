@@ -16,6 +16,7 @@ import { ChatHeader } from './ChatHeader'
 import { Composer } from './Composer'
 import { MessageList } from './MessageList'
 import { ReportPreviewPanel } from './ReportPreviewPanel'
+import { ReportReviewPanel } from './ReportReviewPanel'
 import { ReportPreviewProvider, useChatSidePanel } from './ReportPreviewContext'
 import { SourcePreviewPanel } from './SourcePreviewPanel'
 import { Sidebar } from './Sidebar'
@@ -385,6 +386,12 @@ function ChatShell(props: ShellProps) {
         )}
       </main>
       <ReportPreviewPanel />
+      {panel?.mode === 'review' ? (
+        <ReportReviewPanel
+          key={panel.reportId ?? 'queue'}
+          reportId={panel.reportId}
+        />
+      ) : null}
       <SourcePreviewPanel />
     </div>
   )

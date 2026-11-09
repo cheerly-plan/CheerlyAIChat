@@ -103,22 +103,23 @@ export function ReportJobCard({ jobId, delivery }: Props) {
     }
   }, [jobId, nonce, delivery])
 
-  const links = useMemo(
-    () => extractReportLinks(job?.result?.text),
-    [job?.result?.text],
-  )
+  // 交付文本（随消息落库）优先：有它就不看任务，也不轮询
+  const resultText = delivery || job?.result?.text
+  const links = useMemo(() => extractReportLinks(resultText), [resultText])
   // 溯源/审核这类附属文件不进下载按钮组，降级成一行小字链接，主按钮只留报告本体
   const isAuxLink = (label: string) => /溯源|审核/.test(label)
   const primaryLinks = links.filter((link) => !isAuxLink(link.label))
   const auxLinks = links.filter((link) => isAuxLink(link.label))
-  const summary = useMemo(
-    () => extractSummary(job?.result?.text),
-    [job?.result?.text],
-  )
+  // 结果文本里有「深度 PDF 审核队列：/v1/report/reviews/<id>」，据此直连审核面板
+  const reviewId = useMemo(() => {
+    const match = /\/v1\/report\/reviews\/([0-9a-zA-Z_-]+)/.exec(resultText ?? '')
+    return match?.[1] ?? ''
+  }, [resultText])
+  const summary = useMemo(() => extractSummary(resultText), [resultText])
 
-  const status = job?.status ?? 'running'
+  const status = delivery ? 'succeeded' : (job?.status ?? 'running')
   const progress = Math.max(0, Math.min(100, Math.round(job?.progress ?? 0)))
-  const title = job ? TITLES[job.status] : '研报任务已提交'
+  const title = delivery ? TITLES.succeeded : job ? TITLES[job.status] : '研报任务已提交'
 
   return (
     <section className={`report-job report-job-${status}`}>
@@ -197,7 +198,14 @@ export function ReportJobCard({ jobId, delivery }: Props) {
                   <button
                     type="button"
                     className="report-job-aux-link"
-                    onClick={() => preview.open(link.path, link.label)}
+                    onClick={() => {
+                      // 「人工审核队列」指向审核面板，比下载一份 review.json 有用
+                      if (/审核/.test(link.label) && reviewId) {
+                        preview.openReview(reviewId)
+                        return
+                      }
+                      preview.open(link.path, link.label)
+                    }}
                   >
                     {link.label}
                   </button>

@@ -1,4 +1,4 @@
-import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, ChatSource, MemoryMessage, ReportJob, SessionInfo, SessionTitle, UserInfo } from './types'
+import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, ChatSource, MemoryMessage, ReportJob, ReportReviewRecord, SessionInfo, SessionTitle, UserInfo } from './types'
 
 export const CHAT_MEMORY_PAGE_SIZE = 20
 export const DEFAULT_SESSION_TITLE = '新会话'
@@ -595,6 +595,68 @@ export async function fetchReportJob(jobId: string): Promise<ReportJob> {
 function resolvePreviewDownloadAllowed(header: string | null, href: string): boolean {
   if (header !== null) return header !== '0'
   return !/\.deep\.pdf/i.test(href)
+}
+
+/** 审核队列：默认只看待人工处置的（pending）。 */
+export async function fetchReportReviews(
+  status: 'pending' | 'approved' | 'rejected' | 'finalized' = 'pending',
+): Promise<ReportReviewRecord[]> {
+  const response = await authedFetch(
+    `/v1/report/reviews?status=${encodeURIComponent(status)}`,
+    { headers: authHeaders() },
+  )
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '获取审核队列失败'))
+  }
+  const data = (await response.json()) as { items?: ReportReviewRecord[] }
+  return data.items ?? []
+}
+
+export async function fetchReportReview(
+  reportId: string,
+): Promise<ReportReviewRecord> {
+  const response = await authedFetch(
+    `/v1/report/reviews/${encodeURIComponent(reportId)}`,
+    { headers: authHeaders() },
+  )
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '获取审核记录失败'))
+  }
+  return (await response.json()) as ReportReviewRecord
+}
+
+/** 处置审核项：approve 批准 / reject 驳回 / reset 退回待审（管理员）。 */
+export async function decideReportReview(
+  reportId: string,
+  action: 'approve' | 'reject' | 'reset',
+  note = '',
+): Promise<ReportReviewRecord> {
+  const response = await authedFetch(
+    `/v1/report/reviews/${encodeURIComponent(reportId)}/decision`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ action, note, item_ids: [] }),
+    },
+  )
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '审核操作失败'))
+  }
+  return (await response.json()) as ReportReviewRecord
+}
+
+/** 定稿：校验未过/仍有待审项/被驳回/内容被改动一律 409（管理员）。 */
+export async function finalizeReportReview(
+  reportId: string,
+): Promise<ReportReviewRecord> {
+  const response = await authedFetch(
+    `/v1/report/reviews/${encodeURIComponent(reportId)}/finalize`,
+    { method: 'POST', headers: authHeaders() },
+  )
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '定稿失败'))
+  }
+  return (await response.json()) as ReportReviewRecord
 }
 
 /** 研报附件：路径形如 /v1/report/files/<urlencoded name>，需带鉴权取 blob。

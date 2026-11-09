@@ -111,3 +111,44 @@ export type ReportJob = {
   /** 仅在 succeeded 时返回；聊天任务形如 { kind: 'chat_report', text: '…' } */
   result?: { kind?: string; text?: string } | null
 }
+
+/** 审核队列里的一条待处置项（M2） */
+export type ReportReviewItem = {
+  id: string
+  reason: string
+  value?: string
+  subject?: string
+  name?: string
+  period?: string
+  quote?: string
+  state: string
+  reviewer?: string
+  note?: string
+  decided_at?: string
+}
+
+/** 一份报告的审核记录（GET /v1/report/reviews 的 item） */
+export type ReportReviewRecord = {
+  report_id: string
+  title: string
+  report_status: string
+  status: string
+  created_at: string
+  updated_at?: string
+  validation_passed: boolean
+  error_count: number
+  artifacts?: Record<string, string>
+  items: ReportReviewItem[]
+  decisions?: {
+    at: string
+    actor: string
+    action: string
+    note?: string
+    status?: string
+  }[]
+  finalizable?: boolean
+  gate_reason?: string
+  pending_items?: number
+  finalized_by?: string
+  finalized_at?: string
+}

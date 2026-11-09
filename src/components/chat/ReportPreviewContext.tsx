@@ -16,6 +16,7 @@ export type ReportPreviewTarget = {
 export type SidePanelState =
   | { mode: 'report'; path: string; label?: string }
   | { mode: 'sources'; sources: ChatSource[] }
+  | { mode: 'review'; reportId?: string }
   | null
 
 type ChatSidePanelContextValue = {
@@ -24,6 +25,8 @@ type ChatSidePanelContextValue = {
   target: ReportPreviewTarget | null
   open: (path: string, label?: string) => void
   openSources: (sources: ChatSource[]) => void
+  /** 打开研报审核面板；带 reportId 直接进详情，不带则看待审队列 */
+  openReview: (reportId?: string) => void
   close: () => void
 }
 
@@ -42,14 +45,18 @@ export function ReportPreviewProvider({ children }: { children: ReactNode }) {
     setPanel({ mode: 'sources', sources })
   }, [])
 
+  const openReview = useCallback((reportId?: string) => {
+    setPanel({ mode: 'review', reportId })
+  }, [])
+
   const close = useCallback(() => setPanel(null), [])
 
   const target =
     panel?.mode === 'report' ? { path: panel.path, label: panel.label } : null
 
   const value = useMemo(
-    () => ({ panel, target, open, openSources, close }),
-    [panel, target, open, openSources, close],
+    () => ({ panel, target, open, openSources, openReview, close }),
+    [panel, target, open, openSources, openReview, close],
   )
 
   return (
@@ -65,6 +72,7 @@ export function useReportPreview(): ChatSidePanelContextValue {
       target: null,
       open: () => undefined,
       openSources: () => undefined,
+      openReview: () => undefined,
       close: () => undefined,
     }
   }

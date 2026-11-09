@@ -3363,3 +3363,255 @@ body.is-resizing-preview iframe {
   border-radius: 999px;
   background: #d7dbe4;
 }
+
+
+/* ===== 研报审核面板（M2 人工审核） ===== */
+.report-review-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 16px 32px;
+  background: #fbfcfe;
+}
+
+.report-review-status,
+.report-review-error {
+  margin: 12px 4px;
+  font-size: 13px;
+  color: #667085;
+}
+
+.report-review-error {
+  color: #b42318;
+}
+
+.report-review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.report-review-item {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid #e6e9f2;
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.report-review-item:hover {
+  border-color: #c7d2f8;
+  box-shadow: 0 4px 14px rgba(77, 107, 254, 0.08);
+}
+
+.report-review-item-title {
+  padding-right: 70px;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #101828;
+}
+
+.report-review-item-meta {
+  font-size: 11.5px;
+  color: #98a2b3;
+}
+
+.report-review-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fffaeb;
+  color: #b54708;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.report-review-badge.is-approved,
+.report-review-badge.is-finalized {
+  background: #ecfdf3;
+  color: #067647;
+}
+
+.report-review-badge.is-rejected {
+  background: #fef3f2;
+  color: #b42318;
+}
+
+.report-review-empty {
+  padding: 48px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: #667085;
+}
+
+.report-review-empty-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #98a2b3;
+}
+
+.report-review-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.report-review-back {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #4d6bfe;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.report-review-title {
+  margin: 2px 0 0;
+  font-size: 16px;
+  line-height: 1.45;
+  color: #101828;
+}
+
+.report-review-sub {
+  margin: 0;
+  font-size: 12px;
+  color: #98a2b3;
+}
+
+.report-review-gate {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #fffaeb;
+  color: #93370d;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.report-review-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.report-review-entry {
+  padding: 10px 12px;
+  border: 1px solid #eceef4;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.report-review-entry-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.report-review-entry-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #98a2b3;
+}
+
+.report-review-state {
+  font-size: 11px;
+  font-weight: 600;
+  color: #b54708;
+}
+
+.report-review-state.is-approved {
+  color: #067647;
+}
+
+.report-review-state.is-rejected {
+  color: #b42318;
+}
+
+.report-review-entry-reason {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #344054;
+}
+
+.report-review-entry-meta {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: #98a2b3;
+}
+
+.report-review-note {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid #e6e9f2;
+  border-radius: 10px;
+  background: #fff;
+  color: #344054;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.report-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.report-review-btn {
+  padding: 8px 14px;
+  border: 1px solid #e6e9f2;
+  border-radius: 10px;
+  background: #fff;
+  color: #344054;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.report-review-btn:hover:not(:disabled) {
+  border-color: #c7d2f8;
+  color: #3d5bf5;
+}
+
+.report-review-btn.primary {
+  border-color: #4d6bfe;
+  background: #4d6bfe;
+  color: #fff;
+}
+
+.report-review-btn.primary:hover:not(:disabled) {
+  background: #3c5bf2;
+}
+
+.report-review-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.report-review-done {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #067647;
+}
