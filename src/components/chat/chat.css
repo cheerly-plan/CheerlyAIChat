@@ -3008,27 +3008,6 @@ body.is-resizing-preview iframe {
   background: #f8f9fc;
 }
 
-.report-preview-markdown .markdown table {
-  width: 100%;
-  margin: 12px 0;
-  border-collapse: collapse;
-  font-size: 12.5px;
-}
-
-.report-preview-markdown .markdown th,
-.report-preview-markdown .markdown td {
-  padding: 7px 10px;
-  border: 1px solid #eceef4;
-  text-align: left;
-  vertical-align: top;
-}
-
-.report-preview-markdown .markdown th {
-  background: #f7f8fb;
-  font-weight: 600;
-  color: #344054;
-}
-
 /* 加载/错误：轻量骨架 + 居中状态卡 */
 .report-preview-status,
 .report-preview-error {
@@ -3276,4 +3255,111 @@ body.is-resizing-preview iframe {
 
 .report-job-aux-sep {
   color: #d0d5dd;
+}
+
+/* ===== Markdown 里的表格（聊天与预览共用 DataTable） ===== */
+.markdown .kb-chunk-table-wrap {
+  margin: 12px 0;
+  border: 1px solid #e8ebf2;
+  border-radius: 10px;
+  background: #fff;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.markdown .kb-chunk-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.markdown .kb-chunk-table th,
+.markdown .kb-chunk-table td {
+  padding: 7px 11px;
+  border-bottom: 1px solid #eef0f3;
+  border-right: 1px solid #f2f4f8;
+  text-align: left;
+  vertical-align: top;
+  /* 中文没有空格，默认会在任意字间断行 → 公司名被挤成竖排。统一不折行，
+     靠外层横向滚动；只有首列（长文本）允许在 260px 内折行。 */
+  white-space: nowrap;
+}
+
+.markdown .kb-chunk-table th:last-child,
+.markdown .kb-chunk-table td:last-child {
+  border-right: none;
+}
+
+.markdown .kb-chunk-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f7f8fa;
+  color: #4a5160;
+  font-weight: 600;
+}
+
+.markdown .kb-chunk-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.markdown .kb-chunk-table tbody tr:nth-child(even) td {
+  background: #fbfcfe;
+}
+
+.markdown .kb-chunk-table td.is-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #1f2937;
+}
+
+.markdown .kb-chunk-table .kb-chunk-col1-cell {
+  box-sizing: border-box;
+  /* 少 width:max-content 会让首列塌成 1 个字宽（CJK 处处可断，max-content 就退化） */
+  width: max-content;
+  max-width: 260px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.markdown .kb-chunk-table .kb-chunk-col1 {
+  max-width: 260px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* 窄面板里表格必然横向溢出：首列粘住，滚到右边也知道这行是谁 */
+.markdown .kb-chunk-table th:first-child,
+.markdown .kb-chunk-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: 1px 0 0 #eef0f3;
+}
+
+.markdown .kb-chunk-table thead th:first-child {
+  background: #f7f8fa;
+  z-index: 3;
+}
+
+.markdown .kb-chunk-table tbody tr:nth-child(even) td:first-child {
+  background: #fbfcfe;
+}
+
+/* 横向滚动条常驻一点：macOS 覆盖式滚动条默认看不见，用户不知道右边还有列 */
+.markdown .kb-chunk-table-wrap {
+  scrollbar-width: thin;
+  scrollbar-color: #d7dbe4 transparent;
+}
+
+.markdown .kb-chunk-table-wrap::-webkit-scrollbar {
+  height: 8px;
+}
+
+.markdown .kb-chunk-table-wrap::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #d7dbe4;
 }
