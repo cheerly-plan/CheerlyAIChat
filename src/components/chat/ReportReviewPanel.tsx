@@ -31,7 +31,7 @@ function formatTime(value?: string): string {
 
 /** 研报审核面板：待审队列 → 详情 → 批准/驳回/定稿（全部走 M2 硬门禁）。 */
 export function ReportReviewPanel({ reportId }: { reportId?: string }) {
-  const { close } = useReportPreview()
+  const { close, canReview } = useReportPreview()
   const [selectedId, setSelectedId] = useState<string | undefined>(reportId)
   const [records, setRecords] = useState<ReportReviewRecord[]>([])
   const [current, setCurrent] = useState<ReportReviewRecord | null>(null)
@@ -94,8 +94,12 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
     }
   }
 
-  const title = selectedId ? '审核详情' : '研报审核'
-  const subtitle = selectedId ? '' : `${records.length} 份待人工处置`
+  const title = selectedId ? '审核详情' : canReview ? '研报审核' : '我的研报审核'
+  const subtitle = selectedId
+    ? ''
+    : canReview
+      ? `${records.length} 份待人工处置`
+      : `我生成的研报里 ${records.length} 份待处置`
 
   return (
     <aside

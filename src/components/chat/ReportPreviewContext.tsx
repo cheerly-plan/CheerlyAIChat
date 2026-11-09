@@ -21,7 +21,7 @@ export type SidePanelState =
 
 type ChatSidePanelContextValue = {
   panel: SidePanelState
-  /** 审核面板只对管理员开放（后端读接口也是管理员守卫） */
+  /** 管理员 = 能看全部队列；普通用户只能审自己生成的（后端按 owner 过滤） */
   canReview: boolean
   /** 兼容旧名：研报预览目标 */
   target: ReportPreviewTarget | null
@@ -53,14 +53,10 @@ export function ReportPreviewProvider({
     setPanel({ mode: 'sources', sources })
   }, [])
 
-  const openReview = useCallback(
-    (reportId?: string) => {
-      // 非管理员点了也不打开：队列是全局的，不该让他们看到别人的报告
-      if (!canReview) return
-      setPanel({ mode: 'review', reportId })
-    },
-    [canReview],
-  )
+  const openReview = useCallback((reportId?: string) => {
+    // 谁生成的谁审：队列接口按 owner 过滤，非管理员打开只看到自己的那份
+    setPanel({ mode: 'review', reportId })
+  }, [])
 
   const close = useCallback(() => setPanel(null), [])
 

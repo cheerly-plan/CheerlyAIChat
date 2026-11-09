@@ -199,9 +199,8 @@ export function ReportJobCard({ jobId, delivery }: Props) {
                     type="button"
                     className="report-job-aux-link"
                     onClick={() => {
-                      // 管理员：「人工审核队列」打开审核面板；其他人只能打开这份
-                      // review.json（队列是全局的，不该让普通账号看到别人的报告）
-                      if (/审核/.test(link.label) && reviewId && preview.canReview) {
+                      // 「人工审核队列」打开审核面板（普通用户只能看到自己那份）
+                      if (/审核/.test(link.label) && reviewId) {
                         preview.openReview(reviewId)
                         return
                       }
