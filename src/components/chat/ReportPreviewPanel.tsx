@@ -49,6 +49,8 @@ export function ReportPreviewPanel() {
   const [text, setText] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  // 下载中按文件 path 记录：切换预览目标时状态自动失效，不用在 effect 里手动重置
+  const [downloadingPath, setDownloadingPath] = useState<string | null>(null)
   const [width, setWidth] = useState(() =>
     typeof window === 'undefined' ? 520 : readStoredWidth(),
   )
@@ -70,7 +72,7 @@ export function ReportPreviewPanel() {
     setLoading(true)
     setError('')
     setText('')
-    void fetchReportFile(target.path)
+    void fetchReportFile(target.path, { preview: true })
       .then(async (next) => {
         if (cancelled) {
           URL.revokeObjectURL(next.objectUrl)
@@ -150,7 +152,29 @@ export function ReportPreviewPanel() {
 
   if (!target) return null
 
+  const path = target.path
+  const downloading = downloadingPath === path
+  // 后端 M2 门禁：未定稿的深度层 PDF 只可在线预览，不提供下载入口
+  const canDownload = file === null || file.downloadAllowed
+  function startDownload() {
+    if (downloading || !canDownload) return
+    setDownloadingPath(path)
+    void downloadReportFile(path)
+      .catch((err: unknown) => {
+        window.alert(err instanceof Error ? err.message : '下载失败')
+      })
+      .finally(() => setDownloadingPath(null))
+  }
+
   const title = target.label || file?.filename || '文件预览'
+  const sizeText = file ? formatSize(file.blob.size) : ''
+  const metaNote = file
+    ? canDownload
+      ? '可直接下载'
+      : '需人工审核，仅可在线预览'
+    : loading
+      ? '正在打开…'
+      : ''
   const kind = file ? kindOf(file) : null
   const ext = extensionOf(title, kind)
   const layer = reportLayerOf(target.path, title)
@@ -176,29 +200,49 @@ export function ReportPreviewPanel() {
         }}
       />
       <div className="report-preview-bar">
-        <div className="report-preview-title" title={title}>
-          {layer ? (
-            <span className={`report-preview-layer report-preview-layer-${layer.tone}`}>
-              {layer.label}
-            </span>
-          ) : null}
-          {ext ? <span className={`report-preview-badge report-preview-badge-${ext}`}>{ext}</span> : null}
-          <span className="report-preview-name">{title}</span>
+        <div className="report-preview-heading">
+          <div className="report-preview-row" title={title}>
+            {layer ? (
+              <span className={`report-preview-layer report-preview-layer-${layer.tone}`}>
+                {layer.label}
+              </span>
+            ) : null}
+            {ext ? <span className={`report-preview-badge report-preview-badge-${ext}`}>{ext}</span> : null}
+            <span className="report-preview-name">{title}</span>
+          </div>
+          <div className="report-preview-meta">
+            {sizeText ? <span>{sizeText}</span> : null}
+            {sizeText && metaNote ? (
+              <span className="report-preview-meta-sep">·</span>
+            ) : null}
+            {metaNote ? (
+              <span className={file && !canDownload ? 'report-preview-meta-warn' : undefined}>
+                {metaNote}
+              </span>
+            ) : null}
+          </div>
         </div>
         <div className="report-preview-actions">
           <button
             type="button"
-            className="report-preview-action"
-            aria-label="下载"
-            title="下载"
-            disabled={!file || loading}
-            onClick={() => {
-              void downloadReportFile(target.path).catch((err: unknown) => {
-                window.alert(err instanceof Error ? err.message : '下载失败')
-              })
-            }}
+            className="report-preview-download"
+            aria-label={downloading ? '正在下载' : canDownload ? '下载文件' : '需人工审核通过后可下载'}
+            title={
+              canDownload
+                ? downloading
+                  ? '正在下载…'
+                  : '下载文件'
+                : '需人工审核通过后可下载'
+            }
+            disabled={!file || loading || downloading || !canDownload}
+            onClick={startDownload}
           >
-            <DownloadIcon />
+            {downloading ? (
+              <span className="report-preview-spinner" aria-hidden="true" />
+            ) : (
+              <DownloadIcon />
+            )}
+            <span>{downloading ? '下载中' : '下载'}</span>
           </button>
           <button
             type="button"
@@ -212,10 +256,36 @@ export function ReportPreviewPanel() {
         </div>
       </div>
       <div className={`report-preview-body${kind === 'pdf' ? ' is-pdf' : ''}`}>
-        {loading ? <p className="report-preview-status">正在打开…</p> : null}
-        {error ? <p className="report-preview-error">{error}</p> : null}
+        {loading ? (
+          <div
+            className="report-preview-skeleton"
+            role="status"
+            aria-label="正在打开文件"
+          >
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+        ) : null}
+        {error ? (
+          <div className="report-preview-error-wrap">
+            <div className="report-preview-error-card">
+              <div className="report-preview-error-icon" aria-hidden="true">
+                !
+              </div>
+              <p className="report-preview-error-title">无法打开这个文件</p>
+              <p className="report-preview-error-detail">{error}</p>
+            </div>
+          </div>
+        ) : null}
         {!loading && !error && file && kind === 'pdf' ? (
-          <iframe className="report-preview-frame" title={title} src={file.objectUrl} />
+          <iframe
+            className="report-preview-frame"
+            title={title}
+            src={`${file.objectUrl}${canDownload ? '' : '#toolbar=0&navpanes=0&scrollbar=0'}`}
+          />
         ) : null}
         {!loading && !error && file && kind === 'markdown' ? (
           <div className="report-preview-markdown">
@@ -227,23 +297,44 @@ export function ReportPreviewPanel() {
         ) : null}
         {!loading && !error && file && kind === 'other' ? (
           <div className="report-preview-fallback">
-            <p>此类型暂不支持内嵌预览，请下载后查看。</p>
-            <button
-              type="button"
-              className="report-preview-download-btn"
-              onClick={() => {
-                void downloadReportFile(target.path).catch((err: unknown) => {
-                  window.alert(err instanceof Error ? err.message : '下载失败')
-                })
-              }}
-            >
-              下载文件
-            </button>
+            <div className="report-preview-fallback-card">
+              <span className="report-preview-fallback-icon" aria-hidden="true">
+                <DownloadIcon />
+              </span>
+              <p className="report-preview-fallback-title">此格式暂不支持在线预览</p>
+              <p className="report-preview-fallback-desc">
+                {canDownload ? '下载到本地即可查看完整内容' : '此文件需人工审核，暂不提供下载'}
+              </p>
+              {canDownload ? (
+                <button
+                  type="button"
+                  className="report-preview-download-btn"
+                  disabled={downloading}
+                  onClick={startDownload}
+                >
+                  <DownloadIcon />
+                  <span>{downloading ? '正在下载…' : '下载文件'}</span>
+                </button>
+              ) : null}
+              {file.filename ? (
+                <p className="report-preview-fallback-name" title={file.filename}>
+                  {file.filename}
+                </p>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </div>
     </aside>
   )
+}
+
+/** 文件大小：0 或未知时返回空串，别在头部显示「0 B」 */
+function formatSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
 function extensionOf(
@@ -271,11 +362,12 @@ function reportLayerOf(
   path: string,
   title: string,
 ): { label: string; tone: 'deep' | 'draft' | 'meta' } | null {
-  let raw = title
+  const tail = path.split('/').pop() || title
+  let raw: string
   try {
-    raw = decodeURIComponent(path.split('/').pop() || title)
+    raw = decodeURIComponent(tail)
   } catch {
-    raw = path.split('/').pop() || title
+    raw = tail
   }
   const name = raw.toLowerCase()
   if (/\.deep\.(pdf|md|json)$/i.test(name)) {

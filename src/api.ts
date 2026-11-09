@@ -558,6 +558,9 @@ export type ReportFileBlob = {
   blob: Blob
   objectUrl: string
   contentType: string
+  /** 后端 M2 门禁结论：false = 需人工审核，只能在线预览、不能作为附件下载 */
+  downloadAllowed: boolean
+  reviewStatus: string
 }
 
 function reportFileNameFromPath(path: string): string {
@@ -581,10 +584,24 @@ export async function fetchReportJob(jobId: string): Promise<ReportJob> {
   return (await response.json()) as ReportJob
 }
 
-/** 研报附件：路径形如 /v1/report/files/<urlencoded name>，需带鉴权取 blob。 */
-export async function fetchReportFile(path: string): Promise<ReportFileBlob> {
+/** 头缺失（旧后端 / 代理剥掉自定义头）时，深度层 PDF 一律保守禁下载，避免误放行。 */
+function resolvePreviewDownloadAllowed(header: string | null, href: string): boolean {
+  if (header !== null) return header !== '0'
+  return !/\.deep\.pdf/i.test(href)
+}
+
+/** 研报附件：路径形如 /v1/report/files/<urlencoded name>，需带鉴权取 blob。
+ *  preview=true 走在线预览通道（未定稿的深度层 PDF 也可看），并从响应头读出门禁结论；
+ *  不带 preview 时仍是原来的下载路径，M2 pdf_download_gate 逐字不变。 */
+export async function fetchReportFile(
+  path: string,
+  options: { preview?: boolean } = {},
+): Promise<ReportFileBlob> {
   const href = path.startsWith('/') ? path : `/${path}`
-  const response = await authedFetch(href, { headers: authHeaders() })
+  const url = options.preview
+    ? `${href}${href.includes('?') ? '&' : '?'}preview=1`
+    : href
+  const response = await authedFetch(url, { headers: authHeaders() })
   if (!response.ok) {
     throw new Error(await errorMessage(response, '研报文件打开失败'))
   }
@@ -597,6 +614,13 @@ export async function fetchReportFile(path: string): Promise<ReportFileBlob> {
     blob,
     objectUrl: URL.createObjectURL(blob),
     contentType,
+    downloadAllowed: options.preview
+      ? resolvePreviewDownloadAllowed(
+          response.headers.get('X-Report-Download-Allowed'),
+          href,
+        )
+      : true,
+    reviewStatus: response.headers.get('X-Report-Review-Status') || '',
   }
 }
 

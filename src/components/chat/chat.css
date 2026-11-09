@@ -1521,6 +1521,17 @@
   min-height: 0;
 }
 
+/* 未放行的深度层 PDF：中性提示条，红框留给 PDF 内部的推断结论 */
+.report-preview-review-note {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  background: #fffaeb;
+  border-bottom: 1px solid #fedf89;
+  color: #93370d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .report-preview-resize {
   position: absolute;
   z-index: 2;
@@ -1658,11 +1669,24 @@ body.is-resizing-preview iframe {
   background: transparent;
   color: #6b7280;
   cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .report-preview-action:hover:not(:disabled) {
   background: #f3f4f6;
   color: #111827;
+}
+
+.report-preview-action-download:hover:not(:disabled) {
+  background: rgba(77, 107, 254, 0.1);
+  color: #4d6bfe;
+}
+
+.report-preview-action:focus-visible {
+  outline: 2px solid #4d6bfe;
+  outline-offset: 2px;
 }
 
 .report-preview-action:disabled {
@@ -1734,8 +1758,7 @@ body.is-resizing-preview iframe {
 }
 
 .report-preview-status,
-.report-preview-error,
-.report-preview-fallback {
+.report-preview-error {
   margin: 24px 18px;
   font-size: 14px;
   color: #6b7280;
@@ -1745,18 +1768,119 @@ body.is-resizing-preview iframe {
   color: #b42318;
 }
 
-.report-preview-download-btn {
-  margin-top: 12px;
-  padding: 8px 14px;
-  border: 1px solid #d0d5dd;
-  border-radius: 8px;
-  background: #fff;
-  color: #111827;
-  cursor: pointer;
+/* 不支持内嵌预览时：居中空状态卡片，让「下载」成为唯一明确的主动作 */
+.report-preview-fallback {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 28px 20px 40px;
+  background: #fafbfc;
 }
 
-.report-preview-download-btn:hover {
-  background: #f9fafb;
+.report-preview-fallback-card {
+  width: 100%;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 24px 26px;
+  border: 1px solid #eef0f3;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.05);
+  text-align: center;
+}
+
+.report-preview-fallback-icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: rgba(77, 107, 254, 0.09);
+  color: #4d6bfe;
+}
+
+.report-preview-fallback-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.report-preview-fallback-title {
+  margin: 18px 0 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #111827;
+}
+
+.report-preview-fallback-desc {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #8a909c;
+}
+
+.report-preview-download-btn {
+  height: 40px;
+  margin-top: 22px;
+  padding: 0 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: #4d6bfe;
+  color: #fff;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(77, 107, 254, 0.22);
+  transition:
+    background 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.report-preview-download-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.report-preview-download-btn:hover:not(:disabled) {
+  background: #3c5bf2;
+  box-shadow: 0 7px 18px rgba(77, 107, 254, 0.3);
+  transform: translateY(-1px);
+}
+
+.report-preview-download-btn:active:not(:disabled) {
+  background: #3550db;
+  box-shadow: 0 2px 8px rgba(77, 107, 254, 0.22);
+  transform: translateY(0);
+}
+
+.report-preview-download-btn:focus-visible {
+  outline: 2px solid #4d6bfe;
+  outline-offset: 3px;
+}
+
+.report-preview-download-btn:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.report-preview-fallback-name {
+  max-width: 100%;
+  margin: 14px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #9aa0a6;
 }
 
 .markdown a.report-file-link {
@@ -2634,4 +2758,522 @@ body.is-resizing-preview iframe {
   line-height: 1.5;
   font-weight: 500;
   color: #344054;
+}
+
+/* ===== 预览面板：头部信息层级 + 下载按钮 ===== */
+.report-preview {
+  border-left: 1px solid #e7eaf0;
+  box-shadow: -12px 0 40px rgba(15, 23, 42, 0.06);
+  background: #fff;
+}
+
+.report-preview-bar {
+  height: auto;
+  min-height: 60px;
+  padding: 11px 12px 11px 16px;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid #eef0f4;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: saturate(180%) blur(8px);
+}
+
+.report-preview-heading {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.report-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.report-preview-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #0f172a;
+  letter-spacing: -0.005em;
+}
+
+.report-preview-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #98a2b3;
+}
+
+.report-preview-meta-warn {
+  color: #b45309;
+}
+
+.report-preview-meta-sep {
+  color: #d0d5dd;
+}
+
+.report-preview-layer {
+  padding: 2.5px 7px;
+  border-radius: 7px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.report-preview-badge {
+  min-width: 38px;
+  padding: 2.5px 7px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.report-preview-actions {
+  gap: 6px;
+  align-items: center;
+}
+
+.report-preview-action {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: #98a2b3;
+}
+
+.report-preview-action:hover:not(:disabled) {
+  background: #f2f4f8;
+  color: #344054;
+}
+
+.report-preview-action:focus-visible,
+.report-preview-download:focus-visible {
+  outline: 2px solid #4d6bfe;
+  outline-offset: 2px;
+}
+
+/* 有文字的下载主按钮：图标 + 文案，悬停填色，下载中显示转圈 */
+.report-preview-download {
+  height: 30px;
+  padding: 0 12px 0 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(77, 107, 254, 0.24);
+  border-radius: 9px;
+  background: rgba(77, 107, 254, 0.08);
+  color: #3d5bf5;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.report-preview-download svg {
+  width: 15px;
+  height: 15px;
+}
+
+.report-preview-download:hover:not(:disabled) {
+  background: #4d6bfe;
+  border-color: #4d6bfe;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(77, 107, 254, 0.26);
+}
+
+.report-preview-download:active:not(:disabled) {
+  transform: translateY(0.5px);
+  box-shadow: 0 3px 10px rgba(77, 107, 254, 0.22);
+}
+
+.report-preview-download:disabled {
+  background: #f4f5f8;
+  border-color: #e7eaf0;
+  color: #b3b9c6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.report-preview-spinner {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1.8px solid currentColor;
+  border-top-color: transparent;
+  animation: preview-spin 0.7s linear infinite;
+}
+
+@keyframes preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* PDF 预览：文档卡片化，别把 iframe 怼满灰底 */
+.report-preview-body.is-pdf {
+  padding: 12px;
+  background: #eef0f4;
+}
+
+.report-preview-frame {
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
+}
+
+/* Markdown 预览：行距、标题层级、表格 */
+.report-preview-markdown {
+  padding: 22px 26px 44px;
+}
+
+.report-preview-markdown .markdown {
+  font-size: 13.5px;
+  line-height: 1.78;
+  color: #1f2937;
+}
+
+.report-preview-markdown .markdown h1 {
+  margin: 6px 0 16px;
+  font-size: 19px;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.report-preview-markdown .markdown h2 {
+  margin: 26px 0 10px;
+  padding-bottom: 7px;
+  font-size: 15.5px;
+  border-bottom: 1px solid #f0f2f6;
+}
+
+.report-preview-markdown .markdown h3 {
+  margin: 20px 0 8px;
+  font-size: 14px;
+}
+
+.report-preview-markdown .markdown h4 {
+  margin: 16px 0 6px;
+  font-size: 13.5px;
+}
+
+.report-preview-markdown .markdown p {
+  margin: 9px 0;
+}
+
+.report-preview-markdown .markdown ul,
+.report-preview-markdown .markdown ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.report-preview-markdown .markdown li {
+  margin: 4px 0;
+}
+
+.report-preview-markdown .markdown blockquote {
+  margin: 12px 0;
+  padding: 9px 13px;
+  border-left: 3px solid #dbe1f0;
+  border-radius: 0 8px 8px 0;
+  background: #f8f9fc;
+  color: #475467;
+}
+
+.report-preview-markdown .markdown code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: #f3f4f8;
+  font-size: 12px;
+}
+
+.report-preview-markdown .markdown pre {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid #eceef4;
+  border-radius: 10px;
+  background: #f8f9fc;
+}
+
+.report-preview-markdown .markdown table {
+  width: 100%;
+  margin: 12px 0;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.report-preview-markdown .markdown th,
+.report-preview-markdown .markdown td {
+  padding: 7px 10px;
+  border: 1px solid #eceef4;
+  text-align: left;
+  vertical-align: top;
+}
+
+.report-preview-markdown .markdown th {
+  background: #f7f8fb;
+  font-weight: 600;
+  color: #344054;
+}
+
+/* 加载/错误：轻量骨架 + 居中状态卡 */
+.report-preview-status,
+.report-preview-error {
+  margin: 0;
+  padding: 28px 20px;
+  font-size: 13px;
+  color: #667085;
+}
+
+.report-preview-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 不支持内嵌预览：居中卡片，下载是唯一主动作 */
+.report-preview-fallback {
+  background: #fafbfc;
+}
+
+.report-preview-fallback-card {
+  border-radius: 18px;
+  box-shadow: 0 10px 34px rgba(15, 23, 42, 0.06);
+}
+
+.report-preview-fallback-name {
+  max-width: 100%;
+  margin: 14px 0 0;
+  padding: 4px 10px;
+  border-radius: 7px;
+  background: #f4f5f8;
+  color: #667085;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-preview-download-btn {
+  height: 42px;
+  padding: 0 22px;
+  border-radius: 11px;
+  font-size: 13.5px;
+}
+
+/* ===== 研报任务卡片：文件按钮组 ===== */
+.report-job-files {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.report-job-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid #e6e9f2;
+  border-radius: 10px;
+  background: #fff;
+  color: #344054;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.report-job-file svg {
+  flex-shrink: 0;
+  color: #4d6bfe;
+}
+
+.report-job-file span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.report-job-file:hover {
+  border-color: #c7d2f8;
+  background: #f7f9ff;
+  box-shadow: 0 4px 12px rgba(77, 107, 254, 0.08);
+}
+
+.report-job-file:focus-visible {
+  outline: 2px solid #4d6bfe;
+  outline-offset: 2px;
+}
+
+.report-job-review {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #4d6bfe;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.report-job-review:hover {
+  text-decoration: underline;
+}
+
+/* 加载骨架 */
+.report-preview-skeleton {
+  flex: 1;
+  padding: 26px 26px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  background: #fff;
+}
+
+.report-preview-skeleton span {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #f1f3f7 25%, #f8f9fc 37%, #f1f3f7 63%);
+  background-size: 400% 100%;
+  animation: preview-shimmer 1.4s ease infinite;
+}
+
+.report-preview-skeleton span:nth-child(1) {
+  width: 56%;
+  height: 18px;
+}
+
+.report-preview-skeleton span:nth-child(2) {
+  width: 92%;
+}
+
+.report-preview-skeleton span:nth-child(3) {
+  width: 84%;
+}
+
+.report-preview-skeleton span:nth-child(4) {
+  width: 88%;
+}
+
+.report-preview-skeleton span:nth-child(5) {
+  width: 46%;
+}
+
+@keyframes preview-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+/* 错误：居中卡片，别让红字裸奔 */
+.report-preview-error-wrap {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 28px 20px;
+  background: #fafbfc;
+}
+
+.report-preview-error-card {
+  max-width: 320px;
+  padding: 24px 22px;
+  border: 1px solid #f3e3e3;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.05);
+  text-align: center;
+}
+
+.report-preview-error-icon {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #fef3f2;
+  color: #d92d20;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.report-preview-error-title {
+  margin: 14px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.report-preview-error-detail {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #8a909c;
+  word-break: break-word;
+}
+
+.report-job-aux {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #98a2b3;
+}
+
+.report-job-aux-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.report-job-aux-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #667085;
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  text-decoration-color: #d0d5dd;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.report-job-aux-link:hover {
+  color: #4d6bfe;
+  text-decoration-color: #4d6bfe;
+}
+
+.report-job-aux-sep {
+  color: #d0d5dd;
 }

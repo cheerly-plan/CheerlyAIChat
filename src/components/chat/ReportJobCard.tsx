@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { fetchReportJob } from '../../api'
 import type { ReportJob } from '../../types'
+import { DownloadIcon } from './icons'
 import { resolveReportFilePath, useReportPreview } from './ReportPreviewContext'
 
 // 深度层约 5–8 分钟：3s 一轮够快，也不会把后端打满
@@ -97,6 +98,10 @@ export function ReportJobCard({ jobId }: Props) {
     () => extractReportLinks(job?.result?.text),
     [job?.result?.text],
   )
+  // 溯源/审核这类附属文件不进下载按钮组，降级成一行小字链接，主按钮只留报告本体
+  const isAuxLink = (label: string) => /溯源|审核/.test(label)
+  const primaryLinks = links.filter((link) => !isAuxLink(link.label))
+  const auxLinks = links.filter((link) => isAuxLink(link.label))
   const summary = useMemo(
     () => extractSummary(job?.result?.text),
     [job?.result?.text],
@@ -159,30 +164,49 @@ export function ReportJobCard({ jobId }: Props) {
           {summary.title ? (
             <p className="report-job-summary">{summary.title}</p>
           ) : null}
-          {links.length ? (
-            <div className="report-job-links">
-              {links.map((link) => (
+          {primaryLinks.length ? (
+            <div className="report-job-files">
+              {primaryLinks.map((link) => (
                 <button
                   key={link.path}
                   type="button"
-                  className="report-job-link"
+                  className="report-job-file"
+                  title={link.label}
                   onClick={() => preview.open(link.path, link.label)}
                 >
-                  {link.label}
+                  <DownloadIcon />
+                  <span>{link.label}</span>
                 </button>
               ))}
             </div>
-          ) : (
+          ) : null}
+          {auxLinks.length ? (
+            <p className="report-job-aux">
+              {auxLinks.map((link, index) => (
+                <span className="report-job-aux-item" key={link.path}>
+                  {index ? <span className="report-job-aux-sep">·</span> : null}
+                  <button
+                    type="button"
+                    className="report-job-aux-link"
+                    onClick={() => preview.open(link.path, link.label)}
+                  >
+                    {link.label}
+                  </button>
+                </span>
+              ))}
+            </p>
+          ) : null}
+          {!links.length ? (
             <p className="report-job-note">
               报告已生成，但结果里没有可解析的下载链接；可到右侧审核队列或
               /v1/report/reviews 查看产物。
             </p>
-          )}
+          ) : null}
           {summary.validation ? (
             <p className="report-job-note">校验：{summary.validation}</p>
           ) : null}
           <p className="report-job-note">
-            深度 PDF 与底稿分开审核：PDF 需管理员批准后才能下载，Markdown 可先看。
+            深度层 PDF 可在线预览（红框为需人工审核的推断结论），需管理员批准定稿后才能下载。
           </p>
         </>
       ) : null}
