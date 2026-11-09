@@ -8,7 +8,7 @@ const POLL_INTERVAL_MS = 3000
 // 兜底上限：任务表在内存里，异常任务不该被无限轮询
 const POLL_TIMEOUT_MS = 40 * 60 * 1000
 
-const FILE_LINK = /\[([^\]]+)\]\(\/v1\/report\/files\/[^\s)]+\)/g
+const FILE_LINK = /\[([^\]]+)\]\((\/v1\/report\/files\/[^\s)]+)\)/g
 
 type FileLink = { label: string; path: string }
 

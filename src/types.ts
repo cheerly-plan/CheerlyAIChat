@@ -67,8 +67,8 @@ export type MemoryMessage = {
   tool_calls?: { name: string }[]
   tool_call_id?: string
   name?: string
-  /** 消息级附属信息（当前只有 sources） */
-  meta?: { sources?: ChatSource[] } | null
+  /** 消息级附属信息：引用 + 该轮提交的研报任务 id */
+  meta?: { sources?: ChatSource[]; report_job_id?: string } | null
 }
 
 export type ChatMemory = {

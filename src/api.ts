@@ -246,9 +246,13 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
   // 就顺延给下一条有正文的回答，别把引用丢了
   let pendingSources: ChatSource[] = []
 
-  const flushAssistant = (content: string, sources?: ChatSource[]) => {
+  const flushAssistant = (
+    content: string,
+    sources?: ChatSource[],
+    reportJobId?: string,
+  ) => {
     const merged = sources?.length ? sources : pendingSources
-    if (!content && !merged.length) {
+    if (!content && !merged.length && !reportJobId) {
       pendingSources = []
       return
     }
@@ -257,6 +261,8 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
       role: 'assistant',
       content,
       sources: merged.length ? merged : undefined,
+      // 刷新后卡片凭它继续轮询，任务表还在的话几秒内就把下载链接长回来
+      reportJobId,
     })
     pendingSources = []
   }
@@ -281,7 +287,7 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
       continue
     }
 
-    flushAssistant(msg.content ?? '', sources)
+    flushAssistant(msg.content ?? '', sources, msg.meta?.report_job_id ?? undefined)
   }
   if (pendingSources.length) flushAssistant('')
 
