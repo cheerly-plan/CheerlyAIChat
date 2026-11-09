@@ -2498,3 +2498,132 @@ body.is-resizing-preview iframe {
     max-width: 86%;
   }
 }
+
+
+/* 研报后台任务卡片：提交即返回 job_id，卡片自己轮询 /v1/report/jobs/{id} */
+.report-job {
+  margin-top: 12px;
+  max-width: 640px;
+  padding: 12px 14px;
+  border: 1px solid #e6e8ee;
+  border-radius: 14px;
+  background: #fbfcff;
+}
+
+.report-job-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #344054;
+}
+
+.report-job-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4d6bfe;
+  animation: blink 1s infinite;
+  flex-shrink: 0;
+}
+
+.report-job-succeeded .report-job-dot {
+  animation: none;
+  background: #12b76a;
+}
+
+.report-job-failed .report-job-dot {
+  animation: none;
+  background: #d92d20;
+}
+
+.report-job-title {
+  font-weight: 600;
+}
+
+.report-job-id {
+  margin-left: auto;
+  color: #98a2b3;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.report-job-stage {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #667085;
+  word-break: break-all;
+}
+
+.report-job-bar {
+  margin-top: 8px;
+  height: 6px;
+  border-radius: 999px;
+  background: #eaecf2;
+  overflow: hidden;
+}
+
+.report-job-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4d6bfe, #7d94ff);
+  transition: width 0.4s ease;
+}
+
+.report-job-meta {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  color: #98a2b3;
+}
+
+.report-job-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.report-job-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #d8ddf0;
+  border-radius: 10px;
+  background: #fff;
+  color: #3b5bdb;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.report-job-link:hover {
+  background: #f2f5ff;
+  border-color: #b9c4f2;
+}
+
+.report-job-error {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #d92d20;
+  word-break: break-all;
+}
+
+.report-job-retry {
+  margin-left: 8px;
+  border: none;
+  background: none;
+  padding: 0;
+  color: #3b5bdb;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.report-job-note {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #98a2b3;
+}

@@ -1,4 +1,4 @@
-import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, ChatSource, MemoryMessage, SessionInfo, SessionTitle, UserInfo } from './types'
+import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, ChatSource, MemoryMessage, ReportJob, SessionInfo, SessionTitle, UserInfo } from './types'
 
 export const CHAT_MEMORY_PAGE_SIZE = 20
 export const DEFAULT_SESSION_TITLE = '新会话'
@@ -561,6 +561,18 @@ function reportFileNameFromPath(path: string): string {
   } catch {
     return raw
   }
+}
+
+/** 研报后台任务：聊天入口提交后由前端卡片自己轮询状态与进度。 */
+export async function fetchReportJob(jobId: string): Promise<ReportJob> {
+  const response = await authedFetch(
+    `/v1/report/jobs/${encodeURIComponent(jobId)}`,
+    { headers: authHeaders() },
+  )
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '查询研报任务失败'))
+  }
+  return (await response.json()) as ReportJob
 }
 
 /** 研报附件：路径形如 /v1/report/files/<urlencoded name>，需带鉴权取 blob。 */

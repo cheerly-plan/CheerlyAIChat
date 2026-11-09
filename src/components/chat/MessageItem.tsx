@@ -3,6 +3,7 @@ import type { ChatMessage, ChatSource } from '../../types'
 import { CheckIcon, CopyIcon, EditIcon, RefreshIcon, SendIcon } from './icons'
 import { Markdown } from './Markdown'
 import { useChatSidePanel } from './ReportPreviewContext'
+import { ReportJobCard } from './ReportJobCard'
 
 type Props = {
   message: ChatMessage
@@ -54,7 +55,10 @@ export function MessageItem({
         {message.content ? (
           <Markdown content={message.content} streaming={loading} />
         ) : null}
-        {!loading && !message.content ? (
+        {message.reportJobId ? (
+          <ReportJobCard jobId={message.reportJobId} />
+        ) : null}
+        {!loading && !message.content && !message.reportJobId ? (
           <p className="msg-empty">没有生成文字回复，可重新生成</p>
         ) : null}
         {done || interrupted ? (

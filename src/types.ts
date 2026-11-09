@@ -18,6 +18,7 @@ export type ChatEvent =
   | { type: 'text'; content: string }
   | { type: 'tool_start'; name: string }
   | { type: 'tool_progress'; name: string; message: string }
+  | { type: 'report_job'; job_id: string; poll_url?: string }
   | { type: 'tool_end'; name: string; sources?: ChatSource[] }
   | { type: 'done'; sources?: ChatSource[] }
   | { type: 'error'; message: string }
@@ -86,4 +87,21 @@ export type ChatMessage = {
   sources?: ChatSource[]
   /** 工具执行中的瞬时进度（如研报生成阶段），不落库 */
   status?: string
+  /** 研报后台任务 id：提交即返回，卡片据此轮询 /v1/report/jobs/{id} */
+  reportJobId?: string
+}
+
+/** 研报后台任务（GET /v1/report/jobs/{id} 的返回；聊天入口提交后轮询它） */
+export type ReportJob = {
+  job_id: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  progress: number
+  stage: string
+  messages?: string[]
+  error?: string
+  elapsed_seconds?: number
+  poll_url?: string
+  result_url?: string
+  /** 仅在 succeeded 时返回；聊天任务形如 { kind: 'chat_report', text: '…' } */
+  result?: { kind?: string; text?: string } | null
 }

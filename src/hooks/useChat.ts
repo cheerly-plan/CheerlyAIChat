@@ -436,6 +436,17 @@ export function useChat(initialUser?: UserInfo | null) {
           patchSessionTitle(event.session_id, event.title)
           return
         }
+        if (event.type === 'report_job') {
+          // 研报已提交到服务端后台：把 job_id 挂到这条回答上，
+          // 卡片自己轮询 /v1/report/jobs/{id}，SSE 断开也不影响任务。
+          const jobId = (event.job_id || '').trim()
+          if (jobId) {
+            patchRun(activeSessionId, assistantId, (item) =>
+              item.reportJobId === jobId ? item : { ...item, reportJobId: jobId },
+            )
+          }
+          return
+        }
         if (event.type === 'text') {
           if (resumeReplacePending) {
             resumeReplacePending = false
