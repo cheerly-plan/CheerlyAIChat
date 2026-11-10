@@ -1,12 +1,12 @@
 # Cheerly · AI Chat 前端
 
-一个自研的 AI 对话前端：会话管理、SSE 流式回答、知识库切片浏览、知识图谱可视化。
+一个自研的 AI 对话前端：会话管理、SSE 流式回答、研报任务卡片与预览审核、知识库切片浏览、知识图谱可视化、对话过程回看。
 除 React 与 Lottie 外，路由、Markdown 渲染、虚拟滚动、力导向布局全部手写实现，没有引入
 组件库 / 状态管理 / 请求库。
 
 - 技术栈：React 19 + TypeScript + Vite 8
 - 后端：独立服务（默认 `http://127.0.0.1:8000`），前端只做视图与交互
-- 页面：`#/` 对话、`#/kb` 知识库（管理员）
+- 页面：`#/chat` 对话、`#/board` 管理员看板、`#/kb` 知识库、`#/trace` 对话过程
 
 ---
 
@@ -23,7 +23,7 @@ pnpm lint
 
 | 前缀 | 用途 |
 | --- | --- |
-| `/v1` | 业务接口（鉴权、会话、对话流、知识库、图谱） |
+| `/v1` | 业务接口（鉴权、会话、对话流、知识库、图谱、研报、过程回看） |
 | `/user` | 用户信息 |
 | `/health` | 健康检查 |
 
@@ -39,22 +39,27 @@ React Compiler 已启用（`@vitejs/plugin-babel` + `reactCompilerPreset`），�
 ```
 src/
 ├── main.tsx                 入口，挂载 <App/>
-├── App.tsx                  鉴权门禁：checking / anonymous / authed
+├── App.tsx                  鉴权门禁：checking / anonymous / authed；管理员登录先进看板
 ├── api.ts                   全部 HTTP + SSE 封装的唯一出口
-├── types.ts                 共享数据结构（会话、消息、事件、引用）
-├── router.ts                极简 hash 路由（chat / kb）
+├── types.ts                 共享数据结构（会话、消息、事件、引用、研报任务）
+├── router.ts                极简 hash 路由（board / chat / kb / trace）
 ├── hooks/useChat.ts         对话状态机（本项目最核心的文件）
 ├── lib/
 │   ├── markdown.ts          Markdown 解析器（块级 + 行内，纯函数）
 │   └── sessionTurns.ts      消息流 → 轮次列表（会话大纲数据）
 ├── components/
 │   ├── auth/                登录 / 注册
+│   ├── board/               管理员看板（进知识库 / 对话过程 / 开对话）
 │   ├── chat/                对话主界面
-│   │   ├── Chat.tsx         布局壳：侧栏 + 头部 + 落地页/消息区
+│   │   ├── Chat.tsx         布局壳：侧栏 + 头部 + 落地页/消息区 + 右侧预览
 │   │   ├── Sidebar.tsx      会话列表、分组、重命名、删除
-│   │   ├── ChatHeader.tsx   标题栏（含收起侧栏）
+│   │   ├── ChatHeader.tsx   标题栏（含收起侧栏、审核入口）
 │   │   ├── MessageList.tsx  滚动容器：贴底、分页、大纲、回到底部
-│   │   ├── MessageItem.tsx  单条消息：气泡、操作、参考来源
+│   │   ├── MessageItem.tsx  单条消息：气泡、操作、参考来源、研报卡片
+│   │   ├── ReportJobCard.tsx      研报后台任务进度卡 + 下载链
+│   │   ├── ReportPreviewPanel.tsx 底稿 / 深度层预览
+│   │   ├── ReportReviewPanel.tsx  审核队列（批准 / 驳回 / 定稿）
+│   │   ├── SourcePreviewPanel.tsx 参考来源右侧入流预览
 │   │   ├── Markdown.tsx     Markdown → React，流式增量渲染
 │   │   ├── Composer.tsx     输入框 + 智能搜索 / 知识检索开关
 │   │   ├── SessionOutline.tsx  右侧轮次刻度条
@@ -63,12 +68,13 @@ src/
 │   ├── kb/                  知识库与图谱
 │   │   ├── KnowledgeBase.tsx   文件面板 + 切片列表（虚拟滚动）
 │   │   ├── KbGraphPanel.tsx    图谱视图：检索栏 + 画布 + 证据
-│   │   ├── KnowledgeGraph.tsx  力导向图谱渲染（1792 行）
+│   │   ├── KnowledgeGraph.tsx  力导向图谱渲染
 │   │   ├── KgBuildDialog.tsx   建图配置（文档类型 / 抽取粒度）
 │   │   ├── KbRetrieveDialog.tsx 检索演示弹窗
 │   │   ├── FileEditDialog.tsx  文件名 + 标签一次改完
 │   │   ├── ChunkContent.tsx / tableGrid.ts  表格还原成格子
 │   │   └── chunkText.ts        切片字数与类型判断
+│   ├── trace/               对话过程回看（按用户 / 会话 / 提问）
 │   └── common/ConfirmDialog.tsx
 └── index.css / *.css        全局变量与各模块样式
 ```
@@ -83,18 +89,21 @@ src/
 令牌存在？ ── 否 ──> anonymous → LoginView
      │是
      └─> checking → fetchUserInfo()
-             ├─ 成功 → authed → <Chat initialUser={...}/>
+             ├─ 成功 → authed
+             │          ├─ 管理员 + 空 hash → navigate(#/board)
+             │          └─ 按路由渲染 Board / Chat / KnowledgeBase / Trace
              └─ 失败 → 清令牌 → anonymous
 ```
 
 几个刻意的处理：
 
-- **用户信息复用**：`checking` 阶段拿到的 `UserInfo` 直接传给 `Chat`，`useChat` 不再重复请求
+- **用户信息复用**：`checking` 阶段拿到的 `UserInfo` 直接传给下游页面，`useChat` 不再重复请求
   `/user/info`，避免开屏两次用户查询。
 - **登录后重建 Chat**：`chatEpoch` 作为 `<Chat key>`，登录 / 登出都让整棵对话子树重挂载，
   会话、消息、SSE 连接一并归零，不会残留上一个账号的数据。
 - **权限以 `/user/info` 为准**：登录响应可能滞后（`is_admin` 缺失），因此登录后合并两侧结果，
   任一侧为管理员即放行入口；真正的权限校验在后端（前端 403 只是兜底提示）。
+- **管理员先进看板**：登录成功且当前是空 hash 时 `navigate('board')`，对话 / 知识库 / 过程页从看板进入。
 - **令牌失效全局处理**：`api.ts` 的 `authedFetch` 遇到 401 就清本地令牌并 `reload()`，
   门禁检测不到令牌会自然回落到登录页，业务代码无需各自处理。
 
@@ -160,6 +169,8 @@ queueRunText(id, chunk)  →  pending += chunk
 | `run_started` | 记下 `run_id`，作为断流后恢复的凭据 |
 | `text` | 攒进 `pending`，按帧刷入当前助手气泡 |
 | `tool_start` | 清空调用前的半截字，气泡只留写作光标（不展示工具过程） |
+| `tool_progress` | 研报等长任务的进度文案，挂到当前助手气泡 |
+| `report_job` | 记下 `job_id`，渲染 `ReportJobCard` 并轮询 `/v1/report/jobs/{id}` |
 | `tool_end` | 若带 `sources`，挂到消息上 |
 | `done` | 落 `sources`，收尾 |
 | `error` | 置错误文案并点亮「继续生成」（若已有 `run_id`） |
@@ -252,13 +263,25 @@ queueRunText(id, chunk)  →  pending += chunk
 
 `router.ts` 用 hash 而不是真实路径：刷新、直接分享链接都不需要服务端配置 SPA fallback。
 `useSyncExternalStore` 订阅 `hashchange` / `popstate`，页面状态完全由 URL 决定。
+路由四态：`board` / `chat` / `kb` / `trace`。
 
-`navigate('chat')` 有一个细节：从知识库返回时优先 `history.back()`，避免浏览器后退键在
-chat / kb 之间来回弹；直接以 `#/kb` 打开（没有站内历史）时才就地 `replaceState`。
+从知识库返回时优先 `history.back()`，避免浏览器后退键在页面之间来回弹；直接以 `#/kb`
+打开（没有站内历史）时才就地 `replaceState` 到 fallback。
 
 侧栏会话按 `今天 / 昨天 / 7天内 / 30天内 / 年-月` 分组，四态互斥渲染：骨架屏、加载失败
 （带重试）、空态、分组列表。会话「更多」菜单用 `position: fixed` + 视口边界计算，
 空间不够时向上弹，不会被列表容器裁掉。
+
+### 7.1 研报预览与审核
+
+聊天里提交研报后：
+
+1. SSE `report_job` → `ReportJobCard` 轮询进度，完成后展示标题／校验摘要／下载链
+2. 预览走 `fetchReportFile(href, { preview: true })`，区分底稿与深度层；响应头带出门禁状态
+3. 审核面板拉取 `/v1/report/reviews`；生成者本人与管理员可批准／驳回／定稿
+4. 交付文本写回消息后，刷新页面仍能直接渲染下载链接
+
+参考来源点开后进入右侧 `SourcePreviewPanel`，窄面板下表格不再被挤成竖排。
 
 ---
 
@@ -375,12 +398,31 @@ POST /v1/kb/files/{id}/complete  触发解析 + 向量化
 | GET | `/v1/kg/entities/{id}/chunks` | 实体的原文依据 |
 | GET | `/v1/kg/doc-types` | 可选的抽取配置 |
 
+**研报**
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/v1/report/jobs/{id}` | 轮询研报后台任务 |
+| GET | `/v1/report/files/{name}` | 附件下载；`?preview=1` 在线预览 |
+| GET | `/v1/report/reviews` | 审核队列（管理员读） |
+| GET | `/v1/report/reviews/{id}` | 单条审核详情 |
+| POST | `/v1/report/reviews/{id}/decision` | 批准／驳回 |
+| POST | `/v1/report/reviews/{id}/finalize` | 定稿 |
+
+**对话过程（管理员）**
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/v1/inspect/users` | 可回看的用户列表 |
+| GET | `/v1/inspect/sessions` | 某用户的会话 |
+| GET | `/v1/inspect/turns` | 某会话每问的工具／技能／模型结果 |
+
 ---
 
 ## 10. 样式与响应式
 
-没有 CSS-in-JS、没有 Tailwind，按模块拆四个样式表：`index.css`（reset + 字体）、
-`chat.css`、`kb.css`、`auth.css`，约 6000 行。
+没有 CSS-in-JS、没有 Tailwind，按模块拆样式表：`index.css`（reset + 字体）、
+`chat.css`、`kb.css`、`auth.css`、`board.css`、`trace.css`。
 
 主要断点：
 
@@ -397,8 +439,8 @@ POST /v1/kb/files/{id}/complete  触发解析 + 向量化
 
 ## 11. 实现约定
 
-- **状态不跨层**：`useChat` 只关心对话，`KnowledgeBase` 只关心知识库；两者靠 URL 切换，
-  不共享状态。
+- **状态不跨层**：`useChat` 只关心对话，`KnowledgeBase` / `Trace` / `Board` 各自管自己的页；
+  靠 URL 切换，不共享业务状态。
 - **请求全在 `api.ts`**：类型集中在 `types.ts`，返回值做一次形状归一（补默认值、滤空），
   组件里拿到的数据结构是可信的。
 - **函数式纯逻辑单独成文件**：`lib/markdown.ts`、`lib/sessionTurns.ts`、`kb/tableGrid.ts`
