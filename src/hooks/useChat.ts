@@ -436,6 +436,17 @@ export function useChat(initialUser?: UserInfo | null) {
           patchSessionTitle(event.session_id, event.title)
           return
         }
+        if (event.type === 'report_job') {
+          // 研报已提交到服务端后台：把 job_id 挂到这条回答上，
+          // 卡片自己轮询 /v1/report/jobs/{id}，SSE 断开也不影响任务。
+          const jobId = (event.job_id || '').trim()
+          if (jobId) {
+            patchRun(activeSessionId, assistantId, (item) =>
+              item.reportJobId === jobId ? item : { ...item, reportJobId: jobId },
+            )
+          }
+          return
+        }
         if (event.type === 'text') {
           if (resumeReplacePending) {
             resumeReplacePending = false
@@ -443,24 +454,43 @@ export function useChat(initialUser?: UserInfo | null) {
             patchRun(activeSessionId, assistantId, (item) => ({
               ...item,
               content: event.content,
+              status: undefined,
             }))
             return
           }
+          // 正式正文到来后清掉工具进度文案，避免和流式字叠在一起。
+          patchRun(activeSessionId, assistantId, (item) =>
+            item.status ? { ...item, status: undefined } : item,
+          )
           queueRunText(activeSessionId, event.content)
           return
         }
         flushRun(activeSessionId)
         if (event.type === 'tool_start') {
-          // 工具调用不展示过程。清掉调用前的半截字，气泡只留写作光标，
-          // 直到最终回答的 text 流过来。
+          // 清掉模型在调工具前的半截字；进度文案留给 tool_progress。
           run.pending = ''
-          patchRun(activeSessionId, assistantId, (item) => ({ ...item, content: '' }))
+          patchRun(activeSessionId, assistantId, (item) => ({
+            ...item,
+            content: '',
+            status: toolStatusHint(event.name),
+          }))
+        }
+        if (event.type === 'tool_progress') {
+          const message = (event.message || '').trim()
+          if (message) {
+            patchRun(activeSessionId, assistantId, (item) => ({
+              ...item,
+              status: message,
+            }))
+          }
         }
         if (event.type === 'tool_end') {
           const cited = event.sources
-          if (cited?.length) {
-            patchRun(activeSessionId, assistantId, (item) => ({ ...item, sources: cited }))
-          }
+          patchRun(activeSessionId, assistantId, (item) => ({
+            ...item,
+            sources: cited?.length ? cited : item.sources,
+            // 工具结束到最终正文之间仍可能空一会儿，保留最后一条进度。
+          }))
         }
         if (event.type === 'done') {
           const cited = event.sources
@@ -779,4 +809,10 @@ export function useChat(initialUser?: UserInfo | null) {
     resumeRun,
     stop,
   }
+}
+
+function toolStatusHint(name: string): string {
+  if (name === 'generate_report') return '正在生成研报…'
+  if (name === 'kb_search' || name === 'kg_search') return '正在检索知识库…'
+  return '正在处理…'
 }

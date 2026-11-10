@@ -239,14 +239,14 @@
   color: #9aa0a6;
 }
 
-/* 上传 / 检索：同一套淡蓝底蓝字，与搜索框同高 */
+/* 上传 / 检索：默认只留图标，悬停或键盘聚焦才把文字展开 */
 .kb-upload,
 .kb-retrieve {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 0;
   height: 32px;
-  padding: 0 12px;
+  padding: 0 9px;
   border: none;
   border-radius: 10px;
   background: #e6ecff;
@@ -257,18 +257,41 @@
   cursor: pointer;
   flex-shrink: 0;
   white-space: nowrap;
-  transition: background 0.15s;
+  overflow: hidden;
+  transition: background 0.15s, gap 0.18s ease, padding 0.18s ease;
 }
 
 .kb-upload svg,
 .kb-retrieve svg {
   width: 14px;
   height: 14px;
+  flex-shrink: 0;
+}
+
+.kb-upload span,
+.kb-retrieve span {
+  display: inline-block;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-width 0.18s ease, opacity 0.12s ease;
 }
 
 .kb-upload:hover:not(:disabled),
-.kb-retrieve:hover {
+.kb-retrieve:hover,
+.kb-upload:focus-visible,
+.kb-retrieve:focus-visible {
+  gap: 4px;
+  padding: 0 12px;
   background: #d9e3ff;
+}
+
+.kb-upload:hover:not(:disabled) span,
+.kb-retrieve:hover span,
+.kb-upload:focus-visible span,
+.kb-retrieve:focus-visible span {
+  max-width: 2.5em;
+  opacity: 1;
 }
 
 .kb-upload:disabled {
@@ -1513,6 +1536,12 @@
   overflow: hidden;
 }
 
+/* .kb-chunks 自己写了 display:flex，会盖掉 hidden 的 display:none。
+   切到图谱时切片区靠 hidden 留在 DOM 里，必须真正藏起来。 */
+.kb-chunks[hidden] {
+  display: none;
+}
+
 .kb-chunks-head {
   display: flex;
   align-items: center;
@@ -1531,29 +1560,30 @@
   flex-shrink: 0;
 }
 
-/* 跳页入口：和上传按钮同一套淡蓝底蓝字，高度收一档以贴合标题行 */
+/* 跳页入口：贴标题行的白底小按钮，打开时才带上蓝色描边 */
 .kb-jump-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   height: 26px;
-  padding: 0 10px;
-  border: none;
+  padding: 0 9px;
+  border: 1px solid #e3e6eb;
   border-radius: 8px;
-  background: #e6ecff;
-  color: #4d6bfe;
+  background: #fff;
+  color: #4b5563;
   font: inherit;
   font-size: 12px;
   font-weight: 500;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .kb-jump-btn:hover,
 .kb-jump-btn.is-open {
-  background: #d9e3ff;
-  color: #4d6bfe;
+  border-color: #b9c8ff;
+  background: #f7f9ff;
+  color: #3b5bdb;
   box-shadow: none;
 }
 
@@ -1760,17 +1790,6 @@
 .kb-body.panel-collapsed .kb-kg-bar,
 .kb-body.panel-collapsed .kb-kg-head {
   padding-left: 72px;
-}
-
-/* 标题里的类型标签：文件名已去掉后缀，标签是唯一的类型标识，比列表徽标大一档 */
-.kb-chunks-title .kb-ext {
-  /* 标题栏这里按文字自然宽度，不用列表里那个定宽对齐的框 */
-  width: auto;
-  margin-right: 0;
-  padding: 2px 7px;
-  border-radius: 5px;
-  font-size: 10.5px;
-  flex-shrink: 0;
 }
 
 .kb-chunks-empty {
@@ -2138,7 +2157,7 @@
   vertical-align: 0;
 }
 
-/* ——— 检索栏：按类型在最左（占 500px），搜索框铺中间，跳数在最右 ——— */
+/* ——— 检索栏：按类型在最左，搜索框铺中间，跳数在最右 ——— */
 
 .kb-kg-bar {
   display: flex;
@@ -2214,74 +2233,94 @@
 
 .kb-kg-depth {
   display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  height: 34px;
   padding: 2px;
+  border: 1px solid #e3e6eb;
   border-radius: 9px;
-  background: #eceef1;
+  background: #f4f6f8;
+  box-sizing: border-box;
 }
 
 .kb-kg-depth button {
-  padding: 5px 9px;
+  height: 28px;
+  padding: 0 10px;
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: #5b6472;
+  color: #6b7280;
   font: inherit;
   font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.kb-kg-depth button:hover:not(.is-on) {
+  color: #1f2937;
 }
 
 .kb-kg-depth button.is-on {
   background: #fff;
   color: #3b5bdb;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
-/* 着色选择：检索栏最左，占 500px 把搜索框顶到右边 */
+/* 着色选择：和搜索框同高的白底选择器，宽度跟文案走 */
 .kb-kg-shade {
   position: relative;
   flex: none;
   display: inline-flex;
   align-items: center;
-  width: 500px;
-}
-
-@media (max-width: 1200px) {
-  .kb-kg-shade {
-    width: 250px;
-  }
+  min-width: 0;
 }
 
 .kb-kg-shade-trigger {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 5px;
+  gap: 6px;
+  max-width: 168px;
+  min-width: 0;
   height: 34px;
-  min-width: 96px;
-  padding: 0 14px;
-  border: 0;
+  padding: 0 10px 0 12px;
+  border: 1px solid #e3e6eb;
   border-radius: 9px;
-  background: #4d6bfe;
-  color: #fff;
+  background: #fff;
+  color: #374151;
   font: inherit;
-  font-size: 13px;
+  font-size: 12.5px;
+  font-weight: 500;
   line-height: 1;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.kb-kg-shade-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .kb-kg-shade-trigger:hover,
 .kb-kg-shade-trigger.is-open {
-  background: #3f5ce8;
+  border-color: #b9c8ff;
+  background: #f7f9ff;
+  color: #3b5bdb;
 }
 
 .kb-kg-shade-trigger svg {
   width: 12px;
   height: 12px;
-  color: #fff;
+  flex-shrink: 0;
+  color: #8b93a1;
   transition: transform 0.15s;
+}
+
+.kb-kg-shade-trigger:hover svg,
+.kb-kg-shade-trigger.is-open svg {
+  color: #4d6bfe;
 }
 
 .kb-kg-shade-trigger.is-open svg {
@@ -3304,6 +3343,9 @@
   .kb-panel,
   .kb-item,
   .kb-upload,
+  .kb-upload span,
+  .kb-retrieve,
+  .kb-retrieve span,
   .kb-back,
   .kb-panel-toggle,
   .kg-detail {

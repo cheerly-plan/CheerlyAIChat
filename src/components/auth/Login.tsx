@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { login, register, writeAuthToken } from '../../api'
 import type { AuthUser } from '../../types'
-import { Logo } from '../chat/Logo'
 import './auth.css'
 
 type Props = {
@@ -59,7 +58,6 @@ export function LoginView({ onAuthed }: Props) {
       </div>
       <form className="auth-card" onSubmit={(event) => void submit(event)}>
         <div className="auth-brand">
-          <Logo size={32} />
           <span>Cheerly</span>
         </div>
         <h1 className="auth-title">{mode === 'login' ? '登录' : '注册'}</h1>

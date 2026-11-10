@@ -498,11 +498,13 @@ export default function KbGraphPanel({
               }}
               title="切换图谱着色方式"
             >
-              {colorMode === 'type'
-                ? '按类型'
-                : focusCluster != null
-                  ? `按簇 · ${clusters.find((c) => c.id === focusCluster)?.label ?? ''}`
-                  : '按簇'}
+              <span className="kb-kg-shade-label">
+                {colorMode === 'type'
+                  ? '按类型'
+                  : focusCluster != null
+                    ? `按簇 · ${clusters.find((c) => c.id === focusCluster)?.label ?? ''}`
+                    : '按簇'}
+              </span>
               <ChevronDownIcon />
             </button>
             {focusCluster != null ? (

@@ -1,4 +1,4 @@
-import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, ChatSource, MemoryMessage, SessionInfo, SessionTitle, UserInfo } from './types'
+import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, ChatSource, MemoryMessage, ReportJob, ReportReviewRecord, SessionInfo, SessionTitle, UserInfo } from './types'
 
 export const CHAT_MEMORY_PAGE_SIZE = 20
 export const DEFAULT_SESSION_TITLE = '新会话'
@@ -246,9 +246,14 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
   // 就顺延给下一条有正文的回答，别把引用丢了
   let pendingSources: ChatSource[] = []
 
-  const flushAssistant = (content: string, sources?: ChatSource[]) => {
+  const flushAssistant = (
+    content: string,
+    sources?: ChatSource[],
+    reportJobId?: string,
+    reportDelivery?: string,
+  ) => {
     const merged = sources?.length ? sources : pendingSources
-    if (!content && !merged.length) {
+    if (!content && !merged.length && !reportJobId) {
       pendingSources = []
       return
     }
@@ -257,6 +262,9 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
       role: 'assistant',
       content,
       sources: merged.length ? merged : undefined,
+      // 刷新后卡片凭它继续轮询，任务表还在的话几秒内就把下载链接长回来
+      reportJobId,
+      reportDelivery,
     })
     pendingSources = []
   }
@@ -281,7 +289,12 @@ export function toChatMessages(raw: MemoryMessage[]): ChatMessage[] {
       continue
     }
 
-    flushAssistant(msg.content ?? '', sources)
+    flushAssistant(
+      msg.content ?? '',
+      sources,
+      msg.meta?.report_job_id ?? undefined,
+      msg.meta?.report_delivery ?? undefined,
+    )
   }
   if (pendingSources.length) flushAssistant('')
 
@@ -544,6 +557,149 @@ export async function downloadKbFile(file: KbFile): Promise<void> {
   link.download = file.mime ? `${file.filename}${file.mime}` : file.filename
   link.click()
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
+export type ReportFileBlob = {
+  href: string
+  filename: string
+  blob: Blob
+  objectUrl: string
+  contentType: string
+  /** 后端 M2 门禁结论：false = 需人工审核，只能在线预览、不能作为附件下载 */
+  downloadAllowed: boolean
+  reviewStatus: string
+}
+
+function reportFileNameFromPath(path: string): string {
+  const raw = path.split('/').pop() || 'report'
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return raw
+  }
+}
+
+/** 研报后台任务：聊天入口提交后由前端卡片自己轮询状态与进度。 */
+export async function fetchReportJob(jobId: string): Promise<ReportJob> {
+  const response = await authedFetch(
+    `/v1/report/jobs/${encodeURIComponent(jobId)}`,
+    { headers: authHeaders() },
+  )
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '查询研报任务失败'))
+  }
+  return (await response.json()) as ReportJob
+}
+
+/** 头缺失（旧后端 / 代理剥掉自定义头）时，深度层 PDF 一律保守禁下载，避免误放行。 */
+function resolvePreviewDownloadAllowed(header: string | null, href: string): boolean {
+  if (header !== null) return header !== '0'
+  return !/\.deep\.pdf/i.test(href)
+}
+
+/** 审核队列：默认只看待人工处置的（pending）。 */
+export async function fetchReportReviews(
+  status: 'pending' | 'approved' | 'rejected' | 'finalized' = 'pending',
+): Promise<ReportReviewRecord[]> {
+  const response = await authedFetch(
+    `/v1/report/reviews?status=${encodeURIComponent(status)}`,
+    { headers: authHeaders() },
+  )
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '获取审核队列失败'))
+  }
+  const data = (await response.json()) as { items?: ReportReviewRecord[] }
+  return data.items ?? []
+}
+
+export async function fetchReportReview(
+  reportId: string,
+): Promise<ReportReviewRecord> {
+  const response = await authedFetch(
+    `/v1/report/reviews/${encodeURIComponent(reportId)}`,
+    { headers: authHeaders() },
+  )
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '获取审核记录失败'))
+  }
+  return (await response.json()) as ReportReviewRecord
+}
+
+/** 处置审核项：approve 批准 / reject 驳回 / reset 退回待审（管理员）。 */
+export async function decideReportReview(
+  reportId: string,
+  action: 'approve' | 'reject' | 'reset',
+  note = '',
+): Promise<ReportReviewRecord> {
+  const response = await authedFetch(
+    `/v1/report/reviews/${encodeURIComponent(reportId)}/decision`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ action, note, item_ids: [] }),
+    },
+  )
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '审核操作失败'))
+  }
+  return (await response.json()) as ReportReviewRecord
+}
+
+/** 定稿：校验未过/仍有待审项/被驳回/内容被改动一律 409（管理员）。 */
+export async function finalizeReportReview(
+  reportId: string,
+): Promise<ReportReviewRecord> {
+  const response = await authedFetch(
+    `/v1/report/reviews/${encodeURIComponent(reportId)}/finalize`,
+    { method: 'POST', headers: authHeaders() },
+  )
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '定稿失败'))
+  }
+  return (await response.json()) as ReportReviewRecord
+}
+
+/** 研报附件：路径形如 /v1/report/files/<urlencoded name>，需带鉴权取 blob。
+ *  preview=true 走在线预览通道（未定稿的深度层 PDF 也可看），并从响应头读出门禁结论；
+ *  不带 preview 时仍是原来的下载路径，M2 pdf_download_gate 逐字不变。 */
+export async function fetchReportFile(
+  path: string,
+  options: { preview?: boolean } = {},
+): Promise<ReportFileBlob> {
+  const href = path.startsWith('/') ? path : `/${path}`
+  const url = options.preview
+    ? `${href}${href.includes('?') ? '&' : '?'}preview=1`
+    : href
+  const response = await authedFetch(url, { headers: authHeaders() })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '研报文件打开失败'))
+  }
+  const blob = await response.blob()
+  const contentType =
+    response.headers.get('content-type') || blob.type || 'application/octet-stream'
+  return {
+    href,
+    filename: reportFileNameFromPath(href),
+    blob,
+    objectUrl: URL.createObjectURL(blob),
+    contentType,
+    downloadAllowed: options.preview
+      ? resolvePreviewDownloadAllowed(
+          response.headers.get('X-Report-Download-Allowed'),
+          href,
+        )
+      : true,
+    reviewStatus: response.headers.get('X-Report-Review-Status') || '',
+  }
+}
+
+export async function downloadReportFile(path: string): Promise<void> {
+  const file = await fetchReportFile(path)
+  const link = document.createElement('a')
+  link.href = file.objectUrl
+  link.download = file.filename
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(file.objectUrl), 10_000)
 }
 
 /**
@@ -869,4 +1025,67 @@ export async function rebuildKgGraph(
   if (!response.ok) {
     throw new Error(`重建图谱失败 ${response.status}`)
   }
+}
+
+export type InspectUser = {
+  user_id: string
+  user_name: string
+  username: string
+  is_admin: boolean
+}
+
+export type InspectSession = {
+  session_id: string
+  title: string
+  updated_at: string
+}
+
+export type InspectStep = {
+  kind: 'llm' | 'tool' | 'tool_result' | string
+  name: string
+  tool_call_id: string
+  content: string
+  arguments: Record<string, unknown>
+}
+
+export type InspectTurn = {
+  index: number
+  question: string
+  steps: InspectStep[]
+}
+
+export async function fetchInspectUsers(): Promise<InspectUser[]> {
+  const response = await authedFetch('/v1/inspect/users', { headers: authHeaders() })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '用户列表加载失败'))
+  }
+  const data = (await response.json()) as { users: InspectUser[] }
+  return data.users
+}
+
+export async function fetchInspectSessions(userId: string): Promise<InspectSession[]> {
+  const params = new URLSearchParams({ user_id: userId })
+  const response = await authedFetch(`/v1/inspect/sessions?${params}`, {
+    headers: authHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '会话列表加载失败'))
+  }
+  const data = (await response.json()) as { sessions: InspectSession[] }
+  return data.sessions
+}
+
+export async function fetchInspectTurns(
+  userId: string,
+  sessionId: string,
+): Promise<{ title: string; turns: InspectTurn[] }> {
+  const params = new URLSearchParams({ user_id: userId, session_id: sessionId })
+  const response = await authedFetch(`/v1/inspect/turns?${params}`, {
+    headers: authHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '对话过程加载失败'))
+  }
+  const data = (await response.json()) as { title: string; turns: InspectTurn[] }
+  return { title: data.title, turns: data.turns }
 }

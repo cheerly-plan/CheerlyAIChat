@@ -17,6 +17,8 @@ export type ChatEvent =
   | { type: 'run_started'; run_id: string }
   | { type: 'text'; content: string }
   | { type: 'tool_start'; name: string }
+  | { type: 'tool_progress'; name: string; message: string }
+  | { type: 'report_job'; job_id: string; poll_url?: string }
   | { type: 'tool_end'; name: string; sources?: ChatSource[] }
   | { type: 'done'; sources?: ChatSource[] }
   | { type: 'error'; message: string }
@@ -65,8 +67,12 @@ export type MemoryMessage = {
   tool_calls?: { name: string }[]
   tool_call_id?: string
   name?: string
-  /** 消息级附属信息（当前只有 sources） */
-  meta?: { sources?: ChatSource[] } | null
+  /** 消息级附属信息：引用 + 该轮提交的研报任务 id + 完成后的交付文本 */
+  meta?: {
+    sources?: ChatSource[]
+    report_job_id?: string
+    report_delivery?: string
+  } | null
 }
 
 export type ChatMemory = {
@@ -83,4 +89,66 @@ export type ChatMessage = {
   content: string
   /** 知识库引用（回答下方「参考来源」，点开看原文摘录） */
   sources?: ChatSource[]
+  /** 工具执行中的瞬时进度（如研报生成阶段），不落库 */
+  status?: string
+  /** 研报后台任务 id：提交即返回，卡片据此轮询 /v1/report/jobs/{id} */
+  reportJobId?: string
+  /** 任务完成时落库的交付文本（含下载链接）：有它就不必再轮询 */
+  reportDelivery?: string
+}
+
+/** 研报后台任务（GET /v1/report/jobs/{id} 的返回；聊天入口提交后轮询它） */
+export type ReportJob = {
+  job_id: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  progress: number
+  stage: string
+  messages?: string[]
+  error?: string
+  elapsed_seconds?: number
+  poll_url?: string
+  result_url?: string
+  /** 仅在 succeeded 时返回；聊天任务形如 { kind: 'chat_report', text: '…' } */
+  result?: { kind?: string; text?: string } | null
+}
+
+/** 审核队列里的一条待处置项（M2） */
+export type ReportReviewItem = {
+  id: string
+  reason: string
+  value?: string
+  subject?: string
+  name?: string
+  period?: string
+  quote?: string
+  state: string
+  reviewer?: string
+  note?: string
+  decided_at?: string
+}
+
+/** 一份报告的审核记录（GET /v1/report/reviews 的 item） */
+export type ReportReviewRecord = {
+  report_id: string
+  title: string
+  report_status: string
+  status: string
+  created_at: string
+  updated_at?: string
+  validation_passed: boolean
+  error_count: number
+  artifacts?: Record<string, string>
+  items: ReportReviewItem[]
+  decisions?: {
+    at: string
+    actor: string
+    action: string
+    note?: string
+    status?: string
+  }[]
+  finalizable?: boolean
+  gate_reason?: string
+  pending_items?: number
+  finalized_by?: string
+  finalized_at?: string
 }

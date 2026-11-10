@@ -2,13 +2,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { DEFAULT_SESSION_TITLE } from '../../api'
 import copyIcon from '../../assets/copy.svg'
 import deleteIcon from '../../assets/delete.svg'
-import kbIcon from '../../assets/kb.svg'
 import optionsIcon from '../../assets/options.svg'
 import renameIcon from '../../assets/rename.svg'
 import type { SessionInfo } from '../../types'
 import { ConfirmDialog } from '../common/ConfirmDialog'
-import { Logo } from './Logo'
-import { CloseIcon, NewChatIcon, PanelIcon } from './icons'
+import { CloseIcon, LogoutIcon, NewChatIcon, PanelIcon } from './icons'
 
 type Props = {
   onNewChat: () => void
@@ -25,10 +23,6 @@ type Props = {
   streamingSessionIds?: string[]
   userName?: string
   onLogout?: () => void
-  /** 打开知识库页（与对话视图互斥） */
-  onOpenKb?: () => void
-  /** 会话标题旁已经有收起按钮时，侧栏品牌行不再放一个 */
-  hideToggle?: boolean
 }
 
 export function Sidebar({
@@ -45,8 +39,6 @@ export function Sidebar({
   streamingSessionIds = [],
   userName = '',
   onLogout,
-  onOpenKb,
-  hideToggle = false,
 }: Props) {
   const groups = groupSessions(sessions)
   const [menuId, setMenuId] = useState<string | null>(null)
@@ -71,24 +63,15 @@ export function Sidebar({
     <>
     <aside className="sidebar">
       <div className="brand">
-        <Logo size={28} />
         <span>Cheerly</span>
-        {hideToggle ? null : (
-          <button type="button" className="sidebar-toggle" aria-label="收起侧栏" onClick={onCollapse}>
-            <PanelIcon />
-          </button>
-        )}
+        <button type="button" className="sidebar-toggle" aria-label="收起侧栏" onClick={onCollapse}>
+          <PanelIcon />
+        </button>
       </div>
       <button type="button" className="new-chat" onClick={onNewChat}>
         <NewChatIcon />
         开启新对话
       </button>
-      {onOpenKb ? (
-        <button type="button" className="kb-entry" onClick={onOpenKb}>
-          <img src={kbIcon} alt="" className="kb-entry-icon" />
-          知识库
-        </button>
-      ) : null}
       <div className="history">
         <div className="history-inner">
           {/* 显式四态，互斥渲染：加载骨架 / 加载失败 / 空态 / 会话分组 */}
@@ -134,18 +117,26 @@ export function Sidebar({
           )}
         </div>
       </div>
-      <div className="account">
-        <span className="account-name">{userName}</span>
-        {onLogout ? (
-          <button
-            type="button"
-            className="account-logout"
-            onClick={onLogout}
-            aria-label="退出登录"
-          >
-            退出登录
-          </button>
-        ) : null}
+      <div className="sidebar-foot">
+        <div className="account">
+          {userName.trim() ? (
+            <span className="account-avatar" aria-hidden="true">
+              {userName.trim().slice(0, 1)}
+            </span>
+          ) : null}
+          <span className="account-name">{userName}</span>
+          {onLogout ? (
+            <button
+              type="button"
+              className="account-logout"
+              onClick={onLogout}
+              aria-label="退出登录"
+              title="退出登录"
+            >
+              <LogoutIcon />
+            </button>
+          ) : null}
+        </div>
       </div>
     </aside>
     {renameItem ? (
@@ -192,6 +183,7 @@ function HistoryItem({
   onDelete,
 }: ItemProps) {
   const boxRef = useRef<HTMLDivElement>(null)
+  const titleRef = useRef<HTMLSpanElement>(null)
   const moreRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
@@ -222,6 +214,35 @@ function HistoryItem({
     return () => document.removeEventListener('mousedown', onPointer)
   }, [menuOpen, onCloseMenu])
 
+  function syncTitleMarquee() {
+    const text = titleRef.current
+    const copy = text?.querySelector(':scope > .history-item-title-copy')
+    if (!text || !(copy instanceof HTMLElement)) return
+    const overflow = text.scrollWidth - text.clientWidth
+    if (overflow > 2) {
+      // 第二份标题跟在后面，滚过「一份标题 + 间隙」后画面和开头重合，循环才接得上。
+      // 间隙要盖过右侧「更多」按钮，否则上一句的尾巴还在按钮下，下一句已经挤进来。
+      const gap = 48
+      const shift = copy.offsetWidth + gap
+      const speed = 80
+      text.style.setProperty('--marquee-gap', `${gap}px`)
+      text.style.setProperty('--marquee-shift', `${shift}px`)
+      // 前 8% 停在开头，剩下的时间按 speed 匀速滚
+      text.style.setProperty('--marquee-duration', `${(shift / speed / 0.92).toFixed(2)}s`)
+      text.classList.add('marquee')
+    } else {
+      text.classList.remove('marquee')
+    }
+  }
+
+  function onRowEnter() {
+    requestAnimationFrame(syncTitleMarquee)
+  }
+
+  function onRowLeave() {
+    titleRef.current?.classList.remove('marquee')
+  }
+
   async function copyName() {
     try {
       await navigator.clipboard.writeText(title)
@@ -243,9 +264,16 @@ function HistoryItem({
     <div
       ref={boxRef}
       className={`history-item${active ? ' active' : ''}${menuOpen ? ' menu-open' : ''}`}
+      onMouseEnter={onRowEnter}
+      onMouseLeave={onRowLeave}
     >
       <button type="button" className="history-item-title" onClick={onSelect}>
-        {title}
+        <span ref={titleRef} className="history-item-title-text">
+          <span className="history-item-title-copy">{title}</span>
+          <span className="history-item-title-copy" aria-hidden="true">
+            {title}
+          </span>
+        </span>
       </button>
       {loading ? (
         <span className="history-item-loading" role="status" aria-label="正在回复" />
