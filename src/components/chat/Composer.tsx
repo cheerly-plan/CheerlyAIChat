@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { KbIcon, PaperclipIcon, SendIcon, StopIcon } from './icons'
+import { KbIcon, PaperclipIcon, ReportIcon, SendIcon, StopIcon } from './icons'
 import { GlobeToggleIcon } from './GlobeToggleIcon'
 
 type Props = {
@@ -10,6 +10,9 @@ type Props = {
   /** 「知识库」开关：开启时本轮挂载 kb_search 工具，对话即可查知识库 */
   kbOn?: boolean
   onToggleKb?: () => void
+  /** 「研报」开关：开启时本轮挂载 generate_report 工具，可生成研报 */
+  reportOn?: boolean
+  onToggleReport?: () => void
   onChange: (value: string) => void
   onSend: () => void
   /** 流式回复期间传入：发送按钮变为停止按钮 */
@@ -23,6 +26,8 @@ export function Composer({
   onToggleWebSearch,
   kbOn = false,
   onToggleKb,
+  reportOn = false,
+  onToggleReport,
   onChange,
   onSend,
   onStop,
@@ -97,6 +102,19 @@ export function Composer({
             >
               <KbIcon enabled={kbOn} size={16} />
               知识检索
+            </button>
+          ) : null}
+          {onToggleReport ? (
+            <button
+              type="button"
+              className={`chip chip-toggle${reportOn ? ' active' : ''}`}
+              aria-pressed={reportOn}
+              title={reportOn ? '研报生成已开启' : '开启后可生成研报'}
+              disabled={loading}
+              onClick={onToggleReport}
+            >
+              <ReportIcon enabled={reportOn} size={15} />
+              研报
             </button>
           ) : null}
         </div>

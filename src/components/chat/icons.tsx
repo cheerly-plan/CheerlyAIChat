@@ -245,3 +245,28 @@ export function TagIcon() {
   );
 }
 
+/** 研报开关：一张带折线图的文档，与「知识检索」书本图标同一套简洁线性风格 */
+export function ReportIcon({ enabled = false, size = 16 }: { enabled?: boolean; size?: number }) {
+  return (
+    <svg viewBox="0 0 16 16" width={size} height={size} fill="none" aria-hidden="true">
+      <path
+        d="M3 1.75A1.75 1.75 0 0 1 4.75 0h4.75L13 3.5v10.75A1.75 1.75 0 0 1 11.25 16h-6.5A1.75 1.75 0 0 1 3 14.25V1.75Z"
+        fill={enabled ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <path d="M9.5 0v3.5H13" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+      <path
+        d="M6 10.2 7.2 9l1.2 1.2L10.4 8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="10.4" cy="8" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
+

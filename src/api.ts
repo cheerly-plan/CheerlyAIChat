@@ -339,6 +339,8 @@ export async function sendChatStream(
     webSearch?: boolean
     /** 「知识库」开关：开启时后端为模型挂载 kb_search 工具，可检索全库文档 */
     kb?: boolean
+    /** 「研报」开关：开启时后端为模型挂载 generate_report 工具，可生成研报 */
+    report?: boolean
     signal?: AbortSignal
   } = {},
 ): Promise<void> {
@@ -356,6 +358,7 @@ export async function sendChatStream(
       regenerate: options.regenerate ?? false,
       web_search: options.webSearch ?? false,
       use_kb: options.kb ?? false,
+      use_report: options.report ?? false,
     }),
     signal: options.signal,
   })

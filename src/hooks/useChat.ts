@@ -390,6 +390,8 @@ export function useChat(initialUser?: UserInfo | null) {
       webSearch?: boolean
       // 知识库开关：透传给后端决定是否挂载 kb_search / kg_search
       kb?: boolean
+      // 研报开关：透传给后端决定是否挂载 generate_report / report_job_status
+      report?: boolean
     } = {},
   ) {
     if (!user) {
@@ -606,7 +608,7 @@ export function useChat(initialUser?: UserInfo | null) {
 
   async function send(
     text?: string,
-    options: { webSearch?: boolean; kb?: boolean } = {},
+    options: { webSearch?: boolean; kb?: boolean; report?: boolean } = {},
   ) {
     const content = (text ?? input).trim()
     if (!content || loading || !user) return
@@ -642,12 +644,13 @@ export function useChat(initialUser?: UserInfo | null) {
     await streamReply(content, assistantId, activeId, {
       webSearch: options.webSearch,
       kb: options.kb,
+      report: options.report,
     })
   }
 
   async function regenerate(
     id: string,
-    options: { webSearch?: boolean; kb?: boolean } = {},
+    options: { webSearch?: boolean; kb?: boolean; report?: boolean } = {},
   ) {
     if (loading || !user || !sessionId) return
     clearResumeState()
@@ -668,6 +671,7 @@ export function useChat(initialUser?: UserInfo | null) {
       regenerate: true,
       webSearch: options.webSearch,
       kb: options.kb,
+      report: options.report,
     })
   }
 
