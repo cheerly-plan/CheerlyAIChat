@@ -153,9 +153,9 @@ export function WarningIcon() {
   );
 }
 
-export function CloseIcon() {
+export function CloseIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">
+    <svg viewBox="0 0 16 16" width={size} height={size} fill="none" aria-hidden="true">
       <path d="M14.1871 13.1265L13.1265 14.1872L1.81275 2.87347L2.87341 1.81281L14.1871 13.1265Z" fill="currentColor" />
       <path d="M13.1265 1.81282L14.1871 2.87348L2.8734 14.1872L1.81274 13.1265L13.1265 1.81282Z" fill="currentColor" />
     </svg>
@@ -172,6 +172,20 @@ export function MoreIcon() {
     </svg>
   );
 }
+
+export function PlusIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">
+      <path
+        d="M8 3.5v9M3.5 8h9"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 
 export function PaperclipIcon() {
   return (
@@ -245,27 +259,40 @@ export function TagIcon() {
   );
 }
 
-/** 研报开关：一张带折线图的文档，与「知识检索」书本图标同一套简洁线性风格 */
+/** 研报开关：圆角文档折角 + 上升折线（端点带圆点），与「知识检索」书本图标同属
+    「文档容器 + 内部图形」语言。开启时浅蓝底 + 蓝描边，关闭时仅描边。 */
 export function ReportIcon({ enabled = false, size = 16 }: { enabled?: boolean; size?: number }) {
   return (
     <svg viewBox="0 0 16 16" width={size} height={size} fill="none" aria-hidden="true">
       <path
-        d="M3 1.75A1.75 1.75 0 0 1 4.75 0h4.75L13 3.5v10.75A1.75 1.75 0 0 1 11.25 16h-6.5A1.75 1.75 0 0 1 3 14.25V1.75Z"
+        d="M4 0.5a1.5 1.5 0 0 0-1.5 1.5v12A1.5 1.5 0 0 0 4 15.5h8a1.5 1.5 0 0 0 1.5-1.5V5.5L9 1H4.75"
         fill={enabled ? 'currentColor' : 'none'}
+        fillOpacity={enabled ? 0.14 : 0}
         stroke="currentColor"
         strokeWidth="1.4"
-        strokeLinejoin="round"
-      />
-      <path d="M9.5 0v3.5H13" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-      <path
-        d="M6 10.2 7.2 9l1.2 1.2L10.4 8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.3"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <circle cx="10.4" cy="8" r="0.9" fill="currentColor" />
+      <path
+        d="M9 1v4.5H13.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <polyline
+        points="5.2 11.6 7.1 9.4 8.6 10.6 10.9 8"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="5.2" cy="11.6" r="0.95" fill="currentColor" />
+      <circle cx="7.1" cy="9.4" r="0.95" fill="currentColor" />
+      <circle cx="8.6" cy="10.6" r="0.95" fill="currentColor" />
+      <circle cx="10.9" cy="8" r="0.95" fill="currentColor" />
     </svg>
   );
 }

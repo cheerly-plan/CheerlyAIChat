@@ -33,7 +33,6 @@ function timeGreeting() {
 
 const WEB_SEARCH_PREF_KEY = 'ai_chat.webSearch'
 const KB_PREF_KEY = 'ai_chat.kb'
-const REPORT_PREF_KEY = 'ai_chat.report'
 
 /** 读取布尔记忆偏好；从未设置过时用 fallback（智能搜索默认开、知识库默认关） */
 function loadBoolPref(key: string, fallback: boolean): boolean {
@@ -124,15 +123,11 @@ export function Chat({ onLogout, initialUser = null }: Props) {
       saveBoolPref(KB_PREF_KEY, next)
       return next
     })
-  // 「研报」开关：开启时本轮挂载 generate_report 工具，可生成研报。
-  // 与知识库同一套交互，默认关闭（研报是重流程，不该默认替用户开）
-  const [reportOn, setReportOn] = useState(() => loadBoolPref(REPORT_PREF_KEY, false))
-  const toggleReport = () =>
-    setReportOn((on) => {
-      const next = !on
-      saveBoolPref(REPORT_PREF_KEY, next)
-      return next
-    })
+  // 「研报生成」标签：一次性任务，点「+」选中后挂到输入框，发送时带
+  // use_report=true。研报是「生成一次」的动作，不是持续开关，故不持久化。
+  const [reportTag, setReportTag] = useState(false)
+  const addReport = () => setReportTag(true)
+  const removeReport = () => setReportTag(false)
 
   const isLanding =
     !sessionId &&
@@ -177,8 +172,9 @@ export function Chat({ onLogout, initialUser = null }: Props) {
         toggleWebSearch={toggleWebSearch}
         kbOn={kbOn}
         toggleKb={toggleKb}
-        reportOn={reportOn}
-        toggleReport={toggleReport}
+        reportTag={reportTag}
+        addReport={addReport}
+        removeReport={removeReport}
         send={send}
         stop={stop}
         messages={messages}
@@ -221,8 +217,9 @@ type ShellProps = {
   toggleWebSearch: () => void
   kbOn: boolean
   toggleKb: () => void
-  reportOn: boolean
-  toggleReport: () => void
+  reportTag: boolean
+  addReport: () => void
+  removeReport: () => void
   send: (
     text?: string,
     options?: { webSearch?: boolean; kb?: boolean; report?: boolean },
@@ -339,16 +336,19 @@ function ChatShell(props: ShellProps) {
                     onToggleWebSearch={props.toggleWebSearch}
                     kbOn={props.kbOn}
                     onToggleKb={props.toggleKb}
-                    reportOn={props.reportOn}
-                    onToggleReport={props.toggleReport}
+                    reportTag={props.reportTag}
+                    onAddReport={props.addReport}
+                    onRemoveReport={props.removeReport}
                     onChange={props.setInput}
-                    onSend={() =>
+                    onSend={() => {
+                      const report = props.reportTag
+                      if (report) props.removeReport()
                       void props.send(undefined, {
                         webSearch: props.webSearch,
                         kb: props.kbOn,
-                        report: props.reportOn,
+                        report,
                       })
-                    }
+                    }}
                     onStop={() => props.stop()}
                   />
                 </div>
@@ -366,14 +366,14 @@ function ChatShell(props: ShellProps) {
                     void props.send(text, {
                       webSearch: props.webSearch,
                       kb: props.kbOn,
-                      report: props.reportOn,
+                      report: props.reportTag,
                     })
                   }
                   onRegenerate={(id) =>
                     void props.regenerate(id, {
                       webSearch: props.webSearch,
                       kb: props.kbOn,
-                      report: props.reportOn,
+                      report: props.reportTag,
                     })
                   }
                   onResume={() => void props.resumeRun()}
@@ -388,16 +388,19 @@ function ChatShell(props: ShellProps) {
                     onToggleWebSearch={props.toggleWebSearch}
                     kbOn={props.kbOn}
                     onToggleKb={props.toggleKb}
-                    reportOn={props.reportOn}
-                    onToggleReport={props.toggleReport}
+                    reportTag={props.reportTag}
+                    onAddReport={props.addReport}
+                    onRemoveReport={props.removeReport}
                     onChange={props.setInput}
-                    onSend={() =>
+                    onSend={() => {
+                      const report = props.reportTag
+                      if (report) props.removeReport()
                       void props.send(undefined, {
                         webSearch: props.webSearch,
                         kb: props.kbOn,
-                        report: props.reportOn,
+                        report,
                       })
-                    }
+                    }}
                     onStop={() => props.stop()}
                   />
                 </div>

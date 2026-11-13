@@ -2336,10 +2336,52 @@ body.is-resizing-preview iframe {
   box-shadow: 0 8px 28px rgba(15, 23, 42, 0.06);
 }
 
+/* 「研报生成」标签：独立一行在输入框顶部（textarea 只管正文，标签与正文分离） */
+.composer-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 18px 0;
+}
+
+.composer-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(77, 107, 254, 0.28);
+  border-radius: 999px;
+  background: rgba(77, 107, 254, 0.1);
+  color: #4d6bfe;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.composer-tag-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.65;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+
 .composer-input {
   max-height: 160px;
   overflow: auto;
-  padding: 16px 18px 0;
+  padding: 14px 18px 0;
 }
 
 .composer textarea {
@@ -2372,6 +2414,7 @@ body.is-resizing-preview iframe {
 }
 
 .chips {
+  position: relative;
   display: flex;
   gap: 8px;
 }
@@ -2464,34 +2507,165 @@ body.is-resizing-preview iframe {
   opacity: 0.55;
 }
 
-.composer-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.composer-attach {
+/* 「+」技能/文件入口：点开一个向上弹出的菜单，收纳智能搜索 / 知识检索 /
+   研报 / 添加文件。收起时只占一个圆形加号，替代原来横排的一串 chip。 */
+.composer-plus {
   width: 32px;
   height: 32px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 50%;
   background: transparent;
   color: #6b7280;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
 }
 
-.composer-attach:hover:not(:disabled) {
+.composer-plus:hover:not(:disabled) {
   color: #111827;
   background: #f3f4f6;
 }
 
-.composer-attach:disabled {
+.composer-plus.active {
+  color: #4d6bfe;
+  background: rgba(77, 107, 254, 0.1);
+}
+
+.composer-plus.active svg {
+  transform: rotate(45deg);
+}
+
+.composer-plus svg {
+  transition: transform 0.2s ease;
+}
+
+.composer-plus:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.composer-menu {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  z-index: 30;
+  min-width: 264px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #e8eaee;
+  border-radius: 14px;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.12);
+}
+
+.composer-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #0f1115;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.composer-menu-item:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.composer-menu-item.active {
+  background: rgba(77, 107, 254, 0.06);
+}
+
+.composer-menu-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.composer-menu-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #4d6bfe;
+}
+
+.composer-menu-item.active .composer-menu-icon {
+  color: #4d6bfe;
+}
+
+.composer-menu-item:not(.active) .composer-menu-icon {
+  color: #6b7280;
+}
+
+.composer-menu-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.composer-menu-title {
+  font-size: 14px;
+  line-height: 1.3;
+  color: #0f1115;
+}
+
+.composer-menu-desc {
+  font-size: 12px;
+  line-height: 1.3;
+  color: #9aa0a6;
+}
+
+.composer-menu-check {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid #dcdfe6;
+  box-sizing: border-box;
+}
+
+.composer-menu-check.on {
+  border-color: #4d6bfe;
+  background: #4d6bfe;
+  position: relative;
+}
+
+.composer-menu-check.on::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.composer-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: #eef0f3;
+}
+
+.composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .composer button[type='submit'] {
