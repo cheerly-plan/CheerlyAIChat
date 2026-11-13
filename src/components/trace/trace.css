@@ -506,3 +506,45 @@
     min-height: 420px;
   }
 }
+
+/* token 展示：输入/输出分开配色，方便一眼看出是"读得多"还是"写得多" */
+.trace-step-tokens {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #64748b;
+}
+
+.trace-token-in {
+  color: #0f766e;
+}
+
+.trace-token-out {
+  color: #7c3aed;
+}
+
+.trace-session-tokens {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 14px;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.trace-session-tokens-label {
+  color: #475569;
+  font-weight: 600;
+}
+
+.trace-item-tokens {
+  color: #7c3aed;
+}

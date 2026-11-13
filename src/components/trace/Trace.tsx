@@ -313,6 +313,32 @@ function FlowDiagram({ steps }: { steps: InspectStep[] }) {
   )
 }
 
+// token 展示：没采集到（null）显示「—」，不要显示成 0 误导人
+function fmtTokens(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—'
+  return value.toLocaleString('zh-CN')
+}
+
+function hasTokens(...values: Array<number | null | undefined>): boolean {
+  return values.some((v) => v !== null && v !== undefined)
+}
+
+function TokenBadge({
+  prompt,
+  completion,
+}: {
+  prompt: number | null | undefined
+  completion: number | null | undefined
+}) {
+  if (!hasTokens(prompt, completion)) return null
+  return (
+    <span className="trace-step-tokens" title="输入 / 输出 token（网关计费口径）">
+      <span className="trace-token-in">↑{fmtTokens(prompt)}</span>
+      <span className="trace-token-out">↓{fmtTokens(completion)}</span>
+    </span>
+  )
+}
+
 function preview(text: string | null | undefined) {
   const flat = String(text ?? '').replace(/\s+/g, ' ').trim()
   if (!flat) return '（空提问）'
@@ -335,6 +361,9 @@ function StepCard({ step }: { step: InspectStep }) {
               {step.kind === 'tool_result' ? <span>工具</span> : null}
               <span className="trace-step-tool-name">{step.name}</span>
             </span>
+          ) : null}
+          {step.kind === 'llm' ? (
+            <TokenBadge prompt={step.prompt_tokens} completion={step.completion_tokens} />
           ) : null}
         </div>
         {isCall ? (
@@ -368,6 +397,10 @@ export function Trace({ currentUserId }: Props) {
   const [sessions, setSessions] = useState<InspectSession[]>([])
   const [sessionId, setSessionId] = useState('')
   const [sessionTitle, setSessionTitle] = useState('')
+  const [sessionTokens, setSessionTokens] = useState<{
+    prompt: number | null
+    completion: number | null
+  }>({ prompt: null, completion: null })
   const [turns, setTurns] = useState<InspectTurn[]>([])
   const [turnIndex, setTurnIndex] = useState(0)
   const [error, setError] = useState('')
@@ -427,6 +460,7 @@ export function Trace({ currentUserId }: Props) {
     if (!userId || !sessionId) {
       setTurns([])
       setSessionTitle('')
+      setSessionTokens({ prompt: null, completion: null })
       setTurnIndex(0)
       return
     }
@@ -437,6 +471,10 @@ export function Trace({ currentUserId }: Props) {
       .then((data) => {
         if (cancelled) return
         setSessionTitle(data.title)
+        setSessionTokens({
+          prompt: data.prompt_tokens ?? null,
+          completion: data.completion_tokens ?? null,
+        })
         setTurns(data.turns)
         setTurnIndex(data.turns.length ? data.turns.length - 1 : 0)
       })
@@ -491,13 +529,28 @@ export function Trace({ currentUserId }: Props) {
                   onClick={() => setTurnIndex(item.index)}
                 >
                   <span className="trace-item-title">{preview(item.question)}</span>
-                  <span className="trace-item-meta">{item.steps?.length ?? 0} 步</span>
+                  <span className="trace-item-meta">
+                    {item.steps?.length ?? 0} 步
+                    {hasTokens(item.prompt_tokens, item.completion_tokens) ? (
+                      <span className="trace-item-tokens">
+                        {' · '}
+                        {fmtTokens(item.completion_tokens)} tok
+                      </span>
+                    ) : null}
+                  </span>
                 </button>
               ))
             )}
           </div>
         </aside>
         <section className="trace-main" aria-label="过程" ref={mainRef}>
+          {sessionId && hasTokens(sessionTokens.prompt, sessionTokens.completion) ? (
+            <div className="trace-session-tokens" title="整个会话的网关计费累计">
+              <span className="trace-session-tokens-label">本会话累计</span>
+              <span className="trace-token-in">输入 {fmtTokens(sessionTokens.prompt)}</span>
+              <span className="trace-token-out">输出 {fmtTokens(sessionTokens.completion)}</span>
+            </div>
+          ) : null}
           {!turn ? (
             <p className="trace-muted trace-main-empty">
               {sessionTitle ? `「${sessionTitle}」里还没有可查看的过程。` : '选一条提问后，这里显示 agent 过程。'}

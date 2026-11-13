@@ -1046,12 +1046,24 @@ export type InspectStep = {
   tool_call_id: string
   content: string
   arguments: Record<string, unknown>
+  // 网关计费口径的 token 数；null 表示没采集到（加字段前的历史消息）
+  prompt_tokens?: number | null
+  completion_tokens?: number | null
 }
 
 export type InspectTurn = {
   index: number
   question: string
   steps: InspectStep[]
+  prompt_tokens?: number | null
+  completion_tokens?: number | null
+}
+
+export type InspectTurnsPayload = {
+  title: string
+  turns: InspectTurn[]
+  prompt_tokens?: number | null
+  completion_tokens?: number | null
 }
 
 export async function fetchInspectUsers(): Promise<InspectUser[]> {
@@ -1078,7 +1090,7 @@ export async function fetchInspectSessions(userId: string): Promise<InspectSessi
 export async function fetchInspectTurns(
   userId: string,
   sessionId: string,
-): Promise<{ title: string; turns: InspectTurn[] }> {
+): Promise<InspectTurnsPayload> {
   const params = new URLSearchParams({ user_id: userId, session_id: sessionId })
   const response = await authedFetch(`/v1/inspect/turns?${params}`, {
     headers: authHeaders(),
@@ -1086,6 +1098,11 @@ export async function fetchInspectTurns(
   if (!response.ok) {
     throw new Error(await errorMessage(response, '对话过程加载失败'))
   }
-  const data = (await response.json()) as { title: string; turns: InspectTurn[] }
-  return { title: data.title, turns: data.turns }
+  const data = (await response.json()) as InspectTurnsPayload
+  return {
+    title: data.title,
+    turns: data.turns,
+    prompt_tokens: data.prompt_tokens ?? null,
+    completion_tokens: data.completion_tokens ?? null,
+  }
 }
