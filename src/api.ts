@@ -1055,6 +1055,9 @@ export type InspectTurn = {
   index: number
   question: string
   steps: InspectStep[]
+  // 本轮新增内容的 token（提问 + 工具结果 + 模型输出，后端本地现算）
+  input_tokens?: number
+  // 网关计费口径：同轮多次请求的 prompt 相加，历史被重复计入
   prompt_tokens?: number | null
   completion_tokens?: number | null
 }
@@ -1062,6 +1065,9 @@ export type InspectTurn = {
 export type InspectTurnsPayload = {
   title: string
   turns: InspectTurn[]
+  // 会话当前上下文总量（本地现算）
+  context_tokens?: number
+  // 网关累计扣费
   prompt_tokens?: number | null
   completion_tokens?: number | null
 }
@@ -1102,6 +1108,7 @@ export async function fetchInspectTurns(
   return {
     title: data.title,
     turns: data.turns,
+    context_tokens: data.context_tokens ?? 0,
     prompt_tokens: data.prompt_tokens ?? null,
     completion_tokens: data.completion_tokens ?? null,
   }

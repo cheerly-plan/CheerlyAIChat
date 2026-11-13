@@ -546,5 +546,31 @@
 }
 
 .trace-item-tokens {
+  color: #0f766e;
+}
+
+.trace-item-out {
   color: #7c3aed;
+}
+
+.trace-token-context {
+  color: #1e40af;
+  font-weight: 600;
+}
+
+.trace-token-billed {
+  color: #94a3b8;
+}
+
+/* 一轮的 token 摘要：当次输入 / 输出 在前，扣费口径弱化在后 */
+.trace-turn-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #e2e8f0;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }

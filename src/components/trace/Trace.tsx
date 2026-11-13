@@ -339,6 +339,31 @@ function TokenBadge({
   )
 }
 
+// 一轮的 token：先给「这一问新增多少」，扣费口径作为次要信息
+function TurnTokens({ turn }: { turn: InspectTurn }) {
+  const hasInput = typeof turn.input_tokens === 'number' && turn.input_tokens > 0
+  const hasOut = turn.completion_tokens !== null && turn.completion_tokens !== undefined
+  if (!hasInput && !hasOut && !hasTokens(turn.prompt_tokens)) return null
+  return (
+    <div className="trace-turn-tokens">
+      <span className="trace-token-in" title="本轮新增内容：提问 + 工具结果 + 模型输出">
+        当次输入 {fmtTokens(turn.input_tokens)}
+      </span>
+      <span className="trace-token-out" title="本轮模型生成">
+        输出 {fmtTokens(turn.completion_tokens)}
+      </span>
+      {hasTokens(turn.prompt_tokens) ? (
+        <span
+          className="trace-token-billed"
+          title="网关计费口径：本轮每次请求的 prompt 相加，历史被重复计入，不能当作新增量"
+        >
+          扣费 prompt {fmtTokens(turn.prompt_tokens)}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
 function preview(text: string | null | undefined) {
   const flat = String(text ?? '').replace(/\s+/g, ' ').trim()
   if (!flat) return '（空提问）'
@@ -398,9 +423,10 @@ export function Trace({ currentUserId }: Props) {
   const [sessionId, setSessionId] = useState('')
   const [sessionTitle, setSessionTitle] = useState('')
   const [sessionTokens, setSessionTokens] = useState<{
+    context: number
     prompt: number | null
     completion: number | null
-  }>({ prompt: null, completion: null })
+  }>({ context: 0, prompt: null, completion: null })
   const [turns, setTurns] = useState<InspectTurn[]>([])
   const [turnIndex, setTurnIndex] = useState(0)
   const [error, setError] = useState('')
@@ -460,7 +486,7 @@ export function Trace({ currentUserId }: Props) {
     if (!userId || !sessionId) {
       setTurns([])
       setSessionTitle('')
-      setSessionTokens({ prompt: null, completion: null })
+      setSessionTokens({ context: 0, prompt: null, completion: null })
       setTurnIndex(0)
       return
     }
@@ -472,6 +498,7 @@ export function Trace({ currentUserId }: Props) {
         if (cancelled) return
         setSessionTitle(data.title)
         setSessionTokens({
+          context: data.context_tokens ?? 0,
           prompt: data.prompt_tokens ?? null,
           completion: data.completion_tokens ?? null,
         })
@@ -531,11 +558,11 @@ export function Trace({ currentUserId }: Props) {
                   <span className="trace-item-title">{preview(item.question)}</span>
                   <span className="trace-item-meta">
                     {item.steps?.length ?? 0} 步
-                    {hasTokens(item.prompt_tokens, item.completion_tokens) ? (
-                      <span className="trace-item-tokens">
-                        {' · '}
-                        {fmtTokens(item.completion_tokens)} tok
-                      </span>
+                    {item.input_tokens ? (
+                      <span className="trace-item-tokens"> · {fmtTokens(item.input_tokens)}</span>
+                    ) : null}
+                    {item.completion_tokens ? (
+                      <span className="trace-item-out"> / {fmtTokens(item.completion_tokens)}</span>
                     ) : null}
                   </span>
                 </button>
@@ -544,11 +571,24 @@ export function Trace({ currentUserId }: Props) {
           </div>
         </aside>
         <section className="trace-main" aria-label="过程" ref={mainRef}>
-          {sessionId && hasTokens(sessionTokens.prompt, sessionTokens.completion) ? (
-            <div className="trace-session-tokens" title="整个会话的网关计费累计">
-              <span className="trace-session-tokens-label">本会话累计</span>
-              <span className="trace-token-in">输入 {fmtTokens(sessionTokens.prompt)}</span>
-              <span className="trace-token-out">输出 {fmtTokens(sessionTokens.completion)}</span>
+          {sessionId && (sessionTokens.context > 0 || hasTokens(sessionTokens.prompt)) ? (
+            <div className="trace-session-tokens">
+              <span className="trace-session-tokens-label">本会话</span>
+              <span
+                className="trace-token-context"
+                title="当前上下文总量：全部消息自身的 token 之和"
+              >
+                上下文 {fmtTokens(sessionTokens.context)}
+              </span>
+              {hasTokens(sessionTokens.prompt, sessionTokens.completion) ? (
+                <span
+                  className="trace-token-billed"
+                  title="网关累计扣费：每次请求的 prompt 相加，历史会被重复计费"
+                >
+                  累计扣费 输入 {fmtTokens(sessionTokens.prompt)} / 输出{' '}
+                  {fmtTokens(sessionTokens.completion)}
+                </span>
+              ) : null}
             </div>
           ) : null}
           {!turn ? (
@@ -568,6 +608,7 @@ export function Trace({ currentUserId }: Props) {
                       <span className="trace-step-kind">用户提问</span>
                     </div>
                     <p className="trace-question-text">{String(turn.question ?? '').trim() || '（空提问）'}</p>
+                    <TurnTokens turn={turn} />
                   </div>
                 </li>
                 {turnSteps.map((step, index) => (
