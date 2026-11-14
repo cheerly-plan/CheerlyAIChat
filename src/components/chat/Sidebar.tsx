@@ -6,7 +6,9 @@ import optionsIcon from '../../assets/options.svg'
 import renameIcon from '../../assets/rename.svg'
 import type { SessionInfo } from '../../types'
 import { ConfirmDialog } from '../common/ConfirmDialog'
-import { CloseIcon, LogoutIcon, NewChatIcon, PanelIcon } from './icons'
+import { MemoryDialog } from '../settings/MemoryDialog'
+import { SettingsPopup } from '../settings/SettingsPopup'
+import { CloseIcon, NewChatIcon, PanelIcon, SettingsIcon } from './icons'
 
 type Props = {
   onNewChat: () => void
@@ -44,6 +46,9 @@ export function Sidebar({
   const [menuId, setMenuId] = useState<string | null>(null)
   const [renameItem, setRenameItem] = useState<SessionInfo | null>(null)
   const [deleteItem, setDeleteItem] = useState<SessionInfo | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [memoryOpen, setMemoryOpen] = useState(false)
+  const accountRef = useRef<HTMLDivElement>(null)
 
   async function confirmRename(title: string) {
     if (!renameItem) return
@@ -118,24 +123,24 @@ export function Sidebar({
         </div>
       </div>
       <div className="sidebar-foot">
-        <div className="account">
+        <div className="account" ref={accountRef}>
           {userName.trim() ? (
             <span className="account-avatar" aria-hidden="true">
               {userName.trim().slice(0, 1)}
             </span>
           ) : null}
           <span className="account-name">{userName}</span>
-          {onLogout ? (
-            <button
-              type="button"
-              className="account-logout"
-              onClick={onLogout}
-              aria-label="退出登录"
-              title="退出登录"
-            >
-              <LogoutIcon />
-            </button>
-          ) : null}
+          <button
+            type="button"
+            className="account-settings"
+            onClick={() => setSettingsOpen((open) => !open)}
+            aria-label="设置"
+            aria-expanded={settingsOpen}
+            aria-haspopup="menu"
+            title="设置"
+          >
+            <SettingsIcon />
+          </button>
         </div>
       </div>
     </aside>
@@ -154,6 +159,22 @@ export function Sidebar({
         onConfirm={() => void confirmDelete()}
       />
     ) : null}
+    {settingsOpen ? (
+      <SettingsPopup
+        anchorRef={accountRef}
+        userName={userName}
+        onClose={() => setSettingsOpen(false)}
+        onOpenMemory={() => {
+          setSettingsOpen(false)
+          setMemoryOpen(true)
+        }}
+        onLogout={onLogout ? () => {
+          setSettingsOpen(false)
+          onLogout()
+        } : undefined}
+      />
+    ) : null}
+    {memoryOpen ? <MemoryDialog onClose={() => setMemoryOpen(false)} /> : null}
     </>
   )
 }

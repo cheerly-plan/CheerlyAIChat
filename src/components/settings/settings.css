@@ -1,0 +1,533 @@
+/* 侧栏底部设置按钮：沿用原退出按钮的尺寸，hover 改成中性蓝而非警示红。 */
+.account-settings {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.account-settings:hover {
+  color: #3b7bff;
+  background: rgba(59, 123, 255, 0.08);
+}
+
+/* 账号 popup：锚定在侧栏底部账号栏上方，没有全屏蒙层。
+   z-index 低于 .session-dialog-mask(40)，记忆管理弹窗打开时不会盖在它上面。 */
+.settings-popup {
+  position: fixed;
+  z-index: 30;
+  left: 12px;
+  bottom: 72px;
+  /* 与底部账号卡片等宽；运行时 SettingsPopup 按卡片实际宽度覆写 */
+  width: 256px;
+  max-height: calc(100vh - 48px);
+  padding: 12px;
+  border: 1px solid rgba(16, 24, 40, 0.06);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.04),
+    0 18px 48px rgba(16, 24, 40, 0.14);
+  box-sizing: border-box;
+  overflow-y: auto;
+  animation: settings-popup-in 0.16s ease-out;
+}
+
+@keyframes settings-popup-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-popup {
+    animation: none;
+  }
+}
+
+.settings-popup-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 14px;
+}
+
+.settings-popup-avatar {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #e8edff;
+  color: #4d6bfe;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.settings-popup-user-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.settings-popup-user-text strong {
+  overflow: hidden;
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-popup-user-text small {
+  color: #9aa1ac;
+  font-size: 12px;
+}
+
+.settings-popup-band {
+  height: 8px;
+  margin: 0 -12px 8px;
+  border-top: 1px solid #f1f3f5;
+  border-bottom: 1px solid #f1f3f5;
+  background: #f7f8fa;
+}
+
+.settings-popup-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #1f2937;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.settings-popup-item:hover {
+  background: #f4f7f6;
+}
+
+.settings-popup-item.danger:hover {
+  background: #fff1ef;
+  color: #d5392f;
+}
+
+.settings-popup-item-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: #5b6472;
+}
+
+.settings-popup-item-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.settings-popup-item.danger:hover .settings-popup-item-icon {
+  color: #d5392f;
+}
+
+.settings-popup-item-label {
+  flex: 0 0 auto;
+  font-weight: 500;
+}
+
+.settings-popup-sep {
+  height: 1px;
+  margin: 6px 12px;
+  background: #eef0f3;
+}
+
+.session-dialog.memory-dialog {
+  width: min(680px, calc(100vw - 48px));
+  max-height: min(86vh, 780px);
+  padding: 20px 22px 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.session-dialog.memory-dialog .session-dialog-head {
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+
+.memory-subtitle {
+  margin: 3px 0 0;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.memory-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid #eef0f3;
+  border-radius: 12px;
+  background: #fafbfd;
+  flex-shrink: 0;
+}
+
+.memory-switch-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.memory-switch-text strong {
+  color: #1f2937;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.memory-switch-text span {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.memory-switch {
+  position: relative;
+  width: 40px;
+  height: 23px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #d5d9e0;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.memory-switch.on {
+  background: #3b7bff;
+}
+
+.memory-switch > span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s ease;
+}
+
+.memory-switch.on > span {
+  transform: translateX(17px);
+}
+
+.memory-switch:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.memory-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 16px;
+  border-bottom: 1px solid #eef0f3;
+  flex-shrink: 0;
+}
+
+.memory-tab {
+  padding: 9px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #6b7280;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.memory-tab:hover {
+  color: #1f2937;
+}
+
+.memory-tab.active {
+  border-bottom-color: #3b7bff;
+  color: #3b7bff;
+  font-weight: 600;
+}
+
+.memory-tab-hint {
+  margin: 10px 0 0;
+  color: #8a909b;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.memory-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0;
+  flex-shrink: 0;
+}
+
+.memory-toolbar-right {
+  display: flex;
+  gap: 8px;
+}
+
+.memory-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 18px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #1f2937;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.memory-btn.small {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.memory-btn.ghost:hover:not(:disabled) {
+  background: #f5f7fb;
+}
+
+.memory-btn.primary {
+  border-color: #3b7bff;
+  background: #3b7bff;
+  color: #fff;
+}
+
+.memory-btn.primary:hover:not(:disabled) {
+  background: #2f6bf0;
+}
+
+.memory-btn.danger-text {
+  color: #d5392f;
+}
+
+.memory-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.memory-compose {
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fafbfd;
+  flex-shrink: 0;
+}
+
+.memory-textarea {
+  width: 100%;
+  min-height: 68px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.memory-textarea:focus {
+  border-color: #3b7bff;
+}
+
+.memory-compose-hint {
+  margin: 8px 0 0;
+  color: #8a909b;
+  font-size: 11px;
+}
+
+.memory-compose-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.memory-list {
+  flex: 1;
+  min-height: 160px;
+  overflow-y: auto;
+  border: 1px solid #eef0f3;
+  border-radius: 12px;
+}
+
+.memory-empty {
+  padding: 40px 16px;
+  color: #9ca3af;
+  font-size: 13px;
+  text-align: center;
+}
+
+.memory-item {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f1f2f5;
+}
+
+.memory-item:last-child {
+  border-bottom: 0;
+}
+
+.memory-item .memory-compose {
+  margin-bottom: 0;
+}
+
+.memory-item-text {
+  margin: 0;
+  color: #1f2937;
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.memory-item-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.memory-item-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.memory-item-actions button {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+}
+
+.memory-item-actions button:hover:not(:disabled) {
+  background: #f1f3f7;
+  color: #3b7bff;
+}
+
+.memory-item-actions button.danger:hover:not(:disabled) {
+  background: #fff1ef;
+  color: #d5392f;
+}
+
+.memory-item-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* 写入链返回的处理说明（已写入 / 已删除 / 无需更新） */
+.memory-notice {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #eef7f1;
+  color: #2f6b4a;
+  font-size: 12px;
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+.memory-error {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fff1ef;
+  color: #b8322a;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.memory-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  flex-shrink: 0;
+}
+
+.memory-page-no {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.memory-clear-all {
+  margin-left: auto;
+  padding: 6px 4px;
+  border: 0;
+  background: transparent;
+  color: #b0b5bf;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.memory-clear-all:hover:not(:disabled) {
+  color: #d5392f;
+}
+
+.memory-clear-all:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (max-width: 600px) {
+  .session-dialog.memory-dialog {
+    width: calc(100vw - 24px);
+    max-height: 92vh;
+    padding: 16px 14px 12px;
+  }
+
+  .memory-toolbar {
+    flex-wrap: wrap;
+  }
+}

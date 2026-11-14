@@ -1116,3 +1116,128 @@ export async function fetchInspectTurns(
     completion_tokens: data.completion_tokens ?? null,
   }
 }
+
+/* ── 长期记忆管理（/v1/memory）───────────────────────────────────────────
+   后端按 user_id 严格隔离，普通用户传别人的 user_id 会被忽略，因此这里
+   一律不带 user_id 参数，只靠 Authorization 头确定身份。 */
+
+export type MemoryKind = 'profile' | 'episodes' | 'archive'
+
+export type MemoryRow = {
+  id: string
+  text: string
+  facet?: string
+  kind?: string
+  created_at?: string
+  last_seen?: string
+  archived_at?: string
+  hit_count?: number
+  session_seen?: number
+  source?: string
+  superseded_at?: string | null
+  expires_at?: string | null
+}
+
+export type MemoryPage = {
+  items: MemoryRow[]
+  has_more: boolean
+  next_offset: number | null
+}
+
+const MEMORY_PATH: Record<MemoryKind, string> = {
+  profile: '/v1/memory/profile',
+  episodes: '/v1/memory/episodes',
+  archive: '/v1/memory/archive',
+}
+
+export async function fetchMemorySettings(): Promise<{ enabled: boolean }> {
+  const response = await authedFetch('/v1/memory/settings', { headers: authHeaders() })
+  if (!response.ok) throw new Error(await errorMessage(response, '记忆开关读取失败'))
+  return (await response.json()) as { enabled: boolean }
+}
+
+export async function setMemorySettings(enabled: boolean): Promise<{ enabled: boolean }> {
+  const response = await authedFetch('/v1/memory/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ enabled }),
+  })
+  if (!response.ok) throw new Error(await errorMessage(response, '记忆开关保存失败'))
+  return (await response.json()) as { enabled: boolean }
+}
+
+export async function fetchMemoryPage(
+  kind: MemoryKind,
+  offset = 0,
+  limit = 20,
+): Promise<MemoryPage> {
+  const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+  const response = await authedFetch(`${MEMORY_PATH[kind]}?${params}`, {
+    headers: authHeaders(),
+  })
+  if (!response.ok) throw new Error(await errorMessage(response, '记忆读取失败'))
+  const data = (await response.json()) as {
+    items: MemoryRow[]
+    has_more: boolean
+    next_offset: number | null
+  }
+  return {
+    items: data.items ?? [],
+    has_more: Boolean(data.has_more),
+    next_offset: data.next_offset ?? null,
+  }
+}
+
+/** 用自然语言管理长期画像：新增 / 修改 / 删除都交给后端写入链判断，
+    返回写入链的处理说明（例如「已写入…」「用户画像无需更新」）。 */
+export async function writeMemoryProfile(text: string): Promise<string> {
+  const response = await authedFetch('/v1/memory/profile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ text }),
+  })
+  if (!response.ok) throw new Error(await errorMessage(response, '记忆更新失败'))
+  const data = (await response.json()) as { message?: string }
+  return data.message ?? ''
+}
+
+export async function deleteMemoryItem(kind: 'profile' | 'episodes', id: string): Promise<void> {
+  const response = await authedFetch(`${MEMORY_PATH[kind]}/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!response.ok) throw new Error(await errorMessage(response, '记忆删除失败'))
+}
+
+export async function clearMemoryKind(kind: 'profile' | 'episodes'): Promise<number> {
+  const response = await authedFetch(MEMORY_PATH[kind], {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!response.ok) throw new Error(await errorMessage(response, '清空失败'))
+  const data = (await response.json()) as { deleted?: number }
+  return data.deleted ?? 0
+}
+
+export async function clearAllMemory(): Promise<void> {
+  const response = await authedFetch('/v1/memory', {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!response.ok) throw new Error(await errorMessage(response, '全部清除失败'))
+}
+
+export async function exportMemory(): Promise<void> {
+  const response = await authedFetch('/v1/memory/export', { headers: authHeaders() })
+  if (!response.ok) throw new Error(await errorMessage(response, '记忆导出失败'))
+  const data: unknown = await response.json()
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `cheerly-memory-${new Date().toISOString().slice(0, 10)}.json`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
