@@ -166,11 +166,16 @@
 
 .session-dialog.memory-dialog {
   width: min(680px, calc(100vw - 48px));
-  max-height: min(86vh, 780px);
+  /* 用固定高度而不是 max-height：切 tab / 翻页时内容多少会变，
+     跟着内容伸缩会让整个弹窗上下「抽动」。固定高度 + 列表内部滚动，
+     切换时框体纹丝不动。小屏见底部媒体查询（改用 92dvh）。 */
+  height: min(86vh, 780px);
+  max-height: calc(100vh - 48px);
   padding: 20px 22px 16px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .session-dialog.memory-dialog .session-dialog-head {
@@ -266,6 +271,36 @@
   font: inherit;
   font-size: 13px;
   cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+/* 选中态只换颜色、不改字重，也不加下划线之外的效果：
+   一旦字重变化，文字宽度会变，三个标签整体横向错位，切 tab 时像在「跳」。
+   这里用「加粗副本占位」的经典写法：把同一段文字用 400 和 600 叠在同一个
+   grid 格里，格子宽度由 600 那份决定 —— 显示哪一份都不会改变标签宽度。 */
+.memory-tab-label {
+  display: inline-grid;
+}
+
+.memory-tab-label::before,
+.memory-tab-label > span {
+  grid-area: 1 / 1;
+}
+
+.memory-tab-label::before {
+  content: attr(data-label);
+  font-weight: 600;
+  -webkit-text-fill-color: transparent;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.memory-tab-label > span {
+  font-weight: 400;
+}
+
+.memory-tab.active .memory-tab-label > span {
+  font-weight: 600;
 }
 
 .memory-tab:hover {
@@ -275,13 +310,16 @@
 .memory-tab.active {
   border-bottom-color: #3b7bff;
   color: #3b7bff;
-  font-weight: 600;
 }
 
+/* 提示文案长短不一（最长那句两行、最短的一行），固定两行高度
+   让下方工具条和列表不会因为切 tab 而上下窜。 */
 .memory-tab-hint {
   margin: 10px 0 0;
+  min-height: 2.9em;
   color: #8a909b;
   font-size: 12px;
+  line-height: 1.45;
   flex-shrink: 0;
 }
 
@@ -388,10 +426,29 @@
 
 .memory-list {
   flex: 1;
-  min-height: 160px;
+  /* 不再设 min-height：弹窗高度已固定，列表吃掉剩余空间即可。
+     保留 min-height: 0 让 flex 子项能真正收缩（否则内容会把框撑破）。 */
+  min-height: 0;
+  position: relative;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid #eef0f3;
   border-radius: 12px;
+}
+
+/* 加载新分类时压暗旧内容，替代整块替换成「正在加载…」 */
+.memory-items.is-dimmed {
+  opacity: 0.45;
+  transition: opacity 0.12s ease;
+}
+
+.memory-loading-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.35);
+  cursor: progress;
 }
 
 .memory-empty {
@@ -495,9 +552,19 @@
   flex-shrink: 0;
 }
 
+.memory-pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 页码固定宽度：1 位数和 2 位数不会让「下一页」左右横跳 */
 .memory-page-no {
+  min-width: 3.6em;
+  text-align: center;
   color: #6b7280;
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .memory-clear-all {
@@ -523,11 +590,37 @@
 @media (max-width: 600px) {
   .session-dialog.memory-dialog {
     width: calc(100vw - 24px);
-    max-height: 92vh;
+    /* 小屏以 dvh 为准（移动端地址栏伸缩时 100vh 会跳），仍用固定高度保稳定 */
+    height: 92dvh;
+    max-height: 92dvh;
     padding: 16px 14px 12px;
   }
 
   .memory-toolbar {
     flex-wrap: wrap;
+  }
+
+  .memory-tab-hint {
+    min-height: auto;
+  }
+
+  .memory-footer {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* 小屏把「清除全部记忆」单独放一行，避免和分页按钮挤在一起换行错位 */
+  .memory-clear-all {
+    flex-basis: 100%;
+    margin-left: 0;
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .memory-tab,
+  .memory-tab .memory-tab-label,
+  .memory-items.is-dimmed {
+    transition: none;
   }
 }
