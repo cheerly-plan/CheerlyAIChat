@@ -1,5 +1,4 @@
-import kbIcon from '../../assets/kb.svg'
-import { LogoutIcon, NewChatIcon, TraceIcon } from '../chat/icons'
+import { KnowledgeBaseIcon, LogoutIcon, NewChatIcon, TraceIcon } from '../chat/icons'
 import './board.css'
 
 type Props = {
@@ -47,14 +46,14 @@ export function Board({ userName, onOpenKb, onOpenTrace, onLogout }: Props) {
         <p>从这里进入知识库、查看对话过程，或和 Cheerly 对话。</p>
         <div className="board-cards">
           <button type="button" className="board-card" onClick={onOpenKb}>
-            <span className="board-card-icon">
-              <img src={kbIcon} alt="" />
+            <span className="board-card-icon board-card-icon-chat">
+              <KnowledgeBaseIcon />
             </span>
             <span className="board-card-title">知识库管理</span>
             <span className="board-card-desc">上传文档，查看切片和图谱</span>
           </button>
           <button type="button" className="board-card" onClick={onOpenTrace}>
-            <span className="board-card-icon">
+            <span className="board-card-icon board-card-icon-chat">
               <TraceIcon />
             </span>
             <span className="board-card-title">对话过程</span>

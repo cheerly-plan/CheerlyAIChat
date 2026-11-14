@@ -4,7 +4,7 @@ import {
   KbIcon,
   PaperclipIcon,
   PlusIcon,
-  ReportIcon,
+  ReportGenerateIcon,
   SendIcon,
   StopIcon,
 } from './icons'
@@ -97,7 +97,7 @@ export function Composer({
       {reportTag ? (
         <div className="composer-tags">
           <span className="composer-tag">
-            <ReportIcon enabled size={14} />
+            <ReportGenerateIcon enabled size={14} />
             研报生成
             <button
               type="button"
@@ -185,7 +185,7 @@ export function Composer({
                 }}
               >
                 <span className="composer-menu-icon">
-                  <ReportIcon enabled={reportTag} size={15} />
+                  <ReportGenerateIcon enabled={reportTag} size={15} />
                 </span>
                 <span className="composer-menu-text">
                   <span className="composer-menu-title">研报生成</span>

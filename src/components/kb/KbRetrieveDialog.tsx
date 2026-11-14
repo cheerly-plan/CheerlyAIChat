@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { openKbFileAtPage, searchKb, type KbFile, type KbSearchHit } from '../../api'
-import { CheckIcon, ChevronDownIcon, CloseIcon } from '../chat/icons'
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CloseIcon,
+} from '../chat/icons'
 import { ChunkContent } from './ChunkContent'
 
 const MAX_FILES = 50
@@ -17,36 +23,6 @@ function fileLabel(file: KbFile) {
 function isPdf(file: KbFile) {
   const mime = (file.mime ?? '').toLowerCase()
   return mime.includes('pdf') || file.filename.toLowerCase().endsWith('.pdf')
-}
-
-function ChevronLeftIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-      <path
-        d="m14 6-6 6 6 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function ChevronRightIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-      <path
-        d="m10 6 6 6-6 6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
 }
 
 type Props = {

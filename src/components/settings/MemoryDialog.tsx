@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   clearAllMemory,
   clearMemoryKind,
-  deleteMemoryItem,
   exportMemory,
   fetchMemoryPage,
   fetchMemorySettings,
@@ -12,15 +11,15 @@ import {
   type MemoryRow,
 } from '../../api'
 import { ConfirmDialog } from '../common/ConfirmDialog'
-import { CloseIcon, DownloadIcon, EditIcon, TrashIcon } from '../chat/icons'
+import { CloseIcon, DownloadIcon, EditIcon } from '../chat/icons'
 import './settings.css'
 
 const PAGE_SIZE = 20
 
 const TABS: { key: MemoryKind; label: string; hint: string }[] = [
   { key: 'profile', label: '长期画像', hint: '稳定偏好与个人信息，会常驻在对话上下文中' },
-  { key: 'episodes', label: '情景记忆', hint: '近期对话里提到的具体事情，只读，过期后自动降权；可单条删除' },
-  { key: 'archive', label: '归档', hint: '历史留档，只读，不会自动进入对话' },
+  { key: 'episodes', label: '情景记忆', hint: '近期对话里提到的具体事情，过期后自动降权' },
+  { key: 'archive', label: '归档', hint: '历史留档，不会自动进入对话' },
 ]
 
 const FACET_LABELS: Record<string, string> = {
@@ -40,7 +39,7 @@ type ConfirmState = {
   run: () => Promise<void>
 }
 
-/** 一页列表的快照。key 对应 (分类, 页码, 刷新次数)，用来派生 loading，
+/** 一页列表的快照。key 对应 (分类, 游标, 刷新次数)，用来派生 loading，
     避免切页时在 effect 里同步 setState 触发级联渲染。 */
 type ListView = {
   key: string
@@ -52,9 +51,11 @@ type ListView = {
 
 type Props = { onClose: () => void }
 
-/** 记忆管理：查看 / 自然语言编辑画像 / 删除 / 开关 / 导出，全部走 /v1/memory。
-    画像不做「按 id 直接改某一行」，统一交给后端写入链判断该新增、更新还是删除；
-    情景记忆是系统自动观察记录，只读 + 单条删除。 */
+/** 记忆管理：查看 / 自然语言编辑画像 / 开关 / 导出，全部走 /v1/memory。
+
+    这里刻意不提供「按 id 直接改某一行」的入口——后端写入链要自己判断
+    新增、更新还是删除（含冲突消解与去重），绕过去会把判断逻辑做坏。
+    所以界面上也没有单条删除按钮，删除同样交给自然语言那句输入框。 */
 export function MemoryDialog({ onClose }: Props) {
   const [tab, setTab] = useState<MemoryKind>('profile')
   const [offset, setOffset] = useState(0)
@@ -68,17 +69,16 @@ export function MemoryDialog({ onClose }: Props) {
   const [inputText, setInputText] = useState('')
   const [notice, setNotice] = useState('')
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
-  // 每个分类各自的翻页游标：切回去时停在原来那一页，而不是回到第 1 页。
-  // 存游标栈而不是页码——后端 next_offset = offset + len(items)，某页条目
-  // 少于 PAGE_SIZE 时用 pageNo * PAGE_SIZE 反推会跳过数据。
+  // 每个分类各自的翻页游标栈：切回去时停在原来那一页。
+  // 存游标而不是页码——后端 next_offset = offset + len(items)，某页条目
+  // 少于 PAGE_SIZE 时用页码反推会跳过数据。
   const [navByTab, setNavByTab] = useState<Record<MemoryKind, { offsets: number[] }>>({
     profile: { offsets: [0] },
     episodes: { offsets: [0] },
     archive: { offsets: [0] },
   })
-  // 记住「上一次成功加载的页」，连同它所属的分类。
-  // 只在该分类的内容与当前分类一致时才拿来垫底：切到别的分类时宁可显示
-  // 骨架，也不能把上一个分类的条目短暂显示出来（会让人以为数据串了）。
+  // 记住「上一次成功加载的页」，连同它所属的分类。只有同分类才拿来垫底，
+  // 否则切到别的分类会把它上一个分类的条目短暂显示出来。
   const [lastPage, setLastPage] = useState<{ tab: MemoryKind; items: MemoryRow[] } | null>(null)
 
   const viewKey = `${tab}:${offset}:${refresh}`
@@ -161,7 +161,6 @@ export function MemoryDialog({ onClose }: Props) {
 
   function switchTab(next: MemoryKind) {
     if (next === tab) return
-    // 回到该分类上次停留的那一页（游标栈的栈顶）
     const offsets = navByTab[next].offsets
     setTab(next)
     setOffset(offsets[offsets.length - 1])
@@ -197,28 +196,30 @@ export function MemoryDialog({ onClose }: Props) {
     })
   }
 
-  function askDelete(item: MemoryRow) {
+  /** 唯一的清空入口：按钮文案随分类变化，写明会删掉什么。
+      归档是只读留档，不提供清空。 */
+  function askClear() {
+    if (tab === 'profile') {
+      setConfirm({
+        title: '清空长期画像？',
+        description: '画像条目会被全部删除，不可恢复。情景记忆与归档不受影响。',
+        confirmText: '清空画像',
+        run: async () => { await clearMemoryKind('profile') },
+      })
+      return
+    }
+    if (tab === 'episodes') {
+      setConfirm({
+        title: '清空情景记忆？',
+        description: '情景记忆会被全部删除，不可恢复。长期画像与归档不受影响。',
+        confirmText: '清空情景',
+        run: async () => { await clearMemoryKind('episodes') },
+      })
+      return
+    }
     setConfirm({
-      title: '确定删除这条记忆?',
-      description: '删除后这条内容及其派生记录将被清除，不可恢复。',
-      run: async () => { await deleteMemoryItem(tab === 'profile' ? 'profile' : 'episodes', item.id) },
-    })
-  }
-
-  function askClearKind() {
-    const label = tab === 'profile' ? '长期画像' : '情景记忆'
-    setConfirm({
-      title: `清空全部${label}?`,
-      description: `将删除当前分类下的所有记忆，不可恢复。其他分类不受影响。`,
-      confirmText: '清空',
-      run: async () => { await clearMemoryKind(tab === 'profile' ? 'profile' : 'episodes') },
-    })
-  }
-
-  function askClearAll() {
-    setConfirm({
-      title: '清除全部记忆?',
-      description: '画像、情景、候选与归档将被全部删除，不可恢复。',
+      title: '清除全部记忆？',
+      description: '画像、情景、候选与归档会被全部删除，不可恢复。',
       confirmText: '全部清除',
       run: async () => { await clearAllMemory() },
     })
@@ -227,7 +228,6 @@ export function MemoryDialog({ onClose }: Props) {
   function goPrev() {
     const offsets = navByTab[tab].offsets
     if (offsets.length <= 1) return
-    // 出栈，回到上一页的准确游标（不按页长反推）
     const next = offsets.slice(0, -1)
     setNavByTab((prev) => ({ ...prev, [tab]: { offsets: next } }))
     setOffset(next[next.length - 1])
@@ -236,7 +236,6 @@ export function MemoryDialog({ onClose }: Props) {
 
   function goNext() {
     if (nextOffset === null) return
-    // 入栈记录下一页游标
     setNavByTab((prev) => ({
       ...prev,
       [tab]: { offsets: [...prev[tab].offsets, nextOffset] },
@@ -257,6 +256,8 @@ export function MemoryDialog({ onClose }: Props) {
   }
 
   const activeTab = TABS.find((entry) => entry.key === tab)
+  const canClear = tab !== 'archive'
+  const clearLabel = tab === 'profile' ? '清空画像' : '清空情景'
 
   return (
     <>
@@ -268,26 +269,28 @@ export function MemoryDialog({ onClose }: Props) {
         aria-labelledby="memory-dialog-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="session-dialog-head">
-          <div>
+        <header className="memory-head">
+          <div className="memory-head-text">
             <h3 id="memory-dialog-title">记忆</h3>
             <p className="memory-subtitle">管理 AI 记住的关于你的内容</p>
           </div>
-          <button type="button" className="session-dialog-close" aria-label="关闭" onClick={onClose}>
+          <button type="button" className="memory-close" aria-label="关闭" onClick={onClose}>
             <CloseIcon />
           </button>
-        </div>
+        </header>
 
+        {/* 开关收进头部一行，不再独占一块卡片——它是低频设置，
+            不该比内容本身更抢眼。 */}
         <div className="memory-switch-row">
-          <div className="memory-switch-text">
-            <strong>记忆功能</strong>
-            <span>关闭后不再写入或注入上下文，已有内容保留</span>
-          </div>
+          <label className="memory-switch-label" htmlFor="memory-switch">
+            记忆功能
+            <span>{enabled ? '已开启，会写入并注入上下文' : '已关闭，不再写入或注入，已有内容保留'}</span>
+          </label>
           <button
+            id="memory-switch"
             type="button"
             role="switch"
             aria-checked={enabled}
-            aria-label="记忆功能"
             className={`memory-switch${enabled ? ' on' : ''}`}
             disabled={busy}
             onClick={() => void toggleEnabled()}
@@ -296,7 +299,7 @@ export function MemoryDialog({ onClose }: Props) {
           </button>
         </div>
 
-        <div className="memory-tabs" role="tablist" aria-label="记忆分类">
+        <nav className="memory-tabs" role="tablist" aria-label="记忆分类">
           {TABS.map((entry) => (
             <button
               key={entry.key}
@@ -309,46 +312,37 @@ export function MemoryDialog({ onClose }: Props) {
               className={`memory-tab${tab === entry.key ? ' active' : ''}`}
               onClick={() => switchTab(entry.key)}
             >
-              {/* ::before 放一份 600 字重的隐藏副本占位，保证标签宽度恒定 */}
+              {/* ::before 放一份加粗副本占位，保证标签宽度恒定不抖动 */}
               <span className="memory-tab-label" data-label={entry.label}>
                 <span>{entry.label}</span>
               </span>
             </button>
           ))}
-        </div>
+        </nav>
 
-        <p className="memory-tab-hint" id="memory-panel">{activeTab?.hint}</p>
+        <div className="memory-panel" id="memory-panel" role="tabpanel" aria-labelledby={`memory-tab-${tab}`}>
 
         <div className="memory-toolbar">
-          {tab === 'profile' ? (
+          <span className="memory-hint">{activeTab?.hint}</span>
+          <div className="memory-toolbar-actions">
+            {tab === 'profile' ? (
+              <button
+                type="button"
+                className="memory-link"
+                disabled={busy}
+                onClick={() => setComposing((value) => !value)}
+              >
+                <EditIcon /> {composing ? '收起' : '修改'}
+              </button>
+            ) : null}
             <button
               type="button"
-              className="memory-btn primary small"
-              disabled={busy}
-              onClick={() => setComposing((value) => !value)}
-            >
-              <EditIcon /> 编辑记忆
-            </button>
-          ) : <span />}
-          <div className="memory-toolbar-right">
-            <button
-              type="button"
-              className="memory-btn ghost small"
+              className="memory-link"
               disabled={busy}
               onClick={() => void run(exportMemory)}
             >
               <DownloadIcon /> 导出
             </button>
-            {tab !== 'archive' ? (
-              <button
-                type="button"
-                className="memory-btn ghost small danger-text"
-                disabled={busy}
-                onClick={askClearKind}
-              >
-                清空本类
-              </button>
-            ) : null}
           </div>
         </div>
 
@@ -362,17 +356,19 @@ export function MemoryDialog({ onClose }: Props) {
               placeholder="例如：以后财报都用亿元；把我喝咖啡那条删掉"
               onChange={(event) => setInputText(event.target.value)}
             />
-            <p className="memory-compose-hint">
-              用一句话说明要记的事或要改的事，系统会判断该新增、更新还是删除；
-              内容重复或不需要写时会给出提示。含具体数字的事实建议注明出处。
-            </p>
             <div className="memory-compose-actions">
-              <button type="button" className="memory-btn ghost small" onClick={() => { setComposing(false); setInputText('') }}>
+              <span className="memory-compose-tip">说得越具体判断越准；含数字的事实建议注明出处</span>
+              <button
+                type="button"
+                className="memory-btn text"
+                disabled={busy}
+                onClick={() => { setComposing(false); setInputText('') }}
+              >
                 取消
               </button>
               <button
                 type="button"
-                className="memory-btn primary small"
+                className="memory-btn primary"
                 disabled={busy || !inputText.trim()}
                 onClick={() => void submitText()}
               >
@@ -384,59 +380,59 @@ export function MemoryDialog({ onClose }: Props) {
 
         {notice ? <div className="memory-notice" role="status">{notice}</div> : null}
 
-        <div className="memory-list" aria-busy={loading}>
+        <div className={`memory-list${loading && !initialLoading ? ' is-loading' : ''}`} aria-busy={loading}>
           {initialLoading ? (
             <div className="memory-empty">正在加载…</div>
-          ) : loading ? (
-            // 切 tab / 翻页时保留旧内容并压暗，避免列表塌缩导致弹窗高度跳动
-            <div className="memory-loading-veil" aria-hidden="true" />
           ) : items.length === 0 ? (
-            <div className="memory-empty">这里还没有记忆</div>
-          ) : null}
-          {!initialLoading && items.length > 0 ? (
-            <div className={`memory-items${loading ? ' is-dimmed' : ''}`}>
-              {items.map((item) => (
-                <div className="memory-item" key={item.id}>
-                  <p className="memory-item-text">{item.text}</p>
-                  <div className="memory-item-meta">
-                    <span>{metaOf(item)}</span>
-                    <div className="memory-item-actions">
-                      {tab !== 'archive' ? (
-                        <button
-                          type="button"
-                          className="danger"
-                          aria-label="删除记忆"
-                          title="删除"
-                          disabled={busy}
-                          onClick={() => askDelete(item)}
-                        >
-                          <TrashIcon />
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="memory-empty">
+              {tab === 'profile' ? '还没有长期画像' : tab === 'episodes' ? '还没有情景记忆' : '还没有归档'}
             </div>
-          ) : null}
+          ) : (
+            items.map((item) => (
+              <div className="memory-item" key={item.id}>
+                <p className="memory-item-text">{item.text}</p>
+                <span className="memory-item-meta">{metaOf(item)}</span>
+              </div>
+            ))
+          )}
         </div>
 
         {error ? <div className="memory-error" role="alert">{error}</div> : null}
 
-        <div className="memory-footer">
+        </div>
+
+        <footer className="memory-footer">
           <div className="memory-pager">
-            <button type="button" className="memory-btn ghost small" disabled={busy || pageNo === 0} onClick={goPrev}>
-              上一页
+            <button
+              type="button"
+              className="memory-page-btn"
+              disabled={busy || pageNo === 0}
+              aria-label="上一页"
+              onClick={goPrev}
+            >
+              ‹
             </button>
             <span className="memory-page-no">第 {pageNo + 1} 页</span>
-            <button type="button" className="memory-btn ghost small" disabled={busy || !hasMore} onClick={goNext}>
-              下一页
+            <button
+              type="button"
+              className="memory-page-btn"
+              disabled={busy || !hasMore}
+              aria-label="下一页"
+              onClick={goNext}
+            >
+              ›
             </button>
           </div>
-          <button type="button" className="memory-clear-all" disabled={busy} onClick={askClearAll}>
-            清除全部记忆
+          {/* 全弹窗唯一的清空入口：文案写明当前分类会删掉什么 */}
+          <button
+            type="button"
+            className="memory-clear"
+            disabled={busy}
+            onClick={askClear}
+          >
+            {canClear ? clearLabel : '清除全部记忆'}
           </button>
-        </div>
+        </footer>
       </div>
     </div>
 

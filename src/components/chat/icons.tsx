@@ -1,331 +1,540 @@
-export function LogoutIcon() {
+/**
+ * 全站图标。
+ *
+ * ## 统一规范
+ *
+ * 所有图标都走**同一套描边体系**：24×24 坐标系、`stroke-width: 1.75`、
+ * 圆头圆角（`round` 端点与连接）、`currentColor` 跟随文字颜色。
+ * 显示尺寸通过 `size` 属性指定，默认 16px，CSS 也可以覆盖。
+ *
+ * 为什么统一到 24 而不是 16：24 单位下 1.75 的线宽在 16px 显示时约合
+ * 1.17px，既清晰又不显粗；16 单位下同样观感要画 1.17，取值别扭且缩放
+ * 到 20/24px 时容易糊。统一坐标系后，任何尺寸下视觉重量都一致。
+ *
+ * 历史上这里混过三套 viewBox（16/24/14）和四种线宽（1.4~1.8），换算到
+ * 实际像素是 1.06px~1.60px，同一行图标粗细不齐——这是本次统一的原因。
+ *
+ * ## 约定
+ *
+ * - 只用描边，不用实心填充（除少数必须实心才认得出的细节，如圆点）
+ * - 不硬编码颜色，一律 `currentColor`，让图标跟随主题与交互状态
+ * - 组件签名统一为 `({ size = 16 }: IconProps)`，需要额外状态的在前面
+ */
+
+const STROKE = {
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.75,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+} as const
+
+type IconProps = { size?: number }
+
+/** 所有图标的外壳。集中处理 viewBox、线宽、无障碍属性。 */
+function Icon({ size = 16, children }: IconProps & { children: React.ReactNode }) {
   return (
-    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">
-      <path d="M5.16431 2.61472C4.54663 2.61472 4.12849 2.61472 3.80689 2.64304C3.49453 2.67059 3.33992 2.72098 3.23462 2.77976C3.02427 2.8972 2.8501 3.07037 2.73267 3.28073C2.67391 3.38605 2.62447 3.5406 2.59693 3.853C2.56857 4.17462 2.56763 4.59259 2.56763 5.21042L2.56763 10.7895C2.56763 11.4073 2.56858 11.8253 2.59693 12.1469C2.62447 12.4594 2.67391 12.6139 2.73267 12.7192C2.85009 12.9296 3.02427 13.1027 3.23462 13.2202C3.33992 13.279 3.49453 13.3294 3.80689 13.3569C4.12849 13.3852 4.54663 13.3852 5.16431 13.3852V14.7856C4.57152 14.7856 4.08118 14.7864 3.68384 14.7514C3.27727 14.7156 2.90099 14.6376 2.552 14.4428C2.11505 14.1989 1.75391 13.8378 1.51001 13.4009C1.31546 13.052 1.23822 12.6764 1.20239 12.27C1.16737 11.8726 1.16821 11.3824 1.16821 10.7895L1.16821 5.21042C1.16821 4.61757 1.16737 4.1273 1.20239 3.72995C1.23823 3.32357 1.31545 2.94794 1.51001 2.59909C1.75392 2.16208 2.11504 1.80107 2.552 1.5571C2.90099 1.36233 3.27727 1.28436 3.68384 1.24851C4.08118 1.2135 4.57152 1.21433 5.16431 1.21433L5.16431 2.61472Z" fill="currentColor" />
-      <path d="M14.8108 7.73386C14.8387 7.91002 14.8387 8.08992 14.8108 8.26608C14.7585 8.59621 14.5984 8.85544 14.4221 9.07468C14.2539 9.28369 14.0228 9.51404 13.7688 9.76804L10.4768 13.0591L9.48657 12.0688L12.7786 8.7778C12.8052 8.75114 12.831 8.72537 12.8557 8.70065H4.91138V7.30026H12.8567C12.8317 7.2752 12.8056 7.2492 12.7786 7.22214L9.48657 3.93112L10.4768 2.94089L13.7688 6.2319C14.0229 6.48602 14.2539 6.71617 14.4221 6.92526C14.5985 7.14451 14.7584 7.40371 14.8108 7.73386Z" fill="currentColor" />
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      aria-hidden="true"
+      focusable="false"
+      {...STROKE}
+    >
+      {children}
     </svg>
   )
 }
 
+/* ============ 导航与布局 ============ */
 
-export function PanelIcon() {
+/** 侧栏折叠 / 展开 */
+export function PanelIcon({ size }: IconProps) {
   return (
-    <svg viewBox="0 0 16 16" width="18" height="18" fill="none" aria-hidden="true">
-      <path fillRule="evenodd" clipRule="evenodd" d="M9.67272 0.522841C10.8339 0.522841 11.76 0.522714 12.4963 0.602493C13.2453 0.683657 13.8789 0.854248 14.4264 1.25197C14.7504 1.48739 15.0355 1.77247 15.2709 2.0965C15.6686 2.64394 15.8392 3.27758 15.9204 4.02655C16.0002 4.7629 16 5.68895 16 6.85014V9.14986C16 10.3111 16.0002 11.2371 15.9204 11.9735C15.8392 12.7224 15.6686 13.3561 15.2709 13.9035C15.0355 14.2275 14.7504 14.5126 14.4264 14.748C13.8789 15.1458 13.2453 15.3163 12.4963 15.3975C11.76 15.4773 10.8339 15.4772 9.67272 15.4772H6.3273C5.16611 15.4772 4.24006 15.4773 3.50371 15.3975C2.75474 15.3163 2.1211 15.1458 1.57366 14.748C1.24963 14.5126 0.964549 14.2275 0.729131 13.9035C0.331407 13.3561 0.160817 12.7224 0.0796529 11.9735C-0.000126137 11.2371 1.25338e-09 10.3111 1.25338e-09 9.14986V6.85014C1.25329e-09 5.68895 -0.000126137 4.7629 0.0796529 4.02655C0.160817 3.27758 0.331407 2.64394 0.729131 2.0965C0.964549 1.77247 1.24963 1.48739 1.57366 1.25197C2.1211 0.854248 2.75474 0.683657 3.50371 0.602493C4.24006 0.522714 5.16611 0.522841 6.3273 0.522841H9.67272ZM5.54303 1.88715V14.1118C5.78636 14.1128 6.04709 14.1169 6.3273 14.1169H9.67272C10.8639 14.1169 11.7032 14.1164 12.3493 14.0465C12.9824 13.9779 13.3497 13.8494 13.6268 13.6482C13.8354 13.4966 14.0195 13.3125 14.1711 13.1039C14.3723 12.8268 14.5007 12.4595 14.5693 11.8264C14.6393 11.1803 14.6398 10.341 14.6398 9.14986V6.85014C14.6398 5.65896 14.6393 4.81967 14.5693 4.1736C14.5007 3.54048 14.3723 3.17318 14.1711 2.89609C14.0195 2.68747 13.8354 2.50337 13.6268 2.35179C13.3497 2.1506 12.9824 2.02212 12.3493 1.95353C11.7032 1.88358 10.8639 1.88307 9.67272 1.88307H6.3273C6.04709 1.88307 5.78636 1.8862 5.54303 1.88715ZM4.1828 1.91166C3.99125 1.9216 3.8148 1.93577 3.65076 1.95353C3.01764 2.02212 2.65034 2.1506 2.37325 2.35179C2.16463 2.50337 1.98052 2.68747 1.82895 2.89609C1.62776 3.17318 1.49928 3.54048 1.43069 4.1736C1.36074 4.81967 1.36023 5.65896 1.36023 6.85014V9.14986C1.36023 10.341 1.36074 11.1803 1.43069 11.8264C1.49928 12.4595 1.62776 12.8268 1.82895 13.1039C1.98052 13.3125 2.16463 13.4966 2.37325 13.6482C2.65034 13.8494 3.01764 13.9779 3.65076 14.0465C3.81478 14.0642 3.99127 14.0774 4.1828 14.0873V1.91166Z" fill="currentColor" />
-    </svg>
+    <Icon size={size}>
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
+      <path d="M9 4v16" />
+    </Icon>
   )
 }
 
-
-export function UploadIcon() {
+/** 返回 */
+export function BackIcon({ size }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-      <path
-        d="M12 16V5m0 0L7.5 9.5M12 5l4.5 4.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M4.5 15v2.5A2.5 2.5 0 0 0 7 20h10a2.5 2.5 0 0 0 2.5-2.5V15"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-export function BackIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-      <path
-        d="M15 5 8 12l7 7"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-export function SearchIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="18" height="18" fill="none" aria-hidden="true">
-      <path d="M11.748 6.7028C11.748 3.90104 9.47653 1.62976 6.6748 1.62956C3.87291 1.62956 1.60156 3.90091 1.60156 6.7028C1.60176 9.50453 3.87304 11.776 6.6748 11.776C9.47641 11.7759 11.7479 9.50441 11.748 6.7028ZM13.0479 6.7028C13.0477 10.2224 10.1944 13.0757 6.6748 13.0759C3.15507 13.0759 0.300977 10.2225 0.300781 6.7028C0.300781 3.18294 3.15494 0.328781 6.6748 0.328781C10.1945 0.328977 13.0479 3.18307 13.0479 6.7028Z" fill="currentColor" />
-      <path d="M15.6991 14.7513L14.7792 15.6712L11.3974 12.2894L12.3173 11.3694L15.6991 14.7513Z" fill="currentColor" />
-    </svg>
+    <Icon size={size}>
+      <path d="m15 5-7 7 7 7" />
+    </Icon>
   )
 }
 
-
-export function TraceIcon() {
+export function ChevronDownIcon({ size }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
-      <path
-        d="M5 6.5h9M5 12h14M5 17.5h9"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <circle cx="17.5" cy="6.5" r="1.4" fill="currentColor" />
-      <circle cx="17.5" cy="17.5" r="1.4" fill="currentColor" />
-    </svg>
+    <Icon size={size}>
+      <path d="m6 9 6 6 6-6" />
+    </Icon>
   )
 }
 
-export function NewChatIcon() {
+export function ChevronLeftIcon({ size }: IconProps) {
   return (
-    <svg viewBox="0 0 16 16" width="18" height="18" fill="none" aria-hidden="true">
-      <path d="M8 0.599609C3.91309 0.599609 0.599609 3.91309 0.599609 8C0.599609 9.13376 0.855461 10.2098 1.3125 11.1719L1.5918 11.7588L2.76562 11.2012L2.48633 10.6143C2.11034 9.82278 1.90039 8.93675 1.90039 8C1.90039 4.63106 4.63106 1.90039 8 1.90039C11.3689 1.90039 14.0996 4.63106 14.0996 8C14.0996 11.3689 11.3689 14.0996 8 14.0996C7.31041 14.0996 6.80528 14.0514 6.35742 13.9277C5.91623 13.8059 5.49768 13.6021 4.99707 13.2529C4.26492 12.7422 3.21611 12.5616 2.35156 13.1074L2.33789 13.1162L2.32422 13.126L1.58789 13.6436L2.01953 14.9297L3.0459 14.207C3.36351 14.0065 3.83838 14.0294 4.25293 14.3184C4.84547 14.7317 5.39743 15.011 6.01172 15.1807C6.61947 15.3485 7.25549 15.4004 8 15.4004C12.0869 15.4004 15.4004 12.0869 15.4004 8C15.4004 3.91309 12.0869 0.599609 8 0.599609ZM7.34473 4.93945V7.34961H4.93945V8.65039H7.34473V11.0605H8.64551V8.65039H11.0605V7.34961H8.64551V4.93945H7.34473Z" fill="currentColor" />
-    </svg>
+    <Icon size={size}>
+      <path d="m14 6-6 6 6 6" />
+    </Icon>
   )
 }
 
+export function ChevronRightIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="m10 6 6 6-6 6" />
+    </Icon>
+  )
+}
+
+export function ArrowRightIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M5 12h14" />
+      <path d="m13 6 6 6-6 6" />
+    </Icon>
+  )
+}
+
+/** 跳转（外部 / 定位到条目） */
+export function JumpIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M4 12h14" />
+      <path d="m13 6 6 6-6 6" />
+    </Icon>
+  )
+}
+
+/* ============ 操作 ============ */
+
+export function CloseIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M6 6l12 12M18 6L6 18" />
+    </Icon>
+  )
+}
+
+export function PlusIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M12 5v14M5 12h14" />
+    </Icon>
+  )
+}
+
+export function MoreIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
+export function SearchIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m15.5 15.5 4 4" />
+    </Icon>
+  )
+}
+
+export function UploadIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M12 16V5" />
+      <path d="m7.5 9.5 4.5-4.5 4.5 4.5" />
+      <path d="M4.5 15v2.5A2.5 2.5 0 0 0 7 20h10a2.5 2.5 0 0 0 2.5-2.5V15" />
+    </Icon>
+  )
+}
+
+export function DownloadIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M12 4v10" />
+      <path d="m7.5 10.5 4.5 4.5 4.5-4.5" />
+      <path d="M5 16.5v1.5A2 2 0 0 0 7 20h10a2 2 0 0 0 2-2v-1.5" />
+    </Icon>
+  )
+}
+
+export function TrashIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M4 7h16" />
+      <path d="M9 7V5.2A1.2 1.2 0 0 1 10.2 4h3.6A1.2 1.2 0 0 1 15 5.2V7" />
+      <path d="M6.5 7 5.3 19.2A2 2 0 0 0 7.3 21.5h9.4a2 2 0 0 0 2-2.3L18.5 7" />
+      <path d="M10 11v5M14 11v5" />
+    </Icon>
+  )
+}
+
+export function CopyIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <rect x="9" y="9" width="11" height="11" rx="2.5" />
+      <path d="M15 6.5A2.5 2.5 0 0 0 12.5 4h-7A2.5 2.5 0 0 0 3 6.5v7A2.5 2.5 0 0 0 5.5 16" />
+    </Icon>
+  )
+}
+
+export function CheckIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="m4.5 12.5 5 5 10-11" />
+    </Icon>
+  )
+}
+
+export function RefreshIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M20 12a8 8 0 1 1-2.3-5.6" />
+      <path d="M20 4v5h-5" />
+    </Icon>
+  )
+}
+
+export function EditIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M4 16.5V20h3.5L19 8.5 15.5 5 4 16.5Z" />
+      <path d="M13.5 7 17 10.5" />
+      <path d="M13 20h7" />
+    </Icon>
+  )
+}
+
+export function SendIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M12 20V5" />
+      <path d="m6.5 10.5 5.5-5.5 5.5 5.5" />
+    </Icon>
+  )
+}
+
+export function StopIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <rect x="6" y="6" width="12" height="12" rx="3" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
+export function PaperclipIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M19 11.5 11.6 19a4.6 4.6 0 0 1-6.5-6.5l8-8a3.1 3.1 0 0 1 4.4 4.4l-8 8a1.6 1.6 0 0 1-2.2-2.2l7.4-7.4" />
+    </Icon>
+  )
+}
+
+export function TagIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M3.5 12.2V5.5a2 2 0 0 1 2-2h6.7c.5 0 1 .2 1.4.6l6.3 6.3a2 2 0 0 1 0 2.8l-6.7 6.7a2 2 0 0 1-2.8 0l-6.3-6.3a2 2 0 0 1-.6-1.4Z" />
+      <circle cx="8.3" cy="8.3" r="1.4" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
+/* ============ 状态与提示 ============ */
+
+export function WarningIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M12 4.5 21 20H3l9-15.5Z" />
+      <path d="M12 10v4.5" />
+      <circle cx="12" cy="17.5" r="0.9" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
+/* ============ 功能入口 ============ */
+
+/** 设置：齿轮（外圈带齿 + 中心孔，小尺寸清晰） */
+export function SettingsIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M12 3.2a8.8 8.8 0 1 0 8.8 8.8A8.8 8.8 0 0 0 12 3.2Z" />
+      <path d="M12 1.5v2.8M12 19.7v2.8M1.5 12h2.8M19.7 12h2.8M4.6 4.6l2 2M17.4 17.4l2 2M19.4 4.6l-2 2M6.6 17.4l-2 2" />
+      <circle cx="12" cy="12" r="3.4" />
+    </Icon>
+  )
+}
+
+/** 记忆：书签 */
+export function MemoryIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </Icon>
+  )
+}
+
+export function LogoutIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M9.5 3.5H6a2.5 2.5 0 0 0-2.5 2.5v12A2.5 2.5 0 0 0 6 20.5h3.5" />
+      <path d="M15.5 16.5 21 12l-5.5-4.5" />
+      <path d="M21 12H9" />
+    </Icon>
+  )
+}
+
+/** 新建会话 */
+export function NewChatIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M12 3.5a8.5 8.5 0 1 1-5.9 14.6" />
+      <path d="M12 8v8M8 12h8" />
+    </Icon>
+  )
+}
+
+/** 过程追踪 */
+export function TraceIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M5 6.5h9M5 12h14M5 17.5h9" />
+      <circle cx="17.5" cy="6.5" r="1.3" fill="currentColor" stroke="none" />
+      <circle cx="17.5" cy="17.5" r="1.3" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
+/** 图谱重建进度 */
+export function GraphRefreshIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M20 12a8 8 0 1 1-2.3-5.6" />
+      <path d="M20 4v5h-5" />
+    </Icon>
+  )
+}
+
+/* ============ 过程追踪里的步骤图标 ============ */
+
+export function MessageIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M21 17a2 2 0 0 1-2 2H7l-4 3.2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" />
+    </Icon>
+  )
+}
+
+export function WrenchIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M15 7a3.5 3.5 0 0 1 4.6-3.3l-2.3 2.3 1.7 1.7 2.3-2.3A3.5 3.5 0 0 1 17.8 10l-8.6 8.6a2.1 2.1 0 0 1-3-3Z" />
+    </Icon>
+  )
+}
+
+export function TerminalIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <rect x="3" y="4" width="18" height="16" rx="2.5" />
+      <path d="m7.5 10 2.5 2.5-2.5 2.5" />
+      <path d="M13 15h4" />
+    </Icon>
+  )
+}
+
+export function SparklesIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M12 3.5 13.7 9l5.5 1.7-5.5 1.7L12 18l-1.7-5.6L4.8 10.7 10.3 9Z" />
+      <path d="M18.5 4v3M20 5.5h-3" />
+    </Icon>
+  )
+}
+
+/* ============ 业务模块（ai_agent_backend 四层模块） ============ */
+
+/** 智能体：机器人头 + 天线 */
+export function AgentIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <rect x="3.5" y="7" width="17" height="12.5" rx="3" />
+      <path d="M12 7V4.6" />
+      <circle cx="12" cy="3.6" r="1.4" />
+      <circle cx="8.7" cy="12.8" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="15.3" cy="12.8" r="1.2" fill="currentColor" stroke="none" />
+      <path d="M9.5 16.2c1.4 1.2 3.6 1.2 5 0" />
+    </Icon>
+  )
+}
+
+/** 会话管理：消息气泡 + 会话 */
+export function SessionIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M3 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9l-4 3.5V16a2 2 0 0 1-2-2Z" />
+      <path d="M7 7.5h10M7 11h6" />
+      <circle cx="17" cy="11" r="1.3" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
+/** 用户鉴权：用户 + 锁 */
+export function AuthIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <circle cx="7.5" cy="7" r="2.8" />
+      <path d="M2.5 19c0-3 2.2-5.5 5-5.5 1.8 0 3.4.8 4.3 2.1" />
+      <rect x="13.5" y="13.5" width="7.5" height="6.5" rx="1.5" />
+      <path d="M15.5 13.5v-2a1.8 1.8 0 0 1 3.6 0v2" />
+      <circle cx="17.3" cy="16.8" r="1" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
+/** 工具调用：芯片 + 闪电 */
+export function ToolIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <rect x="7" y="7" width="10" height="10" rx="2" />
+      <path d="M10 7V4M14 7V4M10 17v3M14 17v3M7 10H4M7 14H4M17 10h3M17 14h3" />
+      <path d="m12.8 9.5-2.6 3.1h1.7l-.6 2.4 2.9-3.3h-1.8z" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
+/** 知识库：打开的书 */
+export function KnowledgeBaseIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M12 6c-2-1.4-4.8-2-8-1.5V18c3.2-.5 6-.1 8 1.4 2-1.5 4.8-1.9 8-1.4V4.5c-3.2-.5-6 .1-8 1.5Z" />
+      <path d="M12 6v13.4" />
+      <path d="M6.5 8.5h3M6.5 11.5h3M14.5 8.5h3M14.5 11.5h3" />
+      <path d="M15.5 2.5h3v4.3l-1.5-1-1.5 1z" />
+    </Icon>
+  )
+}
+
+/** 知识图谱：实体节点 + 关系边 */
+export function GraphIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="m7.2 7.6 2.7 2.5M16.8 7.6l-2.7 2.5M12 15.2v1" />
+      <circle cx="5.5" cy="6" r="2.2" />
+      <circle cx="18.5" cy="6" r="2.2" />
+      <circle cx="12" cy="18" r="1.8" />
+      <circle cx="12" cy="12" r="3.1" />
+    </Icon>
+  )
+}
+
+/** 混合检索：漏斗 + 命中勾 */
+export function HybridSearchIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M3.5 5h17L14 12.5V19h-4v-6.5Z" />
+      <path d="M6.8 8.2h1.8M15.4 8.2h1.8" />
+      <path d="m9.3 10.6 1.7 1.7 3.4-3.4" />
+    </Icon>
+  )
+}
+
+/** 向量数据库：存储桶 + 向量点 */
+export function VectorStoreIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <ellipse cx="12" cy="5" rx="7" ry="2.5" />
+      <path d="M5 5v13c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V5" />
+      <path d="M5 11.5c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5" />
+      <circle cx="12" cy="8.2" r="1.5" />
+    </Icon>
+  )
+}
+
+/** 记忆系统：分层记忆 */
+export function MemoryLayersIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <rect x="3" y="3.5" width="18" height="4.5" rx="1.5" />
+      <rect x="3" y="9.5" width="18" height="4.5" rx="1.5" />
+      <rect x="3" y="15.5" width="18" height="4.5" rx="1.5" />
+      <path d="M6 5.75h5M6 11.75h5M6 17.75h5" />
+      <circle cx="17.5" cy="5.75" r="1.3" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
+/** 断点续跑：回环续播 */
+export function ResumeIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M4.5 12a7.5 7.5 0 0 1 12.3-5.2" />
+      <path d="m17.2 3.5 0 3.7-3.7 0" />
+      <path d="M19.5 12a7.5 7.5 0 0 1-12.3 5.2" />
+      <path d="m6.8 20.5 0-3.7 3.7 0" />
+      <path d="m10.5 9.3 4.7 2.7-4.7 2.7z" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
+/** 研报生成：文档 + 图表。开启时描边加粗一档以区分状态。 */
+export function ReportGenerateIcon({ enabled = false, size }: IconProps & { enabled?: boolean }) {
+  return (
+    <Icon size={size}>
+      <path d="M6 3.5h7l5 5v12a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 20.5Z" strokeWidth={enabled ? 2 : 1.75} />
+      <path d="M13 3.5v5h5" />
+      <path d="M8 17.5v-3M12 17.5V12M16 17.5v-2.5" />
+      <path d="m7.5 10.5 2.3-1.9 1.7 1 2-2.2" />
+    </Icon>
+  )
+}
+
+/** 审核门禁：文档 + 放行勾 */
+export function ReviewGateIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H12l4 4.5V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 4 19Z" />
+      <path d="M12 3v4.5h4" />
+      <path d="M6 11h6M6 14h6M6 17h3" />
+      <circle cx="17" cy="16.5" r="3.5" />
+      <path d="m15.6 16.5 1.1 1.1 1.9-1.9" />
+    </Icon>
+  )
+}
+
+/** 异步任务：进度环 + 运行 */
+export function AsyncTaskIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 4a8 8 0 0 1 8 8" />
+      <path d="m10.5 8.7 5 3.3-5 3.3z" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
+/** 评测基线：靶心 + 实测命中 */
+export function EvalBaselineIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 12 14.2 9.8" />
+      <circle cx="14.6" cy="9.4" r="1.6" />
+    </Icon>
+  )
+}
+
+/* ============ 带状态的开关（保留 Lottie 动画） ============ */
 
 /** 知识库开关：合上的书 / 打开的书，动画与「智能搜索」地球开关同一套 Lottie 往返 */
 export { BookToggleIcon as KbIcon } from './BookToggleIcon'
-
-export function CopyIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">
-      <path d="M6.14929 4.02032C7.11197 4.02032 7.87983 4.02016 8.49597 4.07598C9.12128 4.13269 9.65792 4.25188 10.1415 4.53106C10.7202 4.8653 11.2008 5.3459 11.535 5.92462C11.8142 6.40818 11.9334 6.94481 11.9901 7.57012C12.0459 8.18625 12.0458 8.95419 12.0458 9.9168C12.0458 10.8795 12.0459 11.6473 11.9901 12.2635C11.9334 12.8888 11.8142 13.4254 11.535 13.909C11.2008 14.4877 10.7202 14.9683 10.1415 15.3025C9.65792 15.5817 9.12128 15.7009 8.49597 15.7576C7.87984 15.8134 7.11196 15.8133 6.14929 15.8133C5.18667 15.8133 4.41874 15.8134 3.80261 15.7576C3.1773 15.7009 2.64067 15.5817 2.1571 15.3025C1.5784 14.9683 1.09778 14.4877 0.76355 13.909C0.484366 13.4254 0.365184 12.8888 0.308472 12.2635C0.252649 11.6473 0.252808 10.8795 0.252808 9.9168C0.252808 8.95418 0.252664 8.18625 0.308472 7.57012C0.365184 6.94481 0.484366 6.40818 0.76355 5.92462C1.09777 5.34589 1.57839 4.86529 2.1571 4.53106C2.64067 4.25188 3.1773 4.13269 3.80261 4.07598C4.41874 4.02017 5.18666 4.02032 6.14929 4.02032ZM6.14929 5.37774C5.16181 5.37774 4.46634 5.37761 3.92566 5.42657C3.39434 5.47472 3.07859 5.56574 2.83582 5.70587C2.4632 5.92106 2.15354 6.2307 1.93835 6.60333C1.79823 6.8461 1.70721 7.16185 1.65906 7.69317C1.6101 8.23385 1.61023 8.92933 1.61023 9.9168C1.61023 10.9043 1.61009 11.5998 1.65906 12.1404C1.70721 12.6717 1.79823 12.9875 1.93835 13.2303C2.15356 13.6029 2.46321 13.9126 2.83582 14.1277C3.07859 14.2679 3.39434 14.3589 3.92566 14.407C4.46634 14.456 5.16182 14.4559 6.14929 14.4559C7.13682 14.4559 7.83224 14.456 8.37292 14.407C8.90425 14.3589 9.21999 14.2679 9.46277 14.1277C9.83535 13.9126 10.145 13.6029 10.3602 13.2303C10.5004 12.9875 10.5914 12.6717 10.6395 12.1404C10.6885 11.5998 10.6884 10.9043 10.6884 9.9168C10.6884 8.92934 10.6885 8.23384 10.6395 7.69317C10.5914 7.16185 10.5004 6.8461 10.3602 6.60333C10.1451 6.23071 9.83536 5.92107 9.46277 5.70587C9.21999 5.56574 8.90424 5.47472 8.37292 5.42657C7.83224 5.3776 7.13682 5.37774 6.14929 5.37774ZM9.80164 0.367975C10.7638 0.367975 11.5314 0.36788 12.1473 0.423639C12.7726 0.480307 13.3093 0.598759 13.7928 0.877741C14.3717 1.21192 14.8521 1.69355 15.1864 2.27227C15.4655 2.75574 15.5857 3.29164 15.6425 3.9168C15.6983 4.53301 15.6971 5.3016 15.6971 6.26446V7.82989C15.6971 8.29264 15.6989 8.58993 15.6649 8.84844C15.4668 10.3525 14.401 11.5738 12.9833 11.9988V10.5467C13.6973 10.1903 14.2105 9.49662 14.3192 8.67169C14.3387 8.52347 14.3407 8.3358 14.3407 7.82989V6.26446C14.3407 5.27706 14.3398 4.58149 14.2909 4.04083C14.2428 3.50968 14.1526 3.19372 14.0126 2.95098C13.7974 2.57849 13.4876 2.26869 13.1151 2.05352C12.8724 1.91347 12.5564 1.82237 12.0253 1.77423C11.4847 1.72528 10.7888 1.7254 9.80164 1.7254H7.71472C6.7562 1.72558 5.92665 2.27697 5.52332 3.07891H4.07019C4.54221 1.51132 5.9932 0.368186 7.71472 0.367975H9.80164Z" fill="currentColor" />
-    </svg>
-  )
-}
-
-
-export function CheckIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">
-      <path d="M15.0498 3.92579L8.49512 12.3818C8.25774 12.6881 8.04517 12.9645 7.84668 13.1689C7.63957 13.3823 7.38732 13.5841 7.04492 13.6719C6.86373 13.7183 6.6757 13.7346 6.48926 13.7197C6.13666 13.6915 5.8528 13.5355 5.6123 13.3604C5.38201 13.1926 5.12573 12.9567 4.83984 12.6953L1.03125 9.21289L1.96875 8.1875L5.77734 11.6699C6.08684 11.9529 6.27773 12.1249 6.43066 12.2363C6.50183 12.2882 6.54699 12.3135 6.57324 12.3252C6.58525 12.3305 6.59269 12.3322 6.5957 12.333C6.59802 12.3336 6.59961 12.334 6.59961 12.334C6.63317 12.3367 6.66758 12.3335 6.7002 12.3252C6.7002 12.3252 6.70211 12.3251 6.7041 12.3242C6.70698 12.3229 6.71348 12.319 6.72461 12.3115C6.74849 12.2956 6.78843 12.2642 6.84961 12.2012C6.98138 12.0654 7.13957 11.8628 7.39648 11.5313L13.9502 3.07422L15.0498 3.92579Z" fill="currentColor" />
-    </svg>
-  )
-}
-
-
-export function EditIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">
-      <path d="M9.94076 1.34942C10.7047 0.90231 11.6503 0.902415 12.4143 1.34942C12.7061 1.52015 12.9688 1.79118 13.3104 2.13284C13.6521 2.47448 13.9231 2.73721 14.0939 3.02894C14.5408 3.79294 14.5409 4.73856 14.0939 5.50251C13.9231 5.79415 13.652 6.05704 13.3104 6.39861L6.65932 13.0497C6.28068 13.4284 6.00695 13.7108 5.66543 13.9097C5.32391 14.1085 4.94315 14.2074 4.42705 14.3498L3.24394 14.6761C2.77527 14.8054 2.34538 14.9262 2.00131 14.9684C1.65196 15.0112 1.17964 15.0013 0.810764 14.6325C0.441921 14.2637 0.432107 13.7913 0.47486 13.442C0.517035 13.0979 0.6379 12.668 0.767181 12.1993L1.09352 11.0162C1.23588 10.5001 1.33481 10.1193 1.5336 9.77784C1.7325 9.43632 2.0149 9.1626 2.39355 8.78395L9.04466 2.13284C9.38625 1.79126 9.64911 1.52016 9.94076 1.34942ZM15.5427 14.8398H7.55223L8.96707 13.425H15.5427V14.8398ZM3.39382 9.78422C2.965 10.213 2.84244 10.3436 2.75709 10.49C2.67183 10.6366 2.61862 10.8079 2.45733 11.3925L2.13099 12.5756C2.00183 13.0439 1.92194 13.3419 1.88863 13.5536C2.10041 13.5204 2.39872 13.4416 2.86764 13.3123L4.05075 12.9859C4.63544 12.8246 4.80669 12.7715 4.95323 12.6862C5.09968 12.6008 5.23022 12.4783 5.65905 12.0494L10.721 6.98644L8.45577 4.72121L3.39382 9.78422ZM11.7 2.57079C11.3774 2.38198 10.9777 2.38198 10.6551 2.57079C10.5602 2.62647 10.4487 2.72931 10.0449 3.13311L9.45604 3.72094L11.7213 5.98617L12.3102 5.39833C12.7139 4.99457 12.8168 4.88307 12.8725 4.78818C13.0613 4.46561 13.0612 4.06585 12.8725 3.74326C12.8169 3.64827 12.7146 3.53752 12.3102 3.13311C11.9057 2.72863 11.795 2.6264 11.7 2.57079Z" fill="currentColor" />
-    </svg>
-  )
-}
-
-
-export function ChevronDownIcon() {
-  return (
-    <svg viewBox="0 0 14 14" width="18" height="18" fill="none" aria-hidden="true">
-      <g transform="rotate(180 7 7)">
-        <path d="M2.15137 8.5L2.57617 8.07617L5.30273 5.34863C5.55843 5.09294 5.78438 4.86618 5.98828 4.70215C6.20088 4.53117 6.44405 4.38244 6.75 4.33398C6.91565 4.30778 7.08435 4.30778 7.25 4.33398C7.55595 4.38244 7.79912 4.53117 8.01172 4.70215C8.21561 4.86618 8.44157 5.09294 8.69727 5.34863L11.4238 8.07617L11.8486 8.5L11 9.34863L10.5762 8.92383L7.84863 6.19727C7.57405 5.92269 7.40124 5.75152 7.25977 5.6377C7.12709 5.53096 7.07728 5.52187 7.0625 5.51953C7.02105 5.51297 6.97895 5.51297 6.9375 5.51953C6.92272 5.52187 6.87291 5.53096 6.74023 5.6377C6.59876 5.75152 6.42595 5.92268 6.15137 6.19727L3.42383 8.92383L3 9.34863L2.15137 8.5Z" fill="currentColor" />
-      </g>
-    </svg>
-  )
-}
-
-
-export function RefreshIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">
-      <path d="M7.92136 0.349152C10.3744 0.349234 12.5564 1.5052 13.9557 3.29894L15.1281 2.12759C15.3303 1.92546 15.6767 2.06943 15.6767 2.35538V5.53923C15.6766 5.71626 15.5329 5.85976 15.3559 5.86002H12.171C11.8854 5.8597 11.7426 5.51465 11.9443 5.31249L12.9641 4.29056C11.8237 2.74305 9.98908 1.74106 7.92136 1.74097C4.46436 1.74097 1.66233 4.543 1.66233 8C1.66233 11.457 4.46436 14.259 7.92136 14.259C11.3782 14.2589 14.1804 11.4569 14.1804 8H15.5722C15.5722 12.2251 12.1465 15.6507 7.92136 15.6508C3.69614 15.6508 0.270508 12.2252 0.270508 8C0.270508 3.77478 3.69614 0.349152 7.92136 0.349152Z" fill="currentColor" />
-    </svg>
-  )
-}
-
-
-export function WarningIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-      <circle cx="10" cy="10" r="10" fill="#ffb020" />
-      <path
-        d="M10 5.2v6.2"
-        stroke="#fff"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <circle cx="10" cy="14.6" r="1.2" fill="#fff" />
-    </svg>
-  );
-}
-
-export function CloseIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 16 16" width={size} height={size} fill="none" aria-hidden="true">
-      <path d="M14.1871 13.1265L13.1265 14.1872L1.81275 2.87347L2.87341 1.81281L14.1871 13.1265Z" fill="currentColor" />
-      <path d="M13.1265 1.81282L14.1871 2.87348L2.8734 14.1872L1.81274 13.1265L13.1265 1.81282Z" fill="currentColor" />
-    </svg>
-  )
-}
-
-
-export function MoreIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-      <circle cx="5" cy="12" r="1.7" fill="currentColor" />
-      <circle cx="12" cy="12" r="1.7" fill="currentColor" />
-      <circle cx="19" cy="12" r="1.7" fill="currentColor" />
-    </svg>
-  );
-}
-
-export function PlusIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">
-      <path
-        d="M8 3.5v9M3.5 8h9"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
-
-export function PaperclipIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="18" height="18" fill="none" aria-hidden="true">
-      <path d="M5.5498 9.75V5H6.9502V9.75C6.9502 10.3299 7.4201 10.7998 8 10.7998C8.5799 10.7998 9.0498 10.3299 9.0498 9.75V4.5C9.0498 2.9536 7.7964 1.7002 6.25 1.7002C4.7036 1.7002 3.4502 2.9536 3.4502 4.5V9.75C3.4502 12.2629 5.4871 14.2998 8 14.2998C10.5129 14.2998 12.5498 12.2629 12.5498 9.75V4H13.9502V9.75C13.9502 13.0361 11.2861 15.7002 8 15.7002C4.71391 15.7002 2.0498 13.0361 2.0498 9.75V4.5C2.04981 2.1804 3.9304 0.299806 6.25 0.299805C8.5696 0.299805 10.4502 2.1804 10.4502 4.5V9.75C10.4502 11.1031 9.3531 12.2002 8 12.2002C6.6469 12.2002 5.5498 11.1031 5.5498 9.75Z" fill="currentColor" />
-    </svg>
-  )
-}
-
-
-export function SendIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" aria-hidden="true">
-      <path d="M8.3125 0.980206C8.66767 1.05312 8.97902 1.2042 9.2627 1.43235C9.48724 1.613 9.73029 1.85795 9.97949 2.10716L14.707 6.8347L13.293 8.24876L9 3.95579V15.0417H7V3.95579L2.70703 8.24876L1.29297 6.8347L6.02051 2.10716C6.26971 1.85795 6.51277 1.613 6.7373 1.43235C6.97662 1.23988 7.28445 1.04404 7.6875 0.980206C7.8973 0.947029 8.1031 0.955183 8.3125 0.980206Z" fill="currentColor" />
-    </svg>
-  )
-}
-
-
-export function StopIcon() {
-  return (
-    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" aria-hidden="true">
-      <path d="M2 4.88C2 3.68009 2 3.08013 2.30557 2.65954C2.40426 2.52371 2.52371 2.40426 2.65954 2.30557C3.08013 2 3.68009 2 4.88 2H11.12C12.3199 2 12.9199 2 13.3405 2.30557C13.4763 2.40426 13.5957 2.52371 13.6944 2.65954C14 3.08013 14 3.68009 14 4.88V11.12C14 12.3199 14 12.9199 13.6944 13.3405C13.5957 13.4763 13.4763 13.5957 13.3405 13.6944C12.9199 14 12.3199 14 11.12 14H4.88C3.68009 14 3.08013 14 2.65954 13.6944C2.52371 13.5957 2.40426 13.4763 2.30557 13.3405C2 12.9199 2 12.3199 2 11.12V4.88Z" fill="currentColor" />
-    </svg>
-  )
-}
-
-
-export function TrashIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-      <path
-        d="M4 7h16M9 7V5a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 5v2m3 0-.8 12a2 2 0 0 1-2 1.9H8.8a2 2 0 0 1-2-1.9L6 7m4 4v6m4-6v6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-export function DownloadIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-      <path
-        d="M12 4v11m0 0 4.2-4.2M12 15l-4.2-4.2M5 19h14"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-export function TagIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-      <path
-        d="M3.5 12.2V5.5A2 2 0 0 1 5.5 3.5h6.7c.5 0 1 .2 1.4.6l6.3 6.3a2 2 0 0 1 0 2.8l-6.7 6.7a2 2 0 0 1-2.8 0l-6.3-6.3a2 2 0 0 1-.6-1.4Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-      <circle cx="8.3" cy="8.3" r="1.4" fill="currentColor" />
-    </svg>
-  );
-}
-
-/** 设置入口：齿轮。替换侧栏底部原来的「退出登录」直跳按钮。 */
-export function SettingsIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.7" />
-      <path
-        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-/** 记忆入口：书签，表示「被保留下来的内容」。 */
-export function MemoryIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" aria-hidden="true">
-      <path
-        d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-
-/** 研报开关：圆角文档折角 + 上升折线（端点带圆点），与「知识检索」书本图标同属
-    「文档容器 + 内部图形」语言。开启时浅蓝底 + 蓝描边，关闭时仅描边。 */
-export function ReportIcon({ enabled = false, size = 16 }: { enabled?: boolean; size?: number }) {
-  return (
-    <svg viewBox="0 0 16 16" width={size} height={size} fill="none" aria-hidden="true">
-      <path
-        d="M4 0.5a1.5 1.5 0 0 0-1.5 1.5v12A1.5 1.5 0 0 0 4 15.5h8a1.5 1.5 0 0 0 1.5-1.5V5.5L9 1H4.75"
-        fill={enabled ? 'currentColor' : 'none'}
-        fillOpacity={enabled ? 0.14 : 0}
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M9 1v4.5H13.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <polyline
-        points="5.2 11.6 7.1 9.4 8.6 10.6 10.9 8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="5.2" cy="11.6" r="0.95" fill="currentColor" />
-      <circle cx="7.1" cy="9.4" r="0.95" fill="currentColor" />
-      <circle cx="8.6" cy="10.6" r="0.95" fill="currentColor" />
-      <circle cx="10.9" cy="8" r="0.95" fill="currentColor" />
-    </svg>
-  );
-}
-

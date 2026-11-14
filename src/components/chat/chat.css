@@ -99,6 +99,8 @@
 
 .new-chat > svg {
   flex-shrink: 0;
+  width: 18px;
+  height: 18px;
 }
 
 .board-boot {
@@ -385,12 +387,6 @@
   cursor: pointer;
 }
 
-.history-more-icon {
-  width: 14px;
-  height: 14px;
-  display: block;
-}
-
 .history-more:hover {
   background: color-mix(in srgb, var(--row-bg) 82%, #0f1115 18%);
   color: #0f1115;
@@ -409,11 +405,8 @@
     0 12px 32px rgba(0, 0, 0, 0.08);
 }
 
-.history-menu-icon {
-  width: 16px;
-  height: 16px;
+.history-menu button svg {
   flex-shrink: 0;
-  display: block;
 }
 
 .history-menu button {
@@ -723,6 +716,14 @@
   color: #111827;
 }
 
+/* 顶部胶囊与侧栏折叠按钮里的图标固定 18px：
+   图标组件的默认尺寸是 16，这里按原设计放大一档，避免统一规范后变小。 */
+.header-capsule button svg,
+.sidebar-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
 .chat-header-title {
   min-width: 0;
   overflow: hidden;
@@ -899,6 +900,12 @@
 .jump-bottom:hover {
   color: #111827;
   background: #f8fafc;
+}
+
+/* 回到顶部/底部按钮里的箭头固定 18px（图标默认 16） */
+.jump-bottom svg {
+  width: 18px;
+  height: 18px;
 }
 
 .chat:has(.chat-header-title) .list-inner {
@@ -2598,6 +2605,12 @@ body.is-resizing-preview iframe {
   align-items: center;
   justify-content: center;
   color: #4d6bfe;
+}
+
+/* 菜单项图标固定 18px（图标默认 16），与原设计一致 */
+.composer-menu-icon svg {
+  width: 18px;
+  height: 18px;
 }
 
 .composer-menu-item.active .composer-menu-icon {

@@ -20,6 +20,9 @@ import {
 } from '../../api'
 import {
   BackIcon,
+  ChevronRightIcon,
+  GraphRefreshIcon,
+  JumpIcon,
   MoreIcon,
   PanelIcon,
   SearchIcon,
@@ -90,28 +93,6 @@ function graphBuildProgress(file: KbFile): {
 }
 
 /** 重建/构建按钮的图标：12px，比会话里的 RefreshIcon 小一号，list row 才不撑高 */
-function GraphRefreshIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
-      <path
-        d="M20 12a8 8 0 1 1-2.2-5.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M20 5v5h-5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
 /**
  * 实体体量分级。
  *
@@ -170,25 +151,6 @@ function chunkPos(chunk: KbChunk, isPdf = false): string {
 }
 
 /** 跳页入口的图标：12px，跟旁边的标题字号配 */
-function JumpIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="12"
-      height="12"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 12h14" />
-      <path d="M13 6l6 6-6 6" />
-    </svg>
-  )
-}
-
 /** 位置标注里的数字单独一段：两侧留白大一点，扫读时页码更跳出来 */
 function PageLabel({ label }: { label: string }) {
   // 形如 第12页 / 第134–135页 / 表3 / 第12页图表 / 第5段
@@ -1369,16 +1331,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                             aria-expanded={open}
                           >
                             <span className={`kb-gcaret${open ? ' is-open' : ''}`}>
-                              <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
-                                <path
-                                  d="M4.5 2.5 8 6l-3.5 3.5"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="1.5"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
+                              <ChevronRightIcon size={12} />
                             </span>
                             <span className="kb-ggroup-title">{group.label}</span>
                             <span className="kb-ggroup-count">{group.items.length}</span>
@@ -1429,16 +1382,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                           aria-expanded={todoOpen}
                         >
                           <span className={`kb-gcaret${todoOpen ? ' is-open' : ''}`}>
-                            <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
-                              <path
-                                d="M4.5 2.5 8 6l-3.5 3.5"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
+                            <ChevronRightIcon size={12} />
                           </span>
                           <span className="kb-ggroup-title">未构建图谱</span>
                           <span className="kb-ggroup-count">{graphTodo.length}</span>
@@ -1528,16 +1472,7 @@ export function KnowledgeBase({ onBack, canManage = false }: Props) {
                           aria-expanded={doneOpen}
                         >
                           <span className={`kb-gcaret${doneOpen ? ' is-open' : ''}`}>
-                            <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
-                              <path
-                                d="M4.5 2.5 8 6l-3.5 3.5"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
+                            <ChevronRightIcon size={12} />
                           </span>
                           <span className="kb-ggroup-title">已构建图谱</span>
                           <span className="kb-ggroup-count">{graphDone.length}</span>

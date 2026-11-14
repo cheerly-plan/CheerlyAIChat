@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   fetchInspectSessions,
   fetchInspectTurns,
@@ -8,7 +8,15 @@ import {
   type InspectTurn,
   type InspectUser,
 } from '../../api'
-import { CheckIcon, ChevronDownIcon } from '../chat/icons'
+import {
+  ArrowRightIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  MessageIcon,
+  SparklesIcon,
+  TerminalIcon,
+  WrenchIcon,
+} from '../chat/icons'
 import './trace.css'
 
 type Props = {
@@ -194,70 +202,6 @@ const STEP_LABEL: Record<string, string> = {
   llm: 'LLM 结果',
   tool: '工具',
   tool_result: '工具结果',
-}
-
-function Glyph({ children }: { children: ReactNode }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      width="16"
-      height="16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {children}
-    </svg>
-  )
-}
-
-function MessageIcon() {
-  return (
-    <Glyph>
-      <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z" />
-    </Glyph>
-  )
-}
-
-function WrenchIcon() {
-  return (
-    <Glyph>
-      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" />
-    </Glyph>
-  )
-}
-
-function TerminalIcon() {
-  return (
-    <Glyph>
-      <path d="m7 11 2-2-2-2" />
-      <path d="M11 13h4" />
-      <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-    </Glyph>
-  )
-}
-
-function SparklesIcon() {
-  return (
-    <Glyph>
-      <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
-      <path d="M20 2v4" />
-      <path d="M22 4h-4" />
-      <circle cx="4" cy="20" r="2" />
-    </Glyph>
-  )
-}
-
-function ArrowRightIcon() {
-  return (
-    <Glyph>
-      <path d="M5 12h14" />
-      <path d="m12 5 7 7-7 7" />
-    </Glyph>
-  )
 }
 
 function StepGlyph({ kind }: { kind: string }) {

@@ -14,8 +14,8 @@
 }
 
 .account-settings:hover {
-  color: #3b7bff;
-  background: rgba(59, 123, 255, 0.08);
+  color: #4d6bfe;
+  background: rgba(77, 107, 254, 0.08);
 }
 
 /* 账号 popup：锚定在侧栏底部账号栏上方，没有全屏蒙层。
@@ -164,120 +164,162 @@
   background: #eef0f3;
 }
 
+/* ===== 记忆弹窗 =====
+   风格取「扁平」：不用卡片包住列表，去掉背景色块与多层边框，
+   靠留白、分隔线和字重建立层次；颜色统一到全站主色 #4d6bfe。 */
+
 .session-dialog.memory-dialog {
-  width: min(680px, calc(100vw - 48px));
-  /* 用固定高度而不是 max-height：切 tab / 翻页时内容多少会变，
-     跟着内容伸缩会让整个弹窗上下「抽动」。固定高度 + 列表内部滚动，
-     切换时框体纹丝不动。小屏见底部媒体查询（改用 92dvh）。 */
-  height: min(86vh, 780px);
+  /* 固定高度：切 tab / 翻页时内容多少会变，跟着内容伸缩会让弹窗上下抽动 */
+  width: min(640px, calc(100vw - 48px));
+  height: min(84vh, 720px);
   max-height: calc(100vh - 48px);
-  padding: 20px 22px 16px;
+  padding: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   box-sizing: border-box;
 }
 
-.session-dialog.memory-dialog .session-dialog-head {
-  margin-bottom: 14px;
+/* ---- 头部 ---- */
+
+.memory-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 0;
   flex-shrink: 0;
 }
 
-.memory-subtitle {
-  margin: 3px 0 0;
-  color: #6b7280;
-  font-size: 12px;
+.memory-head-text h3 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
 }
+
+.memory-subtitle {
+  margin: 5px 0 0;
+  color: #8a909b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.memory-close {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  margin-top: -2px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #9aa1ac;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.memory-close:hover {
+  background: #f2f4f7;
+  color: #1f2937;
+}
+
+/* ---- 记忆开关：一行纯文本 + 开关，不占卡片 ---- */
 
 .memory-switch-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 12px 14px;
-  border: 1px solid #eef0f3;
-  border-radius: 12px;
-  background: #fafbfd;
+  margin: 14px 24px 0;
+  padding: 11px 14px;
+  border-radius: 10px;
+  background: #f7f8fa;
   flex-shrink: 0;
 }
 
-.memory-switch-text {
+.memory-switch-label {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-}
-
-.memory-switch-text strong {
+  gap: 2px;
   color: #1f2937;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
+  cursor: pointer;
 }
 
-.memory-switch-text span {
-  color: #6b7280;
+.memory-switch-label span {
+  color: #8a909b;
   font-size: 12px;
+  font-weight: 400;
 }
 
 .memory-switch {
   position: relative;
-  width: 40px;
-  height: 23px;
+  width: 38px;
+  height: 22px;
   flex-shrink: 0;
+  padding: 0;
   border: 0;
   border-radius: 999px;
   background: #d5d9e0;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.16s ease;
 }
 
 .memory-switch.on {
-  background: #3b7bff;
+  background: #4d6bfe;
 }
 
 .memory-switch > span {
   position: absolute;
   top: 3px;
   left: 3px;
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: #fff;
-  transition: transform 0.15s ease;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.16);
+  transition: transform 0.16s ease;
 }
 
 .memory-switch.on > span {
-  transform: translateX(17px);
+  transform: translateX(16px);
 }
 
 .memory-switch:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: default;
 }
 
+/* ---- 分类标签：下划线式，无卡片 ---- */
+
 .memory-tabs {
   display: flex;
-  gap: 4px;
-  margin-top: 16px;
+  gap: 20px;
+  margin: 16px 24px 0;
+  padding: 0 2px;
   border-bottom: 1px solid #eef0f3;
   flex-shrink: 0;
 }
 
 .memory-tab {
-  padding: 9px 14px;
+  position: relative;
+  padding: 0 0 10px;
   border: 0;
-  border-bottom: 2px solid transparent;
   background: transparent;
-  color: #6b7280;
+  color: #8a909b;
   font: inherit;
   font-size: 13px;
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: color 0.15s ease;
 }
 
-/* 选中态只换颜色、不改字重，也不加下划线之外的效果：
-   一旦字重变化，文字宽度会变，三个标签整体横向错位，切 tab 时像在「跳」。
-   这里用「加粗副本占位」的经典写法：把同一段文字用 400 和 600 叠在同一个
-   grid 格里，格子宽度由 600 那份决定 —— 显示哪一份都不会改变标签宽度。 */
+/* 选中态只换颜色与下划线，不改字重：
+   加粗会让文字变宽、标签整体横移，切 tab 时看起来像在跳。
+   这里用「同格叠一份加粗副本」占位，格子宽度由加粗那份决定。 */
 .memory-tab-label {
   display: inline-grid;
 }
@@ -290,7 +332,6 @@
 .memory-tab-label::before {
   content: attr(data-label);
   font-weight: 600;
-  -webkit-text-fill-color: transparent;
   visibility: hidden;
   pointer-events: none;
 }
@@ -299,28 +340,37 @@
   font-weight: 400;
 }
 
+.memory-tab:hover {
+  color: #4b5563;
+}
+
+.memory-tab.active {
+  color: #4d6bfe;
+}
+
 .memory-tab.active .memory-tab-label > span {
   font-weight: 600;
 }
 
-.memory-tab:hover {
-  color: #1f2937;
+.memory-tab.active::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: #4d6bfe;
 }
 
-.memory-tab.active {
-  border-bottom-color: #3b7bff;
-  color: #3b7bff;
-}
+/* ---- 工具条：提示文案 + 轻量文字按钮 ---- */
 
-/* 提示文案长短不一（最长那句两行、最短的一行），固定两行高度
-   让下方工具条和列表不会因为切 tab 而上下窜。 */
-.memory-tab-hint {
-  margin: 10px 0 0;
-  min-height: 2.9em;
-  color: #8a909b;
-  font-size: 12px;
-  line-height: 1.45;
-  flex-shrink: 0;
+.memory-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 0 24px;
 }
 
 .memory-toolbar {
@@ -328,299 +378,353 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 12px 0;
+  padding: 12px 0;
   flex-shrink: 0;
 }
 
-.memory-toolbar-right {
-  display: flex;
-  gap: 8px;
+.memory-hint {
+  min-width: 0;
+  overflow: hidden;
+  color: #8a909b;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.memory-btn {
+.memory-toolbar-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.memory-link {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 16px;
-  border-radius: 18px;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #1f2937;
+  gap: 5px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #5b6472;
   font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.memory-btn.small {
-  height: 32px;
-  padding: 0 12px;
   font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.memory-btn.ghost:hover:not(:disabled) {
-  background: #f5f7fb;
+.memory-link:hover:not(:disabled) {
+  background: #f2f4f7;
+  color: #4d6bfe;
 }
 
-.memory-btn.primary {
-  border-color: #3b7bff;
-  background: #3b7bff;
-  color: #fff;
-}
-
-.memory-btn.primary:hover:not(:disabled) {
-  background: #2f6bf0;
-}
-
-.memory-btn.danger-text {
-  color: #d5392f;
-}
-
-.memory-btn:disabled {
-  opacity: 0.5;
+.memory-link:disabled {
+  opacity: 0.45;
   cursor: default;
 }
 
+.memory-link svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---- 自然语言编辑 ---- */
+
 .memory-compose {
-  padding: 12px;
   margin-bottom: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #fafbfd;
   flex-shrink: 0;
 }
 
 .memory-textarea {
   width: 100%;
-  min-height: 68px;
-  padding: 10px 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  min-height: 74px;
+  padding: 11px 12px;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
   background: #fff;
-  color: #111827;
+  color: #1f2937;
   font: inherit;
   font-size: 13px;
   line-height: 1.6;
   resize: vertical;
-  outline: none;
   box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .memory-textarea:focus {
-  border-color: #3b7bff;
-}
-
-.memory-compose-hint {
-  margin: 8px 0 0;
-  color: #8a909b;
-  font-size: 11px;
+  outline: none;
+  border-color: #4d6bfe;
+  box-shadow: 0 0 0 3px rgba(77, 107, 254, 0.12);
 }
 
 .memory-compose-actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
   gap: 8px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
+
+.memory-compose-tip {
+  flex: 1;
+  min-width: 0;
+  color: #9aa1ac;
+  font-size: 12px;
+}
+
+/* ---- 按钮 ---- */
+
+.memory-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #1f2937;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.memory-btn.text {
+  color: #5b6472;
+}
+
+.memory-btn.text:hover:not(:disabled) {
+  background: #f2f4f7;
+}
+
+.memory-btn.primary {
+  background: #4d6bfe;
+  color: #fff;
+}
+
+.memory-btn.primary:hover:not(:disabled) {
+  background: #4059e0;
+}
+
+.memory-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ---- 列表：无外框，条目间只用细分隔线 ---- */
 
 .memory-list {
   flex: 1;
-  /* 不再设 min-height：弹窗高度已固定，列表吃掉剩余空间即可。
-     保留 min-height: 0 让 flex 子项能真正收缩（否则内容会把框撑破）。 */
   min-height: 0;
-  position: relative;
+  margin: 0 -24px;
+  padding: 0 24px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  border: 1px solid #eef0f3;
-  border-radius: 12px;
-}
-
-/* 加载新分类时压暗旧内容，替代整块替换成「正在加载…」 */
-.memory-items.is-dimmed {
-  opacity: 0.45;
+  border-top: 1px solid #f1f3f5;
   transition: opacity 0.12s ease;
 }
 
-.memory-loading-veil {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.35);
-  cursor: progress;
+/* 切分类 / 翻页时压暗旧内容，不整块替换成「正在加载…」 */
+.memory-list.is-loading {
+  opacity: 0.45;
 }
 
 .memory-empty {
-  padding: 40px 16px;
-  color: #9ca3af;
+  padding: 48px 16px;
+  color: #b0b5bf;
   font-size: 13px;
   text-align: center;
 }
 
 .memory-item {
-  padding: 12px 14px;
-  border-bottom: 1px solid #f1f2f5;
+  padding: 13px 0;
+  border-bottom: 1px solid #f4f5f7;
 }
 
 .memory-item:last-child {
   border-bottom: 0;
 }
 
-.memory-item .memory-compose {
-  margin-bottom: 0;
-}
-
 .memory-item-text {
   margin: 0;
   color: #1f2937;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.65;
   word-break: break-word;
 }
 
 .memory-item-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 6px;
-  color: #9ca3af;
+  display: block;
+  margin-top: 5px;
+  color: #b0b5bf;
   font-size: 11px;
 }
 
-.memory-item-actions {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
-}
+/* ---- 提示与错误 ---- */
 
-.memory-item-actions button {
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: #9ca3af;
-  cursor: pointer;
-}
-
-.memory-item-actions button:hover:not(:disabled) {
-  background: #f1f3f7;
-  color: #3b7bff;
-}
-
-.memory-item-actions button.danger:hover:not(:disabled) {
-  background: #fff1ef;
-  color: #d5392f;
-}
-
-.memory-item-actions button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-/* 写入链返回的处理说明（已写入 / 已删除 / 无需更新） */
-.memory-notice {
-  margin-top: 10px;
-  padding: 8px 12px;
+.memory-notice,
+.memory-error {
+  margin-bottom: 10px;
+  padding: 9px 12px;
   border-radius: 8px;
-  background: #eef7f1;
-  color: #2f6b4a;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.55;
   flex-shrink: 0;
+}
+
+.memory-notice {
+  background: #f0f9f3;
+  color: #2f6b4a;
 }
 
 .memory-error {
-  margin-top: 10px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: #fff1ef;
-  color: #b8322a;
-  font-size: 12px;
-  flex-shrink: 0;
+  background: #fff3f1;
+  color: #c0362c;
 }
+
+/* ---- 底部：分页 + 唯一的清空入口 ---- */
 
 .memory-footer {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 12px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 24px 16px;
+  border-top: 1px solid #f1f3f5;
   flex-shrink: 0;
 }
 
 .memory-pager {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 2px;
 }
 
-/* 页码固定宽度：1 位数和 2 位数不会让「下一页」左右横跳 */
+.memory-page-btn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #5b6472;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.memory-page-btn:hover:not(:disabled) {
+  background: #f2f4f7;
+  color: #1f2937;
+}
+
+.memory-page-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* 定宽 + 等宽数字：页数 1→2 位时按钮不横跳 */
 .memory-page-no {
-  min-width: 3.6em;
+  min-width: 62px;
   text-align: center;
-  color: #6b7280;
+  color: #8a909b;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
-.memory-clear-all {
-  margin-left: auto;
-  padding: 6px 4px;
+.memory-clear {
+  padding: 6px 8px;
   border: 0;
+  border-radius: 7px;
   background: transparent;
-  color: #b0b5bf;
+  color: #a8aeb8;
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.memory-clear-all:hover:not(:disabled) {
+.memory-clear:hover:not(:disabled) {
+  background: #fff1ef;
   color: #d5392f;
 }
 
-.memory-clear-all:disabled {
-  opacity: 0.5;
+.memory-clear:disabled {
+  opacity: 0.45;
   cursor: default;
 }
 
+/* ---- 小屏 ---- */
+
 @media (max-width: 600px) {
   .session-dialog.memory-dialog {
-    width: calc(100vw - 24px);
-    /* 小屏以 dvh 为准（移动端地址栏伸缩时 100vh 会跳），仍用固定高度保稳定 */
-    height: 92dvh;
-    max-height: 92dvh;
-    padding: 16px 14px 12px;
+    width: calc(100vw - 20px);
+    /* 用 dvh：移动端地址栏伸缩时 100vh 会跳 */
+    height: 90dvh;
+    max-height: 90dvh;
+  }
+
+  .memory-head,
+  .memory-switch-row,
+  .memory-tabs {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .memory-head {
+    padding: 18px 16px 0;
+  }
+
+  .memory-switch-row {
+    margin-left: 16px;
+    margin-right: 16px;
+    margin-top: 12px;
+  }
+
+  .memory-tabs {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+
+  .memory-panel {
+    padding: 0 16px;
+  }
+
+  .memory-list {
+    margin: 0 -16px;
+    padding: 0 16px;
   }
 
   .memory-toolbar {
     flex-wrap: wrap;
+    gap: 8px;
   }
 
-  .memory-tab-hint {
-    min-height: auto;
+  .memory-hint {
+    flex-basis: 100%;
+    white-space: normal;
+  }
+
+  .memory-compose-actions {
+    flex-wrap: wrap;
+  }
+
+  .memory-compose-tip {
+    flex-basis: 100%;
   }
 
   .memory-footer {
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  /* 小屏把「清除全部记忆」单独放一行，避免和分页按钮挤在一起换行错位 */
-  .memory-clear-all {
-    flex-basis: 100%;
-    margin-left: 0;
-    text-align: left;
+    padding: 10px 16px 14px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .memory-tab,
-  .memory-tab .memory-tab-label,
-  .memory-items.is-dimmed {
+  .memory-switch,
+  .memory-switch > span,
+  .memory-list {
     transition: none;
   }
 }

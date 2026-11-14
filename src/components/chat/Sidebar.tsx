@@ -1,14 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { DEFAULT_SESSION_TITLE } from '../../api'
-import copyIcon from '../../assets/copy.svg'
-import deleteIcon from '../../assets/delete.svg'
-import optionsIcon from '../../assets/options.svg'
-import renameIcon from '../../assets/rename.svg'
 import type { SessionInfo } from '../../types'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { MemoryDialog } from '../settings/MemoryDialog'
 import { SettingsPopup } from '../settings/SettingsPopup'
-import { CloseIcon, NewChatIcon, PanelIcon, SettingsIcon } from './icons'
+import { CloseIcon, CopyIcon, EditIcon, MoreIcon, NewChatIcon, PanelIcon, SettingsIcon, TrashIcon } from './icons'
 
 type Props = {
   onNewChat: () => void
@@ -311,7 +307,7 @@ function HistoryItem({
             else onOpenMenu()
           }}
         >
-          <img src={optionsIcon} alt="" className="history-more-icon" />
+          <MoreIcon size={14} />
         </button>
       </div>
       {menuOpen && menuPos ? (
@@ -322,16 +318,16 @@ function HistoryItem({
           style={{ top: menuPos.top, left: menuPos.left }}
         >
           <button type="button" role="menuitem" onClick={onStartRename}>
-            <img src={renameIcon} alt="" className="history-menu-icon" />
+            <EditIcon size={16} />
             重命名
           </button>
           <button type="button" role="menuitem" onClick={() => void copyName()}>
-            <img src={copyIcon} alt="" className="history-menu-icon" />
+            <CopyIcon size={16} />
             复制名称
           </button>
           <div className="history-menu-sep" />
           <button type="button" role="menuitem" className="danger" onClick={onDelete}>
-            <img src={deleteIcon} alt="" className="history-menu-icon" />
+            <TrashIcon size={16} />
             删除
           </button>
         </div>
