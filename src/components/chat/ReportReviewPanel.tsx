@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   batchApproveReportReviews,
   decideReportReview,
-  fetchReportReviews,
+  fetchActionableReviews,
   finalizeReportReview,
 } from '../../api'
 import type { ReportReviewItem, ReportReviewRecord } from '../../types'
@@ -61,7 +61,7 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
 
   useEffect(() => {
     let cancelled = false
-    fetchReportReviews('pending')
+    fetchActionableReviews()
       .then((data) => {
         if (cancelled) return
         setError('')
@@ -81,7 +81,7 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
   }, [reportId])
 
   async function refresh() {
-    setRecords(await fetchReportReviews('pending'))
+    setRecords(await fetchActionableReviews())
     setSelected([])
   }
 
@@ -197,8 +197,12 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
                       </span>
                     </div>
                     <p className="report-review-item-meta">
-                      待处置 {record.pending_items ?? 0} 项 · 创建{' '}
-                      {formatTime(record.created_at)}
+                      {record.status === 'approved'
+                        ? // 已批准但还没定稿：明确告诉用户下一步做什么，
+                          // 否则「待处置 0 项」会让人以为没活可干
+                          '待审项已全部批准，点「定稿」完成发布'
+                        : `待处置 ${record.pending_items ?? 0} 项`}{' '}
+                      · 创建 {formatTime(record.created_at)}
                     </p>
 
                     {pending.length ? (

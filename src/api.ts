@@ -615,6 +615,22 @@ export async function fetchReportReviews(
   return data.items ?? []
 }
 
+/**
+ * 待处置的审核记录：既要「待审核」（还没批），也要「已批准待定稿」。
+ *
+ * 只查 pending 的话，点完批准记录变成 approved，会立刻从列表里消失——
+ * 用户就找不到定稿入口了（实测就是这个问题）。
+ */
+export async function fetchActionableReviews(): Promise<ReportReviewRecord[]> {
+  const [pending, approved, rejected] = await Promise.all([
+    fetchReportReviews('pending'),
+    fetchReportReviews('approved'),
+    fetchReportReviews('rejected'),
+  ])
+  // 待审核 → 待定稿 → 被驳回（驳回的要留在这里，用户才能「退回待审」）
+  return [...pending, ...approved, ...rejected]
+}
+
 export async function fetchReportReview(
   reportId: string,
 ): Promise<ReportReviewRecord> {
