@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import {
-  batchApproveReportReviews,
   decideReportReview,
   fetchReviewGroups,
   finalizeReportReview,
@@ -48,7 +47,6 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState('')
   const [notes, setNotes] = useState<Record<string, string>>({})
-  const [selected, setSelected] = useState<string[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -73,7 +71,6 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
 
   async function refresh() {
     setGroups(await fetchReviewGroups())
-    setSelected([])
   }
 
   async function act(layer: ReportReviewLayer, action: 'approve' | 'reject' | 'reset') {
@@ -98,27 +95,6 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
       await refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : '定稿失败')
-    } finally {
-      setBusy('')
-    }
-  }
-
-  async function approveSelected() {
-    if (!selected.length) return
-    setBusy('batch')
-    setError('')
-    try {
-      const result = await batchApproveReportReviews(selected)
-      const skipped = result.skipped ?? []
-      if (skipped.length) {
-        setError(
-          `${result.approved.length} 份已确认，${skipped.length} 份未处理：` +
-            skipped.map((item) => item.reason).join('；'),
-        )
-      }
-      await refresh()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '批量确认失败')
     } finally {
       setBusy('')
     }
@@ -160,13 +136,6 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
 
         {!loading && groups.length ? (
           <>
-            <BatchBar
-              groups={groups}
-              selected={selected}
-              busy={busy}
-              onChange={setSelected}
-              onApprove={() => void approveSelected()}
-            />
             <ul className="report-review-list">
               {groups.map((group) => (
                 <GroupCard
@@ -342,49 +311,5 @@ function GroupCard({
         ) : null}
       </div>
     </li>
-  )
-}
-
-/** 批量确认条：只列可整批确认的层。 */
-function BatchBar({
-  groups,
-  selected,
-  busy,
-  onChange,
-  onApprove,
-}: {
-  groups: ReportReviewGroup[]
-  selected: string[]
-  busy: string
-  onChange: (ids: string[]) => void
-  onApprove: () => void
-}) {
-  const eligible = groups
-    .map((group) => group.deep)
-    .filter((layer): layer is ReportReviewLayer => Boolean(layer?.batch_approvable))
-  if (!eligible.length) return null
-  const ids = eligible.map((layer) => layer.review_id)
-  const allSelected = ids.every((id) => selected.includes(id))
-
-  return (
-    <div className="report-review-batch">
-      <label className="report-review-batch-head">
-        <input
-          type="checkbox"
-          checked={allSelected}
-          onChange={() => onChange(allSelected ? [] : ids)}
-          aria-label="全选可批量确认的探断层"
-        />
-        <span>可批量确认 {eligible.length} 份推断层</span>
-      </label>
-      <button
-        type="button"
-        className="report-review-batch-btn"
-        disabled={!selected.length || busy === 'batch'}
-        onClick={onApprove}
-      >
-        {busy === 'batch' ? '确认中…' : `确认选中 ${selected.length} 份`}
-      </button>
-    </div>
   )
 }
