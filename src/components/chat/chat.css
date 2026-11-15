@@ -2986,6 +2986,12 @@ body.is-resizing-preview iframe {
   line-height: 1.4;
   color: #0f172a;
   letter-spacing: -0.005em;
+  /* 长标题不能把右侧关闭按钮挤出去：flex 子项默认 min-width:auto，
+     内容撑破后整个 header 溢出，关闭按钮被推到可视区外 */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .report-preview-meta {
