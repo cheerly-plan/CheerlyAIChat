@@ -143,7 +143,7 @@ export function Composer({
             disabled={loading}
             onClick={() => setMenuOpen((open) => !open)}
           >
-            <PlusIcon />
+            <PlusIcon size={24} />
           </button>
           {/* 常驻开关：智能搜索 */}
           <button
