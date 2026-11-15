@@ -126,9 +126,6 @@ export function ReportJobCard({ jobId, delivery }: Props) {
       <div className="report-job-head">
         <span className="report-job-dot" aria-hidden="true" />
         <span className="report-job-title">{title}</span>
-        <span className="report-job-id" title={`job_id=${jobId}`}>
-          #{jobId.slice(0, 8)}
-        </span>
       </div>
 
       {error ? (

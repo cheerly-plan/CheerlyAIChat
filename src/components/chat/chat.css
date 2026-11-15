@@ -2852,12 +2852,6 @@ body.is-resizing-preview iframe {
   font-weight: 600;
 }
 
-.report-job-id {
-  margin-left: auto;
-  color: #98a2b3;
-  font-size: 11px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
 
 .report-job-stage {
   margin: 8px 0 0;
