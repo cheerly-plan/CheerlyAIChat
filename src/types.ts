@@ -122,6 +122,10 @@ export type ReportReviewItem = {
   period?: string
   quote?: string
   state: string
+  /** 条目种类：deep_pdf / number / citation / other */
+  kind?: string
+  /** 能否整批确认；数字与出处问题必须逐条核对 */
+  batchable?: boolean
   reviewer?: string
   note?: string
   decided_at?: string
@@ -149,6 +153,10 @@ export type ReportReviewRecord = {
   finalizable?: boolean
   gate_reason?: string
   pending_items?: number
+  /** 待审条目详情：列表页据此直接展示「在审什么」，不必点进详情 */
+  pending_list?: ReportReviewItem[]
+  /** 待审条目是否全部属于可整批确认的种类（如推断层 PDF 的整体确认） */
+  batch_approvable?: boolean
   finalized_by?: string
   finalized_at?: string
 }

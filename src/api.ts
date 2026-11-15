@@ -649,6 +649,25 @@ export async function decideReportReview(
 }
 
 /** 定稿：校验未过/仍有待审项/被驳回/内容被改动一律 409（管理员）。 */
+/** 跨报告批量确认（仅限可整批确认的条目，如推断层 PDF 的整体确认）。 */
+export async function batchApproveReportReviews(reportIds: string[]): Promise<{
+  approved: string[]
+  skipped: { report_id: string; reason: string }[]
+}> {
+  const response = await authedFetch('/v1/report/reviews/batch-approve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ report_ids: reportIds }),
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '批量确认失败'))
+  }
+  return (await response.json()) as {
+    approved: string[]
+    skipped: { report_id: string; reason: string }[]
+  }
+}
+
 export async function finalizeReportReview(
   reportId: string,
 ): Promise<ReportReviewRecord> {

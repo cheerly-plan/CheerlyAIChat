@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import {
+  batchApproveReportReviews,
   decideReportReview,
   fetchReportReview,
   fetchReportReviews,
   finalizeReportReview,
 } from '../../api'
-import type { ReportReviewRecord } from '../../types'
+import type { ReportReviewItem, ReportReviewRecord } from '../../types'
 import { CloseIcon } from './icons'
 import { useReportPreview } from './ReportPreviewContext'
 
@@ -22,11 +23,97 @@ const ITEM_STATE_LABEL: Record<string, string> = {
   rejected: '已驳回',
 }
 
+/** 条目种类 → 一句人话。列表里要让用户不点进去也知道在审什么。 */
+const ITEM_KIND_LABEL: Record<string, string> = {
+  deep_pdf: '推断层确认',
+  number: '未核对数字',
+  citation: '出处缺失',
+  other: '其他',
+}
+
+/** 推断层 PDF 那条 reason 很长，列表里只留核心诉求。 */
+const DEEP_PDF_HINT = '含大模型推断结论，需确认标注与免责声明完整性'
+
+function itemHint(item: ReportReviewItem): string {
+  if (item.kind === 'deep_pdf') return DEEP_PDF_HINT
+  if (item.kind === 'number' && item.value) return `正文出现未核对数字 ${item.value}`
+  if (item.kind === 'citation' && item.name) {
+    return `${item.subject || ''} ${item.name}=${item.value || ''} 缺出处`.trim()
+  }
+  return item.reason
+}
+
 function formatTime(value?: string): string {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+/**
+ * 批量确认条。
+ *
+ * 只有全部待审项都属于可整批确认的种类（目前是推断层 PDF 的整体确认）
+ * 才允许勾选；含具体数字/出处问题的报告必须逐条核对，这里不给勾。
+ */
+function BatchBar({
+  records,
+  selected,
+  busy,
+  onChange,
+  onApprove,
+}: {
+  records: ReportReviewRecord[]
+  selected: string[]
+  busy: string
+  onChange: (ids: string[]) => void
+  onApprove: () => void
+}) {
+  const eligible = records.filter((r) => r.batch_approvable).map((r) => r.report_id)
+  if (!eligible.length) return null
+  const allSelected = eligible.every((id) => selected.includes(id))
+  const toggleAll = () =>
+    onChange(allSelected ? [] : eligible)
+  const toggle = (id: string) =>
+    onChange(
+      selected.includes(id)
+        ? selected.filter((x) => x !== id)
+        : [...selected, id],
+    )
+
+  return (
+    <div className="report-review-batch">
+      <label className="report-review-batch-head">
+        <input
+          type="checkbox"
+          checked={allSelected}
+          onChange={toggleAll}
+          aria-label="全选可批量确认的研报"
+        />
+        <span>可批量确认 {eligible.length} 份</span>
+      </label>
+      <div className="report-review-batch-list">
+        {eligible.map((id) => (
+          <label key={id} className="report-review-batch-row">
+            <input
+              type="checkbox"
+              checked={selected.includes(id)}
+              onChange={() => toggle(id)}
+            />
+            <span>{records.find((r) => r.report_id === id)?.title}</span>
+          </label>
+        ))}
+      </div>
+      <button
+        type="button"
+        className="report-review-batch-btn"
+        disabled={!selected.length || busy === 'batch'}
+        onClick={onApprove}
+      >
+        {busy === 'batch' ? '确认中…' : `确认选中 ${selected.length} 份`}
+      </button>
+    </div>
+  )
 }
 
 /** 研报审核面板：待审队列 → 详情 → 批准/驳回/定稿（全部走 M2 硬门禁）。 */
@@ -39,6 +126,7 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState('')
   const [note, setNote] = useState('')
+  const [selected, setSelected] = useState<string[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -76,6 +164,28 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
       setNote('')
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function approveSelected() {
+    if (!selected.length) return
+    setBusy('batch')
+    setError('')
+    try {
+      const result = await batchApproveReportReviews(selected)
+      const skipped = result.skipped ?? []
+      if (skipped.length) {
+        setError(
+          `${result.approved.length} 份已确认，${skipped.length} 份未处理：` +
+            skipped.map((s) => s.reason).join('；'),
+        )
+      }
+      setSelected([])
+      setRecords(await fetchReportReviews('pending'))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '批量确认失败')
     } finally {
       setBusy('')
     }
@@ -136,26 +246,54 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
 
         {!loading && !selectedId ? (
           records.length ? (
-            <ul className="report-review-list">
-              {records.map((record) => (
-                <li key={record.report_id}>
-                  <button
-                    type="button"
-                    className="report-review-item"
-                    onClick={() => setSelectedId(record.report_id)}
-                  >
-                    <span className="report-review-item-title">{record.title}</span>
-                    <span className="report-review-item-meta">
-                      {record.report_id} · 待处置 {record.pending_items ?? 0} 项 ·{' '}
-                      {formatTime(record.created_at)}
-                    </span>
-                    <span className={`report-review-badge is-${record.status}`}>
-                      {STATUS_LABEL[record.status] ?? record.status}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <BatchBar
+                records={records}
+                selected={selected}
+                busy={busy}
+                onChange={setSelected}
+                onApprove={() => void approveSelected()}
+              />
+              <ul className="report-review-list">
+                {records.map((record) => (
+                  <li key={record.report_id}>
+                    <button
+                      type="button"
+                      className="report-review-item"
+                      onClick={() => setSelectedId(record.report_id)}
+                    >
+                      <span className="report-review-item-title">
+                        {record.title}
+                      </span>
+                      {record.pending_list?.length ? (
+                        <span className="report-review-item-pending">
+                          {record.pending_list.slice(0, 2).map((item) => (
+                            <span key={item.id} className="report-review-pending-row">
+                              <span className={`report-review-kind is-${item.kind}`}>
+                                {ITEM_KIND_LABEL[item.kind ?? 'other'] ?? '其他'}
+                              </span>
+                              {itemHint(item)}
+                            </span>
+                          ))}
+                          {record.pending_list.length > 2 ? (
+                            <span className="report-review-pending-more">
+                              另有 {record.pending_list.length - 2} 项
+                            </span>
+                          ) : null}
+                        </span>
+                      ) : null}
+                      <span className="report-review-item-meta">
+                        待处置 {record.pending_items ?? 0} 项 ·{' '}
+                        {formatTime(record.created_at)}
+                      </span>
+                      <span className={`report-review-badge is-${record.status}`}>
+                        {STATUS_LABEL[record.status] ?? record.status}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : (
             <div className="report-review-empty">
               <p>当前没有待审核的研报</p>
