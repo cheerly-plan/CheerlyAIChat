@@ -3610,7 +3610,9 @@ body.is-resizing-preview iframe {
 }
 
 .report-review-item-title {
-  padding-right: 70px;
+  /* 原来留 70px 是给绝对定位的徽标让位；徽标改成 flex 项后不再需要，
+     留着只会把标题挤窄 */
+  min-width: 0;
   font-size: 13.5px;
   font-weight: 600;
   line-height: 1.45;
@@ -3621,8 +3623,8 @@ body.is-resizing-preview iframe {
 .report-review-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: 6px;
+  padding: 10px 12px;
   border: 1px solid #e4e7ec;
   border-radius: 10px;
   background: #fff;
@@ -3642,14 +3644,6 @@ body.is-resizing-preview iframe {
   margin-top: 2px;
 }
 
-.report-review-pending {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
 
 
 .report-review-note {
@@ -3674,19 +3668,7 @@ body.is-resizing-preview iframe {
   margin: 2px 0 4px;
 }
 
-.report-review-pending-row {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 12px;
-  color: #475467;
-  line-height: 1.45;
-}
 
-.report-review-pending-more {
-  font-size: 11.5px;
-  color: #98a2b3;
-}
 
 .report-review-kind {
   flex: none;
@@ -3708,13 +3690,74 @@ body.is-resizing-preview iframe {
   color: #b42318;
 }
 
+/* 层区块：底稿/推断层各自一行，待审明细缩进归属 */
+.report-review-layers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.report-review-layer {
+  padding-left: 8px;
+  border-left: 2px solid #e4e7ec;
+}
+
+.report-review-layer:has(.is-need) {
+  border-left-color: #f79009;
+}
+
+.report-review-layer-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.report-review-layer-name {
+  flex: none;
+  min-width: 42px;
+  font-weight: 600;
+  color: #344054;
+}
+
+.report-review-layer-state {
+  color: #067647;
+}
+
+.report-review-layer-state.is-need {
+  color: #b54708;
+  font-weight: 600;
+}
+
+.report-review-layer-items {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: #475467;
+  line-height: 1.45;
+}
+
+.report-review-layer-items li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
 /* 批量确认 */
 .report-review-batch {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  margin-bottom: 10px;
+  gap: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
   border: 1px solid #e4e7ec;
   border-radius: 10px;
   background: #fafbfc;
@@ -3770,9 +3813,10 @@ body.is-resizing-preview iframe {
 }
 
 .report-review-badge {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+  /* 卡片头里的一行徽标，不要绝对定位：它原来 position: absolute 但父级
+     .report-review-card-head 没有 position: relative，于是相对整个侧栏
+     定位，飘到面板右上角把关闭按钮盖住了。用 flex 的右端对齐即可。 */
+  flex-shrink: 0;
   padding: 2px 8px;
   border-radius: 999px;
   background: #fffaeb;

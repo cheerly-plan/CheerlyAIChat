@@ -9,13 +9,6 @@ import type { ReportReviewGroup, ReportReviewItem, ReportReviewLayer } from '../
 import { CloseIcon } from './icons'
 import { useReportPreview } from './ReportPreviewContext'
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: '待审核',
-  approved: '已批准',
-  rejected: '已驳回',
-  finalized: '已定稿',
-}
-
 const ITEM_KIND_LABEL: Record<string, string> = {
   deep_pdf: '推断层确认',
   number: '未核对数字',
@@ -39,13 +32,6 @@ function formatTime(value?: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return date.toLocaleString('zh-CN', { hour12: false })
-}
-
-/** 一层的状态徽标文案。 */
-function layerBadge(layer: ReportReviewLayer | null): string {
-  if (!layer) return '无'
-  if (layer.pending_items > 0) return `${layer.pending_items} 项待确认`
-  return STATUS_LABEL[layer.status] ?? layer.status
 }
 
 /**
@@ -262,36 +248,43 @@ function GroupCard({
       </div>
       <p className="report-review-item-meta">创建 {formatTime(group.created_at)}</p>
 
-      <ul className="report-review-pending">
+      {/* 只列需要用户关注的层：底稿校验通过会自动定稿，已完成时无需占位。
+          gate_reason 也不显示——它复述的是「仍有 N 条待人工审核」这类
+          和上面状态徽标重复的信息。 */}
+      <ul className="report-review-layers">
         {layers
-          .filter((item) => item.layer)
-          .map(({ key, label, layer }) => (
-            <li key={key} className="report-review-pending-row">
-              <span className={`report-review-kind is-${layer!.pending_items ? 'number' : 'other'}`}>
-                {label}
-              </span>
-              <span>{layerBadge(layer)}</span>
-            </li>
-          ))}
+          .filter(({ layer }) => layer && layer.status !== 'finalized')
+          .map(({ key, label, layer }) => {
+            const need = Boolean(layer!.pending_items)
+            return (
+              <li key={key} className="report-review-layer">
+                <div className="report-review-layer-head">
+                  <span className="report-review-layer-name">{label}</span>
+                  <span
+                    className={`report-review-layer-state${need ? ' is-need' : ''}`}
+                  >
+                    {need ? `⚠ ${layer!.pending_items} 项待确认` : '已批准，可定稿'}
+                  </span>
+                </div>
+                {need && layer!.pending_list?.length ? (
+                  <ul className="report-review-layer-items">
+                    {layer!.pending_list.map((item) => (
+                      <li key={item.id}>
+                        <span className={`report-review-kind is-${item.kind}`}>
+                          {ITEM_KIND_LABEL[item.kind ?? 'other'] ?? '其他'}
+                        </span>
+                        {itemHint(item)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </li>
+            )
+          })}
       </ul>
 
-      {pendingLayer?.pending_list?.length ? (
-        <ul className="report-review-pending">
-          {pendingLayer.pending_list.map((item) => (
-            <li key={item.id} className="report-review-pending-row">
-              <span className={`report-review-kind is-${item.kind}`}>
-                {ITEM_KIND_LABEL[item.kind ?? 'other'] ?? '其他'}
-              </span>
-              <span>{itemHint(item)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {group.next_action !== 'finalized' && group.next_action !== 'rejected' ? (
-        <p className="report-review-gate-line">
-          定稿条件：{toFinalize?.gate_reason || pendingLayer?.gate_reason || '—'}
-        </p>
+      {group.next_action === 'finalized' ? (
+        <p className="report-review-item-meta">已完成审核与定稿</p>
       ) : null}
 
       {rejectedLayer ? (
