@@ -1,4 +1,4 @@
-import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, ChatSource, MemoryMessage, ReportJob, ReportReviewRecord, SessionInfo, SessionTitle, UserInfo } from './types'
+import type { AuthResponse, ChatEvent, ChatMemory, ChatMessage, ChatSource, MemoryMessage, ReportJob, ReportReviewGroup, ReportReviewRecord, SessionInfo, SessionTitle, UserInfo } from './types'
 
 export const CHAT_MEMORY_PAGE_SIZE = 20
 export const DEFAULT_SESSION_TITLE = '新会话'
@@ -615,20 +615,16 @@ export async function fetchReportReviews(
   return data.items ?? []
 }
 
-/**
- * 待处置的审核记录：既要「待审核」（还没批），也要「已批准待定稿」。
- *
- * 只查 pending 的话，点完批准记录变成 approved，会立刻从列表里消失——
- * 用户就找不到定稿入口了（实测就是这个问题）。
- */
-export async function fetchActionableReviews(): Promise<ReportReviewRecord[]> {
-  const [pending, approved, rejected] = await Promise.all([
-    fetchReportReviews('pending'),
-    fetchReportReviews('approved'),
-    fetchReportReviews('rejected'),
-  ])
-  // 待审核 → 待定稿 → 被驳回（驳回的要留在这里，用户才能「退回待审」）
-  return [...pending, ...approved, ...rejected]
+/** 按报告聚合的审核视图：一份报告一条，底稿与推断层各一层。 */
+export async function fetchReviewGroups(): Promise<ReportReviewGroup[]> {
+  const response = await authedFetch('/v1/report/review-groups', {
+    headers: authHeaders(),
+  })
+  if (!response.ok) {
+    throw new Error(await errorMessage(response, '获取审核队列失败'))
+  }
+  const data = (await response.json()) as { items?: ReportReviewGroup[] }
+  return data.items ?? []
 }
 
 export async function fetchReportReview(

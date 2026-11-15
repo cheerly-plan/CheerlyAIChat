@@ -160,3 +160,29 @@ export type ReportReviewRecord = {
   finalized_by?: string
   finalized_at?: string
 }
+
+/** 按报告聚合的审核视图的一层（底稿或推断层） */
+export type ReportReviewLayer = {
+  review_id: string
+  status: string
+  finalizable: boolean
+  gate_reason: string
+  pending_items: number
+  pending_list?: ReportReviewItem[]
+  batch_approvable?: boolean
+  finalized_by?: string
+}
+
+/**
+ * 按报告聚合的审核视图：一份报告一条，底稿与推断层各一层。
+ * next_action 告诉 UI 下一步该显示哪个按钮。
+ */
+export type ReportReviewGroup = {
+  report_id: string
+  title: string
+  created_at: string
+  base: ReportReviewLayer | null
+  deep: ReportReviewLayer | null
+  next_action: 'approve_deep' | 'approve_base' | 'finalize' | 'finalized' | 'rejected' | 'waiting' | 'none'
+  finalizable: boolean
+}

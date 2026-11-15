@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import {
   batchApproveReportReviews,
   decideReportReview,
-  fetchActionableReviews,
+  fetchReviewGroups,
   finalizeReportReview,
 } from '../../api'
-import type { ReportReviewItem, ReportReviewRecord } from '../../types'
+import type { ReportReviewGroup, ReportReviewItem, ReportReviewLayer } from '../../types'
 import { CloseIcon } from './icons'
 import { useReportPreview } from './ReportPreviewContext'
 
@@ -16,7 +16,6 @@ const STATUS_LABEL: Record<string, string> = {
   finalized: '已定稿',
 }
 
-/** 条目种类 → 一句人话。列表里直接说明在审什么。 */
 const ITEM_KIND_LABEL: Record<string, string> = {
   deep_pdf: '推断层确认',
   number: '未核对数字',
@@ -24,7 +23,6 @@ const ITEM_KIND_LABEL: Record<string, string> = {
   other: '其他',
 }
 
-/** 推断层 PDF 那条 reason 很长，列表里只留核心诉求。 */
 const DEEP_PDF_HINT = '含大模型推断结论，需确认标注与免责声明完整性'
 
 function itemHint(item: ReportReviewItem): string {
@@ -43,16 +41,23 @@ function formatTime(value?: string): string {
   return date.toLocaleString('zh-CN', { hour12: false })
 }
 
+/** 一层的状态徽标文案。 */
+function layerBadge(layer: ReportReviewLayer | null): string {
+  if (!layer) return '无'
+  if (layer.pending_items > 0) return `${layer.pending_items} 项待确认`
+  return STATUS_LABEL[layer.status] ?? layer.status
+}
+
 /**
- * 研报审核面板。
+ * 研报审核面板：**按报告组织**，一份报告一张卡。
  *
- * 列表本身就是操作界面：每条直接列出待审内容、批注框与处置按钮，
- * 不再有「详情页」。原来要先点进去才看得到在审什么、才能批准或定稿，
- * 而点进去看到的信息和列表能提供的是同一批——多一跳没有任何信息增量。
+ * 底稿与推断层在后端是两条独立审核记录（底稿可自动定稿、推断层必须人工审），
+ * 但用户眼里是同一份报告。按记录平铺会看到一堆同名条目、也不知道下一步做什么，
+ * 所以列表按报告分组，卡片内显示两层各自的状态。
  */
 export function ReportReviewPanel({ reportId }: { reportId?: string }) {
   const { close, canReview } = useReportPreview()
-  const [records, setRecords] = useState<ReportReviewRecord[]>([])
+  const [groups, setGroups] = useState<ReportReviewGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState('')
@@ -61,11 +66,11 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
 
   useEffect(() => {
     let cancelled = false
-    fetchActionableReviews()
+    fetchReviewGroups()
       .then((data) => {
         if (cancelled) return
         setError('')
-        setRecords(data)
+        setGroups(data)
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -81,19 +86,16 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
   }, [reportId])
 
   async function refresh() {
-    setRecords(await fetchActionableReviews())
+    setGroups(await fetchReviewGroups())
     setSelected([])
   }
 
-  async function act(
-    record: ReportReviewRecord,
-    action: 'approve' | 'reject' | 'reset',
-  ) {
-    setBusy(`${record.report_id}:${action}`)
+  async function act(layer: ReportReviewLayer, action: 'approve' | 'reject' | 'reset') {
+    setBusy(`${layer.review_id}:${action}`)
     setError('')
     try {
-      await decideReportReview(record.report_id, action, (notes[record.report_id] ?? '').trim())
-      setNotes((prev) => ({ ...prev, [record.report_id]: '' }))
+      await decideReportReview(layer.review_id, action, (notes[layer.review_id] ?? '').trim())
+      setNotes((prev) => ({ ...prev, [layer.review_id]: '' }))
       await refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败')
@@ -102,11 +104,11 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
     }
   }
 
-  async function finalize(record: ReportReviewRecord) {
-    setBusy(`${record.report_id}:finalize`)
+  async function finalize(layer: ReportReviewLayer) {
+    setBusy(`${layer.review_id}:finalize`)
     setError('')
     try {
-      await finalizeReportReview(record.report_id)
+      await finalizeReportReview(layer.review_id)
       await refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : '定稿失败')
@@ -137,9 +139,7 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
   }
 
   const title = canReview ? '研报审核' : '我的研报审核'
-  const subtitle = canReview
-    ? `${records.length} 份待人工处置`
-    : `我生成的研报里 ${records.length} 份待处置`
+  const subtitle = `${groups.length} 份报告`
 
   return (
     <aside
@@ -153,9 +153,7 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
           <div className="report-preview-row">
             <span className="report-preview-name">{title}</span>
           </div>
-          <div className="report-preview-meta">
-            {subtitle ? <span>{subtitle}</span> : null}
-          </div>
+          <div className="report-preview-meta">{subtitle}</div>
         </div>
         <div className="report-preview-actions">
           <button
@@ -174,118 +172,34 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
         {error ? <p className="report-review-error">{error}</p> : null}
         {loading ? <p className="report-review-status">正在加载…</p> : null}
 
-        {!loading && records.length ? (
+        {!loading && groups.length ? (
           <>
             <BatchBar
-              records={records}
+              groups={groups}
               selected={selected}
               busy={busy}
               onChange={setSelected}
               onApprove={() => void approveSelected()}
             />
             <ul className="report-review-list">
-              {records.map((record) => {
-                const pending = record.pending_list ?? []
-                const id = record.report_id
-                const working = busy.startsWith(`${id}:`)
-                return (
-                  <li key={id} className="report-review-card">
-                    <div className="report-review-card-head">
-                      <span className="report-review-item-title">{record.title}</span>
-                      <span className={`report-review-badge is-${record.status}`}>
-                        {STATUS_LABEL[record.status] ?? record.status}
-                      </span>
-                    </div>
-                    <p className="report-review-item-meta">
-                      {record.status === 'approved'
-                        ? // 已批准但还没定稿：明确告诉用户下一步做什么，
-                          // 否则「待处置 0 项」会让人以为没活可干
-                          '待审项已全部批准，点「定稿」完成发布'
-                        : `待处置 ${record.pending_items ?? 0} 项`}{' '}
-                      · 创建 {formatTime(record.created_at)}
-                    </p>
-
-                    {pending.length ? (
-                      <ul className="report-review-pending">
-                        {pending.map((item) => (
-                          <li key={item.id} className="report-review-pending-row">
-                            <span className={`report-review-kind is-${item.kind}`}>
-                              {ITEM_KIND_LABEL[item.kind ?? 'other'] ?? '其他'}
-                            </span>
-                            <span>{itemHint(item)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-
-                    {record.gate_reason ? (
-                      <p className="report-review-gate-line">
-                        定稿条件：{record.gate_reason}
-                      </p>
-                    ) : null}
-
-                    {/* 只有被驳回时才需要写明原因，其余情况不强制 */}
-                    {record.status === 'rejected' ? (
-                      <input
-                        className="report-review-note"
-                        placeholder="批注（可选）"
-                        value={notes[id] ?? ''}
-                        onChange={(event) =>
-                          setNotes((prev) => ({ ...prev, [id]: event.target.value }))
-                        }
-                      />
-                    ) : null}
-
-                    <div className="report-review-card-actions">
-                      {(record.pending_items ?? 0) > 0 ? (
-                        <button
-                          type="button"
-                          className="report-review-btn"
-                          disabled={working}
-                          onClick={() => void act(record, 'approve')}
-                        >
-                          {busy === `${id}:approve`
-                            ? '处理中…'
-                            : `批准 ${record.pending_items} 项`}
-                        </button>
-                      ) : null}
-                      {record.status === 'rejected' ? (
-                        <button
-                          type="button"
-                          className="report-review-btn"
-                          disabled={working}
-                          onClick={() => void act(record, 'reset')}
-                        >
-                          退回待审
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="report-review-btn"
-                          disabled={working}
-                          onClick={() => void act(record, 'reject')}
-                        >
-                          驳回
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="report-review-btn primary"
-                        disabled={working || !record.finalizable}
-                        title={record.finalizable ? '' : record.gate_reason}
-                        onClick={() => void finalize(record)}
-                      >
-                        {busy === `${id}:finalize` ? '定稿中…' : '定稿'}
-                      </button>
-                    </div>
-                  </li>
-                )
-              })}
+              {groups.map((group) => (
+                <GroupCard
+                  key={group.report_id}
+                  group={group}
+                  busy={busy}
+                  note={notes}
+                  onNote={(id, value) =>
+                    setNotes((prev) => ({ ...prev, [id]: value }))
+                  }
+                  onAct={act}
+                  onFinalize={finalize}
+                />
+              ))}
             </ul>
           </>
         ) : null}
 
-        {!loading && !records.length ? (
+        {!loading && !groups.length ? (
           <div className="report-review-empty">
             <p>当前没有待审核的研报</p>
             <p className="report-review-empty-hint">
@@ -294,39 +208,170 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
           </div>
         ) : null}
       </div>
-
     </aside>
   )
 }
 
-/**
- * 批量确认条。
- *
- * 只有全部待审项都属于可整批确认的种类（目前是推断层 PDF 的整体确认）
- * 才允许勾选；含具体数字/出处问题的报告必须逐条核对，这里不给勾。
- */
+/** 一份报告一张卡：标题 + 两层状态 + 下一步动作。 */
+function GroupCard({
+  group,
+  busy,
+  note,
+  onNote,
+  onAct,
+  onFinalize,
+}: {
+  group: ReportReviewGroup
+  busy: string
+  note: Record<string, string>
+  onNote: (id: string, value: string) => void
+  onAct: (layer: ReportReviewLayer, action: 'approve' | 'reject' | 'reset') => Promise<void>
+  onFinalize: (layer: ReportReviewLayer) => Promise<void>
+}) {
+  const layers: { key: string; label: string; layer: ReportReviewLayer | null }[] = [
+    { key: 'base', label: '底稿', layer: group.base },
+    { key: 'deep', label: '推断层', layer: group.deep },
+  ]
+  const target =
+    group.next_action === 'approve_deep'
+      ? group.deep
+      : group.next_action === 'approve_base'
+        ? group.base
+        : null
+  const pendingLayer = target ?? group.deep ?? group.base
+  const toFinalize =
+    group.next_action === 'finalize'
+      ? [group.base, group.deep].find(
+          (l) => l && l.finalizable && l.status !== 'finalized',
+        ) ?? null
+      : null
+  const rejectedLayer = [group.base, group.deep].find((l) => l?.status === 'rejected') ?? null
+  const working = busy.startsWith(`${pendingLayer?.review_id ?? ''}:`)
+
+  return (
+    <li className="report-review-card">
+      <div className="report-review-card-head">
+        <span className="report-review-item-title">{group.title}</span>
+        <span className={`report-review-badge is-${group.next_action === 'finalized' ? 'finalized' : 'pending'}`}>
+          {group.next_action === 'finalized'
+            ? '已完成'
+            : group.next_action === 'rejected'
+              ? '已驳回'
+              : '待处理'}
+        </span>
+      </div>
+      <p className="report-review-item-meta">创建 {formatTime(group.created_at)}</p>
+
+      <ul className="report-review-pending">
+        {layers
+          .filter((item) => item.layer)
+          .map(({ key, label, layer }) => (
+            <li key={key} className="report-review-pending-row">
+              <span className={`report-review-kind is-${layer!.pending_items ? 'number' : 'other'}`}>
+                {label}
+              </span>
+              <span>{layerBadge(layer)}</span>
+            </li>
+          ))}
+      </ul>
+
+      {pendingLayer?.pending_list?.length ? (
+        <ul className="report-review-pending">
+          {pendingLayer.pending_list.map((item) => (
+            <li key={item.id} className="report-review-pending-row">
+              <span className={`report-review-kind is-${item.kind}`}>
+                {ITEM_KIND_LABEL[item.kind ?? 'other'] ?? '其他'}
+              </span>
+              <span>{itemHint(item)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {group.next_action !== 'finalized' && group.next_action !== 'rejected' ? (
+        <p className="report-review-gate-line">
+          定稿条件：{toFinalize?.gate_reason || pendingLayer?.gate_reason || '—'}
+        </p>
+      ) : null}
+
+      {rejectedLayer ? (
+        <input
+          className="report-review-note"
+          placeholder="批注（可选）"
+          value={note[rejectedLayer.review_id] ?? ''}
+          onChange={(event) => onNote(rejectedLayer.review_id, event.target.value)}
+        />
+      ) : null}
+
+      <div className="report-review-card-actions">
+        {target && target.pending_items > 0 ? (
+          <button
+            type="button"
+            className="report-review-btn"
+            disabled={working}
+            onClick={() => void onAct(target, 'approve')}
+          >
+            {busy === `${target.review_id}:approve`
+              ? '处理中…'
+              : `批准 ${target.pending_items} 项`}
+          </button>
+        ) : null}
+        {toFinalize ? (
+          <button
+            type="button"
+            className="report-review-btn primary"
+            disabled={working || !toFinalize.finalizable}
+            title={toFinalize.gate_reason}
+            onClick={() => void onFinalize(toFinalize)}
+          >
+            {busy === `${toFinalize.review_id}:finalize` ? '定稿中…' : '定稿'}
+          </button>
+        ) : null}
+        {group.next_action === 'rejected' && rejectedLayer ? (
+          <button
+            type="button"
+            className="report-review-btn"
+            disabled={working}
+            onClick={() => void onAct(rejectedLayer, 'reset')}
+          >
+            退回待审
+          </button>
+        ) : null}
+        {pendingLayer && group.next_action !== 'finalized' && group.next_action !== 'rejected' ? (
+          <button
+            type="button"
+            className="report-review-btn"
+            disabled={working}
+            onClick={() => void onAct(pendingLayer, 'reject')}
+          >
+            驳回
+          </button>
+        ) : null}
+      </div>
+    </li>
+  )
+}
+
+/** 批量确认条：只列可整批确认的层。 */
 function BatchBar({
-  records,
+  groups,
   selected,
   busy,
   onChange,
   onApprove,
 }: {
-  records: ReportReviewRecord[]
+  groups: ReportReviewGroup[]
   selected: string[]
   busy: string
   onChange: (ids: string[]) => void
   onApprove: () => void
 }) {
-  const eligible = records
-    .filter((record) => record.batch_approvable)
-    .map((record) => record.report_id)
+  const eligible = groups
+    .map((group) => group.deep)
+    .filter((layer): layer is ReportReviewLayer => Boolean(layer?.batch_approvable))
   if (!eligible.length) return null
-  const allSelected = eligible.every((id) => selected.includes(id))
-  const toggle = (id: string) =>
-    onChange(
-      selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id],
-    )
+  const ids = eligible.map((layer) => layer.review_id)
+  const allSelected = ids.every((id) => selected.includes(id))
 
   return (
     <div className="report-review-batch">
@@ -334,23 +379,11 @@ function BatchBar({
         <input
           type="checkbox"
           checked={allSelected}
-          onChange={() => onChange(allSelected ? [] : eligible)}
-          aria-label="全选可批量确认的研报"
+          onChange={() => onChange(allSelected ? [] : ids)}
+          aria-label="全选可批量确认的探断层"
         />
-        <span>可批量确认 {eligible.length} 份</span>
+        <span>可批量确认 {eligible.length} 份推断层</span>
       </label>
-      <div className="report-review-batch-list">
-        {eligible.map((id) => (
-          <label key={id} className="report-review-batch-row">
-            <input
-              type="checkbox"
-              checked={selected.includes(id)}
-              onChange={() => toggle(id)}
-            />
-            <span>{records.find((r) => r.report_id === id)?.title}</span>
-          </label>
-        ))}
-      </div>
       <button
         type="button"
         className="report-review-batch-btn"
