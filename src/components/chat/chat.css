@@ -3691,51 +3691,57 @@ body.is-resizing-preview iframe {
 }
 
 /* 层区块：底稿/推断层各自一行，待审明细缩进归属 */
-.report-review-layers {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+
+
+
+
+
+
+
+
+
+/* 状态提示块：一句话说清这份报告卡在哪、下一步做什么 */
+.report-review-callout {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border-left: 3px solid #d0d5dd;
+  background: #f9fafb;
 }
 
-.report-review-layer {
-  padding-left: 8px;
-  border-left: 2px solid #e4e7ec;
-}
-
-.report-review-layer:has(.is-need) {
+.report-review-callout.is-todo {
   border-left-color: #f79009;
+  background: #fffbf1;
 }
 
-.report-review-layer-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 12px;
-  line-height: 1.5;
+.report-review-callout.is-ready {
+  border-left-color: #4d6bfe;
+  background: #f5f7ff;
 }
 
-.report-review-layer-name {
-  flex: none;
-  min-width: 42px;
+.report-review-callout.is-rejected {
+  border-left-color: #d92d20;
+  background: #fef3f2;
+}
+
+.report-review-callout.is-done {
+  border-left-color: #12b76a;
+  background: #f0fdf6;
+}
+
+.report-review-callout-title {
+  margin: 0;
+  font-size: 12.5px;
   font-weight: 600;
   color: #344054;
+  line-height: 1.45;
 }
 
-.report-review-layer-state {
-  color: #067647;
-}
-
-.report-review-layer-state.is-need {
-  color: #b54708;
-  font-weight: 600;
-}
-
-.report-review-layer-items {
+.report-review-callout-items {
   list-style: none;
-  margin: 2px 0 0;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -3745,10 +3751,17 @@ body.is-resizing-preview iframe {
   line-height: 1.45;
 }
 
-.report-review-layer-items li {
+.report-review-callout-items li {
   display: flex;
   align-items: baseline;
   gap: 6px;
+}
+
+/* 卡片头右侧的日期 */
+.report-review-item-date {
+  flex: none;
+  font-size: 11.5px;
+  color: #98a2b3;
 }
 
 /* 批量确认 */
