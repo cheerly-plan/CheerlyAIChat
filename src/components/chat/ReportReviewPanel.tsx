@@ -200,7 +200,7 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
                   {step.kind === 'approve' ? (
                     <div className="report-review-callout is-todo">
                       <p className="report-review-callout-title">
-                        {step.layer.pending_items} 项需要确认
+                        {step.layer.pending_items} 项待确认
                       </p>
                       <ul className="report-review-callout-items">
                         {step.layer.pending_list?.map((item) => (
@@ -208,7 +208,9 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
                             <span className={`report-review-kind is-${item.kind}`}>
                               {ITEM_KIND_LABEL[item.kind ?? 'other'] ?? '其他'}
                             </span>
-                            {itemHint(item)}
+                            <span className="report-review-item-hint">
+                              {itemHint(item)}
+                            </span>
                           </li>
                         ))}
                       </ul>
@@ -218,7 +220,7 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
                   {step.kind === 'finalize' ? (
                     <div className="report-review-callout is-ready">
                       <p className="report-review-callout-title">
-                        已确认，发布会生成可下载的 PDF
+                        待发布
                       </p>
                     </div>
                   ) : null}
@@ -226,7 +228,7 @@ export function ReportReviewPanel({ reportId }: { reportId?: string }) {
                   {step.kind === 'rejected' ? (
                     <div className="report-review-callout is-rejected">
                       <p className="report-review-callout-title">
-                        已驳回，不可发布
+                        已驳回
                       </p>
                     </div>
                   ) : null}

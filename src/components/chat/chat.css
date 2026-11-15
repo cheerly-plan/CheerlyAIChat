@@ -3558,20 +3558,66 @@ body.is-resizing-preview iframe {
 }
 
 
-/* ===== 研报审核面板（M2 人工审核） ===== */
+/* ===== 研报审核面板：对齐项目卡片规范（白卡片 / 16px 标题 / 36px 按钮） ===== */
+
+/* 复用预览外壳：审核是列表，宽度固定、标题单行、不要毛玻璃 */
+.report-review.report-preview {
+  width: 480px;
+  max-width: 45vw;
+  box-shadow: -8px 0 24px rgba(15, 23, 42, 0.05);
+}
+
+.report-review .report-preview-bar {
+  height: 56px;
+  min-height: 0;
+  padding: 0 14px 0 20px;
+  gap: 10px;
+  border-bottom: 1px solid #e9ecf1;
+  background: #fff;
+  backdrop-filter: none;
+}
+
+.report-review .report-preview-heading {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.report-review .report-preview-name {
+  flex: 0 1 auto;
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.report-review .report-preview-meta {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #f1f3f7;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.report-review .report-preview-meta:empty {
+  display: none;
+}
+
+/* 浅灰底让白卡片浮起来，层级靠底色而不是一堆边框 */
 .report-review-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 14px 16px 32px;
-  background: #fbfcfe;
+  padding: 18px 20px 32px;
+  background: #f7f8fa;
 }
 
 .report-review-status,
 .report-review-error {
-  margin: 12px 4px;
-  font-size: 13px;
-  color: #667085;
+  margin: 24px 4px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #6b7280;
 }
 
 .report-review-error {
@@ -3584,295 +3630,234 @@ body.is-resizing-preview iframe {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
-.report-review-item {
-  position: relative;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px 14px;
-  border: 1px solid #e6e9f2;
-  border-radius: 12px;
-  background: #fff;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.report-review-item:hover {
-  border-color: #c7d2f8;
-  box-shadow: 0 4px 14px rgba(77, 107, 254, 0.08);
-}
-
-.report-review-item-title {
-  /* 原来留 70px 是给绝对定位的徽标让位；徽标改成 flex 项后不再需要，
-     留着只会把标题挤窄 */
-  min-width: 0;
-  font-size: 13.5px;
-  font-weight: 600;
-  line-height: 1.45;
-  color: #101828;
-}
-
-/* 列表即操作界面：每份报告是一张卡，待审内容与按钮都在卡里 */
 .report-review-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
-  border: 1px solid #e4e7ec;
-  border-radius: 10px;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #e6e9ef;
+  border-radius: 14px;
   background: #fff;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
 }
 
 .report-review-card-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 12px;
+}
+
+.report-review-item-title {
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #111827;
+  overflow-wrap: anywhere;
+}
+
+.report-review-item-date {
+  flex: none;
+  padding-top: 2px;
+  font-size: 12px;
+  color: #8a909c;
+}
+
+/* 状态收成一枚小徽标：颜色只出现在徽标里，不做整块彩色底 */
+.report-review-callout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 10px;
 }
 
-.report-review-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 2px;
+.report-review-callout-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f1f3f7;
+  color: #4b5563;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
+.report-review-callout-title::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.8;
+}
 
+.report-review-callout.is-todo .report-review-callout-title,
+.report-review-callout.is-ready .report-review-callout-title {
+  background: #e8edff;
+  color: #3452c4;
+}
+
+.report-review-callout.is-rejected .report-review-callout-title {
+  background: #fee9e7;
+  color: #b42318;
+}
+
+.report-review-callout.is-done .report-review-callout-title {
+  background: #e4f7ec;
+  color: #067647;
+}
+
+/* 待审明细独立成浅灰块，标题与说明各占一列，长文本换行也不串位 */
+.report-review-callout-items {
+  list-style: none;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 10px;
+  background: #f8f9fb;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #344054;
+}
+
+.report-review-callout-items li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.report-review-item-hint {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.report-review-kind {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid #dfe4ec;
+  border-radius: 6px;
+  background: #fff;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
 
 .report-review-note {
+  box-sizing: border-box;
   width: 100%;
-  padding: 6px 8px;
-  border: 1px solid #e4e7ec;
-  border-radius: 8px;
-  font-size: 12.5px;
-  color: #344054;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #111827;
+  font: inherit;
+  font-size: 13.5px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.report-review-note::placeholder {
+  color: #9aa0a6;
 }
 
 .report-review-note:focus {
   outline: none;
   border-color: #4d6bfe;
+  box-shadow: 0 0 0 3px rgba(77, 107, 254, 0.1);
 }
 
-/* 列表里的待审条目：不点进详情也要能看出「在审什么」 */
-.report-review-item-pending {
+/* 操作区用一条极淡的线把「信息」和「动作」分开 */
+.report-review-card-actions {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 2px 0 4px;
-}
-
-
-
-.report-review-kind {
-  flex: none;
-  padding: 1px 6px;
-  border-radius: 4px;
-  font-size: 11px;
-  background: #f2f4f7;
-  color: #667085;
-}
-
-.report-review-kind.is-deep_pdf {
-  background: #eef2ff;
-  color: #4d6bfe;
-}
-
-.report-review-kind.is-number,
-.report-review-kind.is-citation {
-  background: #fef3f2;
-  color: #b42318;
-}
-
-/* 层区块：底稿/推断层各自一行，待审明细缩进归属 */
-
-
-
-
-
-
-
-
-
-/* 状态提示块：一句话说清这份报告卡在哪、下一步做什么 */
-.report-review-callout {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 7px 10px;
-  border-radius: 8px;
-  border-left: 3px solid #d0d5dd;
-  background: #f9fafb;
-}
-
-.report-review-callout.is-todo {
-  border-left-color: #f79009;
-  background: #fffbf1;
-}
-
-.report-review-callout.is-ready {
-  border-left-color: #4d6bfe;
-  background: #f5f7ff;
-}
-
-.report-review-callout.is-rejected {
-  border-left-color: #d92d20;
-  background: #fef3f2;
-}
-
-.report-review-callout.is-done {
-  border-left-color: #12b76a;
-  background: #f0fdf6;
-}
-
-.report-review-callout-title {
-  margin: 0;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #344054;
-  line-height: 1.45;
-}
-
-.report-review-callout-items {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  font-size: 12px;
-  color: #475467;
-  line-height: 1.45;
-}
-
-.report-review-callout-items li {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-/* 卡片头右侧的日期 */
-.report-review-item-date {
-  flex: none;
-  font-size: 11.5px;
-  color: #98a2b3;
-}
-
-/* 批量确认 */
-
-
-.report-review-badge {
-  /* 卡片头里的一行徽标，不要绝对定位：它原来 position: absolute 但父级
-     .report-review-card-head 没有 position: relative，于是相对整个侧栏
-     定位，飘到面板右上角把关闭按钮盖住了。用 flex 的右端对齐即可。 */
-  flex-shrink: 0;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #fffaeb;
-  color: #b54708;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.report-review-badge.is-approved,
-.report-review-badge.is-finalized {
-  background: #ecfdf3;
-  color: #067647;
-}
-
-.report-review-badge.is-rejected {
-  background: #fef3f2;
-  color: #b42318;
-}
-
-.report-review-empty {
-  padding: 48px 16px;
-  text-align: center;
-  font-size: 13px;
-  color: #667085;
-}
-
-.report-review-empty-hint {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: #98a2b3;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-.report-review-note {
-  box-sizing: border-box;
-  width: 100%;
-  padding: 9px 11px;
-  border: 1px solid #e6e9f2;
-  border-radius: 10px;
-  background: #fff;
-  color: #344054;
-  font: inherit;
-  font-size: 12.5px;
-  line-height: 1.5;
-  resize: vertical;
-}
-
-.report-review-actions {
-  display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
-  padding-top: 2px;
+  padding-top: 14px;
+  border-top: 1px solid #eef0f3;
 }
 
 .report-review-btn {
-  padding: 8px 14px;
-  border: 1px solid #e6e9f2;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid #d5d9e0;
   border-radius: 10px;
   background: #fff;
   color: #344054;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .report-review-btn:hover:not(:disabled) {
-  border-color: #c7d2f8;
-  color: #3d5bf5;
+  background: #f7f8fa;
+  border-color: #d1d5db;
+  color: #111827;
 }
 
 .report-review-btn.primary {
   border-color: #4d6bfe;
   background: #4d6bfe;
   color: #fff;
+  box-shadow: 0 4px 12px rgba(77, 107, 254, 0.18);
 }
 
 .report-review-btn.primary:hover:not(:disabled) {
   background: #3c5bf2;
+  border-color: #3c5bf2;
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(77, 107, 254, 0.24);
+}
+
+.report-review-btn:focus-visible {
+  outline: 2px solid #4d6bfe;
+  outline-offset: 2px;
 }
 
 .report-review-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.55;
   cursor: default;
 }
 
-.report-review-done {
-  font-size: 12.5px;
+.report-review-empty {
+  padding: 72px 24px;
+  text-align: center;
+  font-size: 14px;
+  color: #475467;
+}
+
+.report-review-empty > p:first-child {
+  margin: 0;
+  font-size: 14px;
   font-weight: 600;
-  color: #067647;
+  color: #111827;
+}
+
+.report-review-empty-hint {
+  max-width: 260px;
+  margin: 8px auto 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #98a2b3;
 }
